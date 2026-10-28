@@ -64,6 +64,7 @@ def apply() -> None:
     _patch_full_screen()
     _patch_screen_edges()
     _patch_splitters()
+    _patch_docks()
     _patch_update_check()
     _patch_page_html()
 
@@ -403,6 +404,12 @@ def _patch_splitters() -> None:
 
     QSplitter.addWidget = add_widget
     QSplitter.insertWidget = insert_widget
+
+
+def _patch_docks() -> None:
+    from . import maindocks
+
+    maindocks.install()
 
 
 def _patch_page_html() -> None:
