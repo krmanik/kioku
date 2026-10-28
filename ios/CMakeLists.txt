@@ -42,6 +42,8 @@ set(RUST_LIBS
     ${DEPS}/sdist/orjson-${ORJSON_VERSION}/target/${RUST_TARGET}/release/liborjson.a
     ${DEPS}/sdist/rpds_py-${RPDS_VERSION}/target/${RUST_TARGET}/release/librpds.a
 )
+# PyMuPDF's pymupdf._mupdf and pymupdf._extra (shared/tools/build_pymupdf.sh)
+set(PYMUPDF_LIB ${CMAKE_SOURCE_DIR}/../build/pymupdf/ios/lib/libpymupdf.a)
 
 # app icon (shared/tools/make_icon.py), compiled by Xcode's asset catalog tool
 # and the privacy manifest App Store Connect requires (res/PrivacyInfo.xcprivacy)
@@ -56,6 +58,7 @@ target_link_libraries(Kioku PRIVATE
     pyqt6_QtCore pyqt6_QtGui pyqt6_QtWidgets pyqt6_QtNetwork pyqt6_QtSvg
     pyqt6_sip
     ${RUST_LIBS}
+    ${PYMUPDF_LIB}
     Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Network Qt6::Svg
     "-F${PYTHON_SLICE}" "-framework Python"
     "-framework WebKit" "-framework JavaScriptCore" "-framework UIKit" "-framework Security"
