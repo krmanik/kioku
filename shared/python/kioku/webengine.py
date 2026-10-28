@@ -510,6 +510,9 @@ class QWebEnginePage(QObject, _Lenient):
         self._web = platform.WebView()
         self._last_load: tuple[str, dict[str, str]] | None = None
         self._retried = False
+        # (shown, requested) while load() runs: the platform views report the
+        # requested URL at once, Qt only once the new page is there
+        self._loading: tuple[QUrl, QUrl] | None = None
         self._web.on_console = self._on_console  # type: ignore[method-assign]
         self._web.on_selection = self._on_selection  # type: ignore[method-assign]
         self._web.on_pdf_finished = self.pdfPrintingFinished.emit  # type: ignore[method-assign]
@@ -583,8 +586,8 @@ class QWebEnginePage(QObject, _Lenient):
         self._install_scripts()
         self._last_load = (qurl.toString(), self._profile._headers_for(qurl))
         self._retried = False
+        self._loading = (self.url(), qurl)
         self._web.load_url(*self._last_load)
-        self.urlChanged.emit(qurl)
 
     def setUrl(self, url: QUrl) -> None:
         self.load(url)
@@ -601,9 +604,13 @@ class QWebEnginePage(QObject, _Lenient):
         self.setHtml(bytes(data).decode("utf8", "replace"), baseUrl)
 
     def url(self) -> QUrl:
+        if self._loading is not None:
+            return self._loading[0]
         return QUrl(self._web.url())
 
     def requestedUrl(self) -> QUrl:
+        if self._loading is not None:
+            return self._loading[1]
         return self.url()
 
     def title(self) -> str:
@@ -763,6 +770,11 @@ class QWebEnginePage(QObject, _Lenient):
     def _on_load_finished(self, ok: bool) -> None:
         if not ok and self._retry_local_load():
             return
+        if self._loading is not None:
+            shown = self._loading[0]
+            self._loading = None
+            if self.url() != shown:
+                self.urlChanged.emit(self.url())
         self.loadProgress.emit(100)
         self.loadFinished.emit(ok)
         self.titleChanged.emit(self._web.title())

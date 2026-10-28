@@ -20,6 +20,8 @@ sys.path.append(os.path.join(HERE, "..", "python"))
 class FakeWebView:
     """Records what kioku.webengine asks of the platform web view."""
 
+    BRIDGE = ""
+
     def __init__(self) -> None:
         self.state = {"back": "", "forward": ""}
         self.calls: list[str] = []
