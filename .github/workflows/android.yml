@@ -59,7 +59,7 @@ jobs:
       - name: Tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq protobuf-compiler ninja-build zip rsync > /dev/null
+          sudo apt-get install -y -qq protobuf-compiler ninja-build zip rsync swig > /dev/null
           rustup --version
 
       - uses: actions/setup-java@v4

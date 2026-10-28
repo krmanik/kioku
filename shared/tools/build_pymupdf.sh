@@ -37,8 +37,8 @@ fi
 # Bindings source, generated on the build machine (same for every target) ----
 VENV=$WORK/venv
 if [ ! -x "$VENV/bin/python" ]; then
-    "python$PYTHON_VERSION" -m venv "$VENV"
-    "$VENV/bin/pip" install -q libclang pipcl
+    uv venv -q -p "$PYTHON_VERSION" "$VENV"
+    uv pip install -q -p "$VENV/bin/python" pip libclang pipcl
 fi
 if [ ! -s "$MUPDF/platform/python/mupdfcpp_swig.i.cpp" ]; then
     # mupdfwrap installs what it misses with whichever pip is first on PATH

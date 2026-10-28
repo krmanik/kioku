@@ -49,7 +49,7 @@ jobs:
 
       - name: Tools
         run: |
-          brew install protobuf
+          brew install protobuf swig
           rustup --version
 
       - name: Cache Qt and Python
