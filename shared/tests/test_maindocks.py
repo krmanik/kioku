@@ -42,7 +42,8 @@ def settle() -> None:
 def test_phone_stacks_the_dock() -> None:
     window, _, dock = make(390)
     assert window.dockWidgetArea(dock) == BOTTOM
-    assert dock.minimumWidth() == 0
+    # what its title bar needs, not the add-on's 550
+    assert dock.minimumWidth() < 100
     assert dock.geometry().right() < window.width()
     # the main view keeps about half the height
     assert abs(window.centralWidget().height() - dock.height()) < 120
@@ -82,6 +83,7 @@ def test_through_add_dock_widget(monkeypatch) -> None:
     window.show()
     monkeypatch.setattr(aqt, "mw", window, raising=False)
     monkeypatch.setattr(QMainWindow, "addDockWidget", QMainWindow.addDockWidget)
+    monkeypatch.setattr(QMainWindow, "splitDockWidget", QMainWindow.splitDockWidget)
     maindocks.install()
     dock = QDockWidget("Reader")
     dock.setWidget(QWidget())
@@ -95,3 +97,109 @@ def test_through_add_dock_widget(monkeypatch) -> None:
         window.setFixedSize(390, 800)
         settle()
         assert window.dockWidgetArea(dock) == BOTTOM
+
+
+def installed(monkeypatch, width: int) -> QMainWindow:
+    from kioku import maindocks
+
+    window = QMainWindow()
+    window.setCentralWidget(QWidget())
+    window.setFixedSize(width, 800)
+    window.show()
+    monkeypatch.setattr(aqt, "mw", window, raising=False)
+    monkeypatch.setattr(QMainWindow, "addDockWidget", QMainWindow.addDockWidget)
+    monkeypatch.setattr(QMainWindow, "splitDockWidget", QMainWindow.splitDockWidget)
+    maindocks.install()
+    return window
+
+
+def panel(title: str) -> QDockWidget:
+    dock = QDockWidget(title)
+    dock.setWidget(QWidget())
+    dock.setMinimumWidth(400)
+    return dock
+
+
+def shown(dock: QDockWidget) -> bool:
+    return not dock.visibleRegion().isEmpty()
+
+
+def test_second_dock_becomes_a_tab(monkeypatch) -> None:
+    # Incremento: its reader on the right, then Add Card on the left
+    window = installed(monkeypatch, 390)
+    reader, add = panel("Reader"), panel("Add Card")
+    window.addDockWidget(RIGHT, reader)
+    settle()
+    window.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, add)
+    settle()
+    assert window.tabifiedDockWidgets(add) == [reader]
+    assert shown(add) and not shown(reader)
+    assert add.geometry().right() < window.width() and add.width() > 300
+    # on a tablet they go back to their sides, untabbed
+    window.setFixedSize(1024, 800)
+    settle()
+    assert window.dockWidgetArea(add) == Qt.DockWidgetArea.LeftDockWidgetArea
+    assert window.dockWidgetArea(reader) == RIGHT
+    assert window.tabifiedDockWidgets(add) == []
+    window.setFixedSize(390, 800)
+    settle()
+    assert len(window.tabifiedDockWidgets(add) + window.tabifiedDockWidgets(reader)) == 2
+
+
+def test_side_by_side_split_becomes_a_tab(monkeypatch) -> None:
+    window = installed(monkeypatch, 390)
+    reader, other = panel("Reader"), panel("Reference")
+    window.addDockWidget(RIGHT, reader)
+    settle()
+    window.splitDockWidget(reader, other, Qt.Orientation.Horizontal)
+    settle()
+    assert window.tabifiedDockWidgets(other) == [reader]
+    assert shown(other)
+
+
+def test_tablet_split_stays_side_by_side(monkeypatch) -> None:
+    window = installed(monkeypatch, 1024)
+    reader, other = panel("Reader"), panel("Reference")
+    window.addDockWidget(RIGHT, reader)
+    window.splitDockWidget(reader, other, Qt.Orientation.Horizontal)
+    settle()
+    assert window.tabifiedDockWidgets(other) == []
+    assert shown(other) and shown(reader)
+
+
+def test_expand_over_the_main_view(monkeypatch) -> None:
+    window = installed(monkeypatch, 390)
+    reader = panel("Reader")
+    window.addDockWidget(RIGHT, reader)
+    settle()
+    docks = window._kioku_docks
+    button = docks.buttons[reader]
+    assert button.isVisible() and button.text() == "▲"
+    button.click()
+    settle()
+    assert not window.centralWidget().isVisible()
+    assert reader.height() > 700
+    assert button.text() == "▼"
+    button.click()
+    settle()
+    assert window.centralWidget().isVisible()
+    assert abs(window.centralWidget().height() - reader.height()) < 120
+
+
+def test_expanded_collapses_when_wide_or_closed(monkeypatch) -> None:
+    window = installed(monkeypatch, 390)
+    reader = panel("Reader")
+    window.addDockWidget(RIGHT, reader)
+    settle()
+    docks = window._kioku_docks
+    docks.buttons[reader].click()
+    window.setFixedSize(1024, 800)
+    settle()
+    assert window.centralWidget().isVisible()
+    assert not docks.buttons[reader].isVisible()
+    window.setFixedSize(390, 800)
+    settle()
+    docks.buttons[reader].click()
+    reader.close()
+    settle()
+    assert window.centralWidget().isVisible()
