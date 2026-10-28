@@ -9,9 +9,11 @@ and over those in an earlier --local directory.
 """
 import argparse
 import hashlib
+import http.client
 import os
 import re
 import sys
+import time
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -27,11 +29,19 @@ REPO_BASE = {
 }
 
 
-def fetch(url):
+def fetch(url, attempts=5):
     # The Termux CDN rejects Python's default User-Agent.
     req = urllib.request.Request(url, headers={"User-Agent": "Debian APT-HTTP/1.3 (kioku)"})
-    with urllib.request.urlopen(req) as r:
-        return r.read()
+    for attempt in range(attempts):
+        try:
+            with urllib.request.urlopen(req, timeout=60) as r:
+                return r.read()
+        # the CDN sometimes drops a connection mid-file
+        except (OSError, http.client.HTTPException) as e:
+            if attempt == attempts - 1:
+                raise
+            print(f"retrying {url}: {e}", file=sys.stderr)
+            time.sleep(2 ** attempt)
 
 
 def parse_index(text, repo):
