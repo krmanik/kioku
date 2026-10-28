@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import weakref
 from ctypes import c_bool, c_long, c_void_p
 from typing import Any, Callable
@@ -41,6 +42,7 @@ WKUserScript = ObjCClass("WKUserScript")
 WKContentWorld = ObjCClass("WKContentWorld")
 NSURL = ObjCClass("NSURL")
 NSMutableURLRequest = ObjCClass("NSMutableURLRequest")
+NSNumber = ObjCClass("NSNumber")
 UIColor = ObjCClass("UIColor")
 NSData = ObjCClass("NSData")
 NSDictionary = ObjCClass("NSDictionary")
@@ -309,6 +311,11 @@ class WebView:
         config = WKWebViewConfiguration.alloc().init()
         config.setAllowsInlineMediaPlayback_(True)
         config.setMediaTypesRequiringUserActionForPlayback_(0)
+        # like QtWebEngine (LocalContentCanAccessFileUrls): local pages may
+        # read other local files, e.g. an add-on's pdf.js reading a PDF
+        prop(config, "preferences").setValue_forKey_(
+            NSNumber.numberWithBool_(True), at("allowFileAccessFromFileURLs")
+        )
         self.controller = prop(config, "userContentController")
         page_world = prop(WKContentWorld, "pageWorld")
         self.controller.addScriptMessageHandlerWithReply_contentWorld_name_(
@@ -357,6 +364,11 @@ class WebView:
         nsurl = NSURL.URLWithString_(at(url))
         if nsurl is None:
             logger.warning("bad url %s", url)
+            return
+        if prop(nsurl, "isFileURL"):
+            # loadRequest lets a local page read only itself
+            home = NSURL.fileURLWithPath_isDirectory_(at(os.path.expanduser("~")), True)
+            self.webview.loadFileURL_allowingReadAccessToURL_(nsurl, home)
             return
         request = NSMutableURLRequest.requestWithURL_(nsurl)
         for key, value in (headers or {}).items():

@@ -10,6 +10,9 @@ import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.database.Cursor;
 import android.graphics.Bitmap;
+import android.graphics.Color;
+import android.graphics.pdf.PdfRenderer;
+import android.graphics.pdf.content.PdfPageTextContent;
 import android.graphics.Insets;
 import android.media.MediaPlayer;
 import android.net.Uri;
@@ -17,6 +20,7 @@ import android.os.Build;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.ParcelFileDescriptor;
 import android.provider.OpenableColumns;
 import android.provider.Settings;
 import android.speech.tts.TextToSpeech;
@@ -81,6 +85,8 @@ public class KiokuBridge {
     static Activity activity;
     private static final Handler ui = new Handler(Looper.getMainLooper());
     private static final Map<Integer, Page> pages = new ConcurrentHashMap<>();
+    private static final Map<Integer, PdfRenderer> pdfs = new ConcurrentHashMap<>();
+    private static int nextPdf = 1;
     private static MediaPlayer player;
     private static volatile TextToSpeech tts;
 
@@ -198,6 +204,23 @@ public class KiokuBridge {
             case "lifecycle.watch":
                 watchLifecycle = a.getBoolean("on");
                 return true;
+            // PDFs for PyQt6.QtPdf, from Python's worker threads
+            case "pdf.open":
+                return pdfOpen(a.getString("path"));
+            case "pdf.text":
+                return pdfText(a.getInt("id"), a.getInt("page"));
+            case "pdf.render":
+                return pdfRender(a.getInt("id"), a.getInt("page"), a.getInt("width"),
+                        a.getInt("height"), a.getString("out"));
+            case "pdf.close": {
+                PdfRenderer r = pdfs.remove(a.getInt("id"));
+                if (r != null) {
+                    synchronized (r) {
+                        r.close();
+                    }
+                }
+                return true;
+            }
         }
         // everything else runs on the UI thread without waiting
         ui.post(() -> {
@@ -603,6 +626,86 @@ public class KiokuBridge {
         }
     }
 
+    // PDFs -------------------------------------------------------------------
+
+    /** {"id", "sizes": [[width, height] in points, ...]} or {"fail": missing|format|password} */
+    private static Object pdfOpen(String path) throws Exception {
+        File file = new File(path);
+        if (!file.isFile()) {
+            return obj("fail", "missing");
+        }
+        ParcelFileDescriptor fd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY);
+        PdfRenderer r;
+        try {
+            r = new PdfRenderer(fd);
+        } catch (SecurityException e) {
+            fd.close();
+            return obj("fail", "password");
+        } catch (java.io.IOException e) {
+            fd.close();
+            return obj("fail", "format");
+        }
+        JSONArray sizes = new JSONArray();
+        for (int i = 0; i < r.getPageCount(); i++) {
+            try (PdfRenderer.Page page = r.openPage(i)) {
+                sizes.put(new JSONArray().put(page.getWidth()).put(page.getHeight()));
+            }
+        }
+        int id;
+        synchronized (pdfs) {
+            id = nextPdf++;
+        }
+        pdfs.put(id, r);
+        return obj("id", id, "sizes", sizes);
+    }
+
+    private static PdfRenderer pdf(int id) {
+        PdfRenderer r = pdfs.get(id);
+        if (r == null) {
+            throw new IllegalStateException("no PDF " + id);
+        }
+        return r;
+    }
+
+    /** The page's text; PdfRenderer only reads it from Android 15 on. */
+    private static String pdfText(int id, int index) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            return "";
+        }
+        PdfRenderer r = pdf(id);
+        StringBuilder text = new StringBuilder();
+        synchronized (r) {
+            try (PdfRenderer.Page page = r.openPage(index)) {
+                for (PdfPageTextContent part : page.getTextContents()) {
+                    if (text.length() > 0) {
+                        text.append('\n');
+                    }
+                    text.append(part.getText());
+                }
+            }
+        }
+        return text.toString();
+    }
+
+    /** Renders the page stretched to width x height on white into a PNG. */
+    private static String pdfRender(int id, int index, int width, int height, String out)
+            throws Exception {
+        PdfRenderer r = pdf(id);
+        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        bitmap.eraseColor(Color.WHITE);
+        synchronized (r) {
+            try (PdfRenderer.Page page = r.openPage(index)) {
+                page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
+            }
+        }
+        try (OutputStream os = new FileOutputStream(out)) {
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, os);
+        } finally {
+            bitmap.recycle();
+        }
+        return out;
+    }
+
     // Audio ------------------------------------------------------------------
 
     private static void playAudio(String path) {
@@ -756,6 +859,9 @@ public class KiokuBridge {
             s.setDomStorageEnabled(true);
             s.setMediaPlaybackRequiresUserGesture(false);
             s.setAllowFileAccess(true);
+            // like QtWebEngine (LocalContentCanAccessFileUrls): local pages may
+            // read other local files, e.g. an add-on's pdf.js reading a PDF
+            s.setAllowFileAccessFromFileURLs(true);
             s.setLoadWithOverviewMode(false);
             s.setUseWideViewPort(true);
             s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);

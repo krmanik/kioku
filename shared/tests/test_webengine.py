@@ -110,3 +110,26 @@ def test_set_html_has_viewport_from_the_start() -> None:
     own = "<head><meta name=viewport content='width=500'></head>"
     out = webscripts.with_viewport(own)
     assert out.count("viewport") == 1 and 'id="kioku-phone"' in out
+
+
+def test_url_changes_when_the_new_page_is_there(platform) -> None:
+    # the Incremento add-on loads its reader only when url() isn't the reader's
+    # yet, and otherwise talks to the page right away
+    page = webengine.QWebEnginePage()
+    platform_url = {"url": "file:///old.html"}
+    page._web.url = lambda: platform_url["url"]
+    page._web.title = lambda: ""
+    # the platform views report the requested URL as soon as a load starts
+    page._web.load_url = lambda url, headers: platform_url.update(url=url)
+    changed: list[str] = []
+    page.urlChanged.connect(lambda url: changed.append(url.toString()))
+
+    page.load(QUrl("file:///new.html"))
+    assert page.url().toString() == "file:///old.html"
+    assert page.requestedUrl().toString() == "file:///new.html"
+    assert changed == []
+
+    page._on_load_finished(True)
+    assert page.url().toString() == "file:///new.html"
+    assert page.requestedUrl().toString() == "file:///new.html"
+    assert changed == ["file:///new.html"]
