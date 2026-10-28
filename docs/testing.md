@@ -685,6 +685,15 @@ Tested on the iOS Simulator (iPhone 16 Pro) and the Android emulator
 | Reader stacked under the main view in portrait, beside it in landscape | ✅ | ✅ (rotated both ways) | ✅ |
 | Optional tools (PyMuPDF, Tesseract, DjVuLibre, FFmpeg) | – (iOS can't start processes; no PyMuPDF for iOS) | – (no PyMuPDF for Android) | ✅ installed from the Termux repositories with the app installer (`python-pymupdf tesseract djvulibre`); FFmpeg is in the runtime |
 
+On the iPhone 15 Pro Max (device build with the stack fix): objects freed
+on the main thread are deallocated and an sqlite3 commit after a finished
+statement works; `QPdfDocument` over PDFKit gives page count, sizes,
+title, text and renders; Incremento installed from AnkiWeb loads, imports
+a PDF as a topic card with its cover, and the review shows the pdf.js
+reader stacked under the main view ("PDF 1 / 2"). Its dependency setup
+dialog lists PyMuPDF, Tesseract, FFmpeg and DjVuLibre as missing, as
+expected. Landscape wasn't tried on the phone.
+
 On the Simulator the add-on reports Tesseract and FFmpeg as found: the
 Simulator sees the Mac's Homebrew. Two Incremento instances on one device
 (native app and Termux variant) can't both open its browser bridge
