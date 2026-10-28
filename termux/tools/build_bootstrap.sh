@@ -30,16 +30,17 @@ python3 -I tools/fetch_debs.py --roots "$ROOTS" --local build/anki-debs --local 
 # Package name the .debs were built for (com.termux for the official repos).
 python3 -I tools/debs_to_prefix.py --package "${SOURCE_PACKAGE:-com.termux}" --debs build/debs --out build/rootfs-repo
 
-echo "== PyQt6.sip and pure-Python dependencies"
+echo "== PyQt6.sip, PyQt6.QtPdf and pure-Python dependencies"
 tools/build_pyqt6_sip.sh build/rootfs-repo/usr "$PYVER" build/pyqt6-sip-overlay
+tools/build_pyqt6_pdf.sh build/rootfs-repo/usr "$PYVER" build/pyqt6-pdf-overlay
 tools/fetch_python_deps.sh "$PYVER" build/python-deps
 
 tools/fetch_novnc.sh build/novnc-overlay
 
-# Preferences > Advanced, shared with the native apps (launch_anki.py)
+# Shared with the native apps (launch_anki.py): Preferences > Advanced, add-on docks
 rm -rf build/kioku-overlay
 mkdir -p build/kioku-overlay/share/ankidx/kioku
-for m in advanced ankidroid background switchsync syncserver; do
+for m in advanced ankidroid background maindocks switchsync syncserver; do
 	cp ../shared/python/kioku/$m.py build/kioku-overlay/share/ankidx/kioku/
 done
 
@@ -49,5 +50,5 @@ cp build/debs-closure.tsv build/base-overlay/var/lib/ankidesk/base-packages.tsv
 
 echo "== bootstrap"
 python3 -I tools/build_rootfs.py --src build/rootfs-repo/usr --owners build/rootfs-repo/file-owners.tsv \
-	--extra rootfs-overlay --extra build/python-deps --extra build/pyqt6-sip-overlay --extra build/base-overlay --extra build/novnc-overlay --extra build/kioku-overlay \
+	--extra rootfs-overlay --extra build/python-deps --extra build/pyqt6-sip-overlay --extra build/pyqt6-pdf-overlay --extra build/base-overlay --extra build/novnc-overlay --extra build/kioku-overlay \
 	--package "$APP_ID" --rootfs-dir "$ROOTFS_DIR" --stage build/rootfs-stage --out app/src/main/assets/bootstrap-aarch64.zip

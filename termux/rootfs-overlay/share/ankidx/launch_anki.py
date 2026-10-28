@@ -57,8 +57,26 @@ def provide_opengl_placeholders() -> None:
             setattr(QtGui, name, type(name, (), {}))
 
 
+def provide_accessible_names() -> None:
+    """Termux's pyqt6 is also built without PyQt_Accessibility, which drops the
+    accessible name and description accessors of QWidget and QTabBar. Add-ons
+    call them (the Incremento add-on fails to load without them), and nothing
+    reads them in the X11 session, so keep the values as Qt properties."""
+    from PyQt6.QtWidgets import QTabBar, QWidget
+
+    if hasattr(QWidget, "setAccessibleName"):
+        return
+    for name in ("accessibleName", "accessibleDescription"):
+        setter = "set" + name[0].upper() + name[1:]
+        setattr(QWidget, name, lambda self, key=name: self.property(key) or "")
+        setattr(QWidget, setter, lambda self, value, key=name: self.setProperty(key, value))
+    QTabBar.accessibleTabName = lambda self, index: self.property(f"accessibleTabName{index}") or ""
+    QTabBar.setAccessibleTabName = lambda self, index, value: self.setProperty(f"accessibleTabName{index}", value)
+
+
 provide_qtquick_stub()
 provide_opengl_placeholders()
+provide_accessible_names()
 
 from aqt.profiles import ProfileManager, VideoDriver  # noqa: E402
 
@@ -183,6 +201,10 @@ if REMOTE:
     gui_hooks.profile_did_open.append(maximize_first_time)
 else:
     ankidesk_mobile.setup()
+    # add-ons' side docks under the main view on the phone's narrow screen
+    from kioku import maindocks
+
+    maindocks.install()
 gui_hooks.main_window_did_init.append(signal_ready)
 
 aqt.run()

@@ -666,3 +666,26 @@ focus object. Fix: [fixes.md](fixes.md#runtime-platform)
 
 Not found: which path in the tester's app left the focus null without the
 signal. The patch covers every such path for this crash.
+
+## Incremento add-on, all variants (2026-10-28)
+
+[Incremento](https://ankiweb.net/shared/info/1013949798) (incremental
+reading, 2026.10.26) failed to load everywhere: `No module named
+'PyQt6.QtPdf'`. Fixes in [fixes.md](fixes.md) and, for Termux,
+[termux/docs/building.md](../termux/docs/building.md) ("Known gaps").
+Tested on the iOS Simulator (iPhone 16 Pro) and the Android emulator
+(Android 17), both native apps and the Termux variant.
+
+| Step | iOS Simulator | Android (native) | Termux |
+| --- | --- | --- | --- |
+| Add-on loads (menu, timer bar, Topics deck, getting-started guide) | ✅ | ✅ | ✅ (also needed the accessible-name fallback) |
+| `QPdfDocument`: page count, sizes, title and dates, text, render, worker threads, error codes | ✅ PDFKit | ✅ PdfRenderer (text from Android 15 on) | ✅ real bindings |
+| Import a PDF as a topic card (cover image, text) | ✅ | ✅ | ✅ (through PyMuPDF) |
+| Review it: pdf.js reader in the dock, "PDF 1 / 2" | ✅ | ✅ | ✅ |
+| Reader stacked under the main view in portrait, beside it in landscape | ✅ | ✅ (rotated both ways) | ✅ |
+| Optional tools (PyMuPDF, Tesseract, DjVuLibre, FFmpeg) | – (iOS can't start processes; no PyMuPDF for iOS) | – (no PyMuPDF for Android) | ✅ installed from the Termux repositories with the app installer (`python-pymupdf tesseract djvulibre`); FFmpeg is in the runtime |
+
+On the Simulator the add-on reports Tesseract and FFmpeg as found: the
+Simulator sees the Mac's Homebrew. Two Incremento instances on one device
+(native app and Termux variant) can't both open its browser bridge
+(127.0.0.1:8766); the second logs "Address already in use".
