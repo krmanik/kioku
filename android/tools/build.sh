@@ -29,6 +29,11 @@ BUILD=$ROOT/build/cmake
 "$ROOT/tools/build_rust.sh"
 "$ROOT/tools/gen_pyqt.sh" > /dev/null
 "$ROOT/../shared/tools/prepare_site.sh" "$ROOT/.venv/bin/python" "$ROOT/deps/sdist" "$ROOT/build/site"
+# PyMuPDF: its modules sit next to libmupdfcpp.so (RUNPATH $ORIGIN) and are
+# unpacked with the rest of the runtime
+"$ROOT/../shared/tools/build_pymupdf.sh" android > "$ROOT/build/pymupdf.log" 2>&1 || {
+    tail -30 "$ROOT/build/pymupdf.log"; exit 1; }
+cp -R "$ROOT/../build/pymupdf/android/site/" "$ROOT/build/site/"
 
 # package/ plus the Python runtime as an asset
 mkdir -p "$BUILD/package"

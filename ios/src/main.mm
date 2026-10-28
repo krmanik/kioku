@@ -19,6 +19,8 @@ PyObject *PyInit_QtSvg(void);
 PyObject *PyInit__rsbridge(void);
 PyObject *PyInit_orjson(void);
 PyObject *PyInit_rpds(void);
+PyObject *PyInit__mupdf(void);
+PyObject *PyInit__extra(void);
 }
 
 static void fail(const char *what, PyStatus status) {
@@ -71,6 +73,8 @@ int main(int argc, char *argv[]) {
         PyImport_AppendInittab("anki._rsbridge", PyInit__rsbridge);
         PyImport_AppendInittab("orjson.orjson", PyInit_orjson);
         PyImport_AppendInittab("rpds", PyInit_rpds);
+        PyImport_AppendInittab("pymupdf._mupdf", PyInit__mupdf);
+        PyImport_AppendInittab("pymupdf._extra", PyInit__extra);
 
         PyPreConfig preconfig;
         PyPreConfig_InitIsolatedConfig(&preconfig);
