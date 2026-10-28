@@ -24,6 +24,7 @@ services:
     image: ghcr.io/krmanik/kioku-desktop:latest
     restart: unless-stopped
     shm_size: 1gb
+    # time for Anki to close the collection and make its backup
     stop_grace_period: 1m
     ports:
       - "127.0.0.1:3000:3000"
@@ -33,7 +34,15 @@ services:
       TZ: Etc/UTC
       CUSTOM_USER: anki
       PASSWORD: change-me
+      # a taskbar for switching between Anki's windows
       SELKIES_DESKTOP: "true"
+      # fit Anki's pages and windows on a phone's screen
+      # ANKI_FIT_SCREEN: "true"
+      # download Microsoft's core fonts (Arial, Times New Roman, ...) on
+      # the first start, for decks that use them; you accept their licence
+      # ANKI_MS_FONTS: "true"
+    # the server's GPU (Intel, AMD) instead of the CPU, for drawing and
+    # the video; only if the server has /dev/dri
     # devices:
     #   - /dev/dri:/dev/dri
     volumes:
