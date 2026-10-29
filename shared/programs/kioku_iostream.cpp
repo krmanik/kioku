@@ -9,6 +9,7 @@
 
 extern "C" {
 FILE *kioku_stdin(void);
+int kioku_stdin_fd(void);
 FILE *kioku_stdout(void);
 FILE *kioku_stderr(void);
 int kioku_in_app(void);
@@ -17,15 +18,16 @@ int kioku_in_app(void);
 namespace {
 
 // reads what's there (a line from an interactive add-on) instead of waiting
-// for a full buffer; writes straight through to the FILE
+// for a full buffer, from the run's input descriptor; writes straight through
+// to the FILE
 class FileBuf : public std::streambuf {
   public:
-    explicit FileBuf(FILE *file) : file_(file) {}
+    explicit FileBuf(FILE *file, int fd = -1) : file_(file), fd_(fd) {}
 
   protected:
     int_type underflow() override {
         fflush(kioku_stdout());
-        ssize_t n = read(fileno(file_), buf_, sizeof(buf_));
+        ssize_t n = read(fd_, buf_, sizeof(buf_));
         if (n <= 0) return traits_type::eof();
         setg(buf_, buf_, buf_ + n);
         return traits_type::to_int_type(buf_[0]);
@@ -41,12 +43,13 @@ class FileBuf : public std::streambuf {
 
   private:
     FILE *file_;
+    int fd_;
     char buf_[4096];
 };
 
 // one run per thread (kioku_run starts a thread for each)
 struct Streams {
-    FileBuf in{kioku_stdin()};
+    FileBuf in{kioku_stdin(), kioku_stdin_fd()};
     FileBuf out{kioku_stdout()};
     FileBuf err{kioku_stderr()};
     std::istream is{&in};

@@ -195,6 +195,16 @@ def test_kakasi(tmp, ok):
         p.stdin.flush()
         readings.append(p.stdout.readline().rstrip(b"\r\n").decode("sjis"))
     ok("kakasi, Japanese Support's way", readings == ["かんじ", "かたかな"], readings)
+    # a second kakasi while that one stays open (two add-ons), then the first again
+    try:
+        other = run("kakasi", "-isjis", "-osjis", "-JH", input="東京\n".encode("sjis"), timeout=10)
+        other = other.stdout.decode("sjis").strip()
+    except subprocess.TimeoutExpired:
+        other = "timed out"
+    p.stdin.write("漢字\n".encode("sjis"))
+    p.stdin.flush()
+    again = p.stdout.readline().rstrip(b"\r\n").decode("sjis")
+    ok("kakasi while another stays open", other == "とうきょう" and again == "かんじ", (other, again))
     p.stdin.close()
     p.wait(timeout=10)
     # (Shift-JIS, as every add-on that uses kakasi: Android's iconv has no

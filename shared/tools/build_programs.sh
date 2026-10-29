@@ -130,6 +130,7 @@ fetch "https://github.com/webmproject/libvpx/archive/refs/tags/v$VPX_VERSION.tar
 fetch "https://storage.googleapis.com/aom-releases/libaom-$AOM_VERSION.tar.gz" libaom-$AOM_VERSION
 fetch "https://downloads.sourceforge.net/project/libpng/libpng16/$PNG_VERSION/libpng-$PNG_VERSION.tar.xz" libpng-$PNG_VERSION
 fetch "https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/$JPEG_VERSION/libjpeg-turbo-$JPEG_VERSION.tar.gz" libjpeg-turbo-$JPEG_VERSION
+fetch "https://github.com/libffi/libffi/releases/download/v$LIBFFI_VERSION/libffi-$LIBFFI_VERSION.tar.gz" libffi-$LIBFFI_VERSION
 fetch "https://download.savannah.gnu.org/releases/freetype/freetype-$FREETYPE_VERSION.tar.xz" freetype-$FREETYPE_VERSION
 fetch "https://github.com/DanBloomberg/leptonica/releases/download/$LEPTONICA_VERSION/leptonica-$LEPTONICA_VERSION.tar.gz" leptonica-$LEPTONICA_VERSION
 fetch "https://github.com/tesseract-ocr/tesseract/archive/refs/tags/$TESSERACT_VERSION.tar.gz" tesseract-$TESSERACT_VERSION
@@ -392,6 +393,11 @@ fi
 
 # Tesseract, with leptonica; only the program's own
 # file gets kioku_prog.h (tesseract_glue.c does the rest)
+# libffi: not for the programs, for cffi on Android (build_wheels.sh; Android's
+# Python has no headers for its own)
+if [ "$TARGET" = android ]; then
+    autotools_build libffi "$SRC/libffi-$LIBFFI_VERSION" --with-pic --disable-docs --disable-multi-os-directory
+fi
 # FreeType: not for the programs, for Pillow's ImageFont (build_wheels.sh)
 cmake_build freetype "$SRC/freetype-$FREETYPE_VERSION" -DFT_DISABLE_HARFBUZZ=ON \
     -DFT_DISABLE_BROTLI=ON -DFT_DISABLE_BZIP2=ON -DFT_DISABLE_PNG=ON -DFT_DISABLE_ZLIB=ON
@@ -453,9 +459,11 @@ NAME=espeak
 if step $NAME; then
     O=$BUILD/$NAME
     rm -rf "$O" && mkdir -p "$O" && : > "$BUILD/$NAME.log"
-    # the library's globals too: state_espeak.h only adds a pragma. iOS has
-    # le16toh() and co. in sys/endian.h, which its configure misses
-    STATE_ESPEAK=$(state_header espeak)
+    # the library's globals too: state_espeak.h only adds a pragma. Room for
+    # the data folder's path (160 bytes by default: too few in the iOS
+    # Simulator). iOS has le16toh() and co. in sys/endian.h, which its
+    # configure misses
+    STATE_ESPEAK="$(state_header espeak) -DN_PATH_HOME=1024"
     case $TARGET in ios | ios-sim) STATE_ESPEAK="$STATE_ESPEAK -include sys/endian.h" ;; esac
     cmake -S "$ESPEAK" -B "$O/build" -G Ninja -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON "${ESPEAK_OPTIONS[@]}" "${CMAKE_TARGET[@]}" \

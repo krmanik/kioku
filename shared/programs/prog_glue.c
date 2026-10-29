@@ -21,10 +21,11 @@ extern char data_end[] __asm("section$end$__DATA$__kd_" XSTR(KIOKU_FAMILY));
 extern char bss_start[] __asm("section$start$__DATA$__kb_" XSTR(KIOKU_FAMILY));
 extern char bss_end[] __asm("section$end$__DATA$__kb_" XSTR(KIOKU_FAMILY));
 #else
-extern char data_start[] __asm("__start_kd_" XSTR(KIOKU_FAMILY));
-extern char data_end[] __asm("__stop_kd_" XSTR(KIOKU_FAMILY));
-extern char bss_start[] __asm("__start_kb_" XSTR(KIOKU_FAMILY));
-extern char bss_end[] __asm("__stop_kb_" XSTR(KIOKU_FAMILY));
+/* weak: ELF has no such symbols for a section a program doesn't have */
+extern char data_start[] __asm("__start_kd_" XSTR(KIOKU_FAMILY)) __attribute__((weak));
+extern char data_end[] __asm("__stop_kd_" XSTR(KIOKU_FAMILY)) __attribute__((weak));
+extern char bss_start[] __asm("__start_kb_" XSTR(KIOKU_FAMILY)) __attribute__((weak));
+extern char bss_end[] __asm("__stop_kb_" XSTR(KIOKU_FAMILY)) __attribute__((weak));
 #endif
 static char *saved_state;
 #endif

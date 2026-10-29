@@ -70,8 +70,13 @@ struct session {
     int argc;
     char **argv;
     FILE *in, *out, *err;
+    int in_fd;
     int code;
     kioku_sighandler_t handlers[NSIG];
+    /* the program's globals (kioku_state_reset), and this run's copy of them
+     * while it waits for input */
+    char *data, *data_end, *bss, *bss_end;
+    char *own_data, *own_bss;
 };
 
 static __thread struct session *current;
@@ -90,6 +95,7 @@ static struct session *active(void) { return current ? current : family_session[
 int kioku_in_app(void) { return current != NULL; }
 
 FILE *kioku_stdin(void) { return current ? current->in : stdin; }
+int kioku_stdin_fd(void) { return current ? current->in_fd : 0; }
 FILE *kioku_stdout(void) { return current ? current->out : stdout; }
 FILE *kioku_stderr(void) { return current ? current->err : stderr; }
 
@@ -114,7 +120,7 @@ kioku_sighandler_t kioku_signal(int sig, kioku_sighandler_t handler) {
 int kioku_fd(int fd) {
     struct session *s = active();
     if (!s || fd < 0 || fd > 2) return fd;
-    return fileno(fd == 0 ? s->in : fd == 1 ? s->out : s->err);
+    return fd == 0 ? s->in_fd : fileno(fd == 1 ? s->out : s->err);
 }
 
 /* FFmpeg's log (libavutil isn't compiled with kioku_prog.h): set by
@@ -128,13 +134,55 @@ void kioku_log_write(const char *line) {
  * back before every later one. Called by the program's entry point, under its
  * family's lock. */
 void kioku_state_reset(char *data, char *data_end, char *bss, char *bss_end, char **saved) {
-    if (!*saved) {
-        *saved = malloc(data_end - data + 1);
-        memcpy(*saved, data, data_end - data);
-    } else {
-        memcpy(data, *saved, data_end - data);
-        memset(bss, 0, bss_end - bss);
+    /* a section the program doesn't have: NULL (weak symbols on Android) */
+    size_t data_size = data ? (size_t)(data_end - data) : 0;
+    size_t bss_size = bss ? (size_t)(bss_end - bss) : 0;
+    if (current) {
+        current->data = data;
+        current->data_end = data + data_size;
+        current->bss = bss;
+        current->bss_end = bss + bss_size;
     }
+    if (!*saved) {
+        *saved = malloc(data_size + 1);
+        if (data_size) memcpy(*saved, data, data_size);
+    } else {
+        if (data_size) memcpy(data, *saved, data_size);
+        if (bss_size) memset(bss, 0, bss_size);
+    }
+}
+
+/* The run's standard input. A program with its globals in sections (state_
+ * <family>.h) gives up its family's lock while it waits for input, with its
+ * globals saved, and gets them back after: add-ons keep kakasi open for the
+ * whole session (Japanese Support), so a second one would wait forever. */
+static int session_read(void *cookie, char *buf, int n) {
+    struct session *s = cookie;
+    int family = s->program->family;
+    size_t data_size = (size_t)(s->data_end - s->data), bss_size = (size_t)(s->bss_end - s->bss);
+    int swap = family >= 0 && (data_size || bss_size);
+    fflush(s->out);
+    if (swap) {
+        if (!s->own_data) s->own_data = malloc(data_size + 1);
+        if (!s->own_bss) s->own_bss = malloc(bss_size + 1);
+        if (data_size) memcpy(s->own_data, s->data, data_size);
+        if (bss_size) memcpy(s->own_bss, s->bss, bss_size);
+        family_session[family] = NULL;
+        pthread_mutex_unlock(&family_lock[family]);
+    }
+    ssize_t r = read(s->in_fd, buf, (size_t)n);
+    if (swap) {
+        pthread_mutex_lock(&family_lock[family]);
+        family_session[family] = s;
+        if (data_size) memcpy(s->data, s->own_data, data_size);
+        if (bss_size) memcpy(s->bss, s->own_bss, bss_size);
+    }
+    return (int)r;
+}
+
+static int session_close(void *cookie) {
+    struct session *s = cookie;
+    return close(s->in_fd);
 }
 
 static void *run_thread(void *arg) {
@@ -156,8 +204,12 @@ static void *run_thread(void *arg) {
 int kioku_run(const char *name, int argc, char **argv, int in, int out, int err) {
     struct program *p = find_program(name);
     if (!p) return -1;
-    struct session s = {.program = p, .argc = argc, .argv = argv};
+    struct session s = {.program = p, .argc = argc, .argv = argv, .in_fd = in};
+#ifdef __APPLE__
+    s.in = funopen(&s, session_read, NULL, NULL, session_close);
+#else
     s.in = fdopen(in, "r");
+#endif
     s.out = fdopen(out, "w");
     s.err = fdopen(err, "w");
     setvbuf(s.err, NULL, _IONBF, 0);
@@ -185,6 +237,8 @@ int kioku_run(const char *name, int argc, char **argv, int in, int out, int err)
     fclose(s.in);
     fclose(s.out);
     fclose(s.err);
+    free(s.own_data);
+    free(s.own_bss);
     return s.code;
 }
 

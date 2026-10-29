@@ -1,7 +1,7 @@
 #!/bin/bash
 # Python packages with native code that add-ons import, for the native apps
-# (docs/addon-deps.md): numpy, Pillow, cryptography (with pyOpenSSL) and
-# jieba. Not lxml and psutil: optional in the add-ons that import them, and
+# (docs/addon-deps.md): numpy, Pillow, cryptography (with cffi and pyOpenSSL)
+# and jieba. Not lxml and psutil: optional in the add-ons that import them, and
 # neither builds for these platforms as it is.
 #   ios, ios-sim: prebuilt iOS wheels (numpy and cryptography from BeeWare's
 #                 index, Pillow from PyPI)
@@ -73,9 +73,12 @@ ios | ios-sim)
     fetch_wheel $BEEWARE numpy "$NUMPY_IOS_VERSION"
     fetch_wheel $BEEWARE cryptography "$CRYPTOGRAPHY_VERSION"
     fetch_wheel https://pypi.org/simple pillow "$PILLOW_VERSION"
+    fetch_wheel https://pypi.org/simple cffi "$CFFI_VERSION"
     ;;
 android)
     build_wheel numpy "$NUMPY_VERSION" "${NUMPY_BUILD[@]}"
+    build_wheel cffi "$CFFI_VERSION" \
+        CIBW_ENVIRONMENT="PKG_CONFIG_PATH=$ROOT/build/programs/android/prefix/lib/pkgconfig"
     # its CI script for the image libraries isn't in the sdist: the ones
     # build_programs.sh built (libjpeg-turbo, libpng, libwebp, FreeType)
     # (and the NDK's zlib, which it doesn't look for in the sysroot)
@@ -89,17 +92,21 @@ android)
     build_wheel pillow "$PILLOW_VERSION" CIBW_BEFORE_ALL= \
         CIBW_CONFIG_SETTINGS="raqm=disable imagequant=disable xcb=disable avif=disable" \
         CIBW_ENVIRONMENT="CFLAGS=-I$PREFIX/include PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig ZLIB_ROOT=$ZLIB"
-    # Rust ignores LDFLAGS: 16 KB pages (Android 15+ devices) need it in RUSTFLAGS
+    # Rust ignores LDFLAGS: 16 KB pages (Android 15+ devices) and libpython
+    # (Android resolves extension modules' Python symbols only through it;
+    # PyO3's abi3 build leaves it out) go in RUSTFLAGS
     build_wheel cryptography "$CRYPTOGRAPHY_VERSION" \
-        CIBW_ENVIRONMENT="RUSTFLAGS='-C link-arg=-Wl,-z,max-page-size=16384'"
+        CIBW_ENVIRONMENT="RUSTFLAGS='-C link-arg=-Wl,-z,max-page-size=16384 -C link-arg=-lpython$PYTHON_VERSION'"
     ;;
 esac
 
-# pure Python, the same everywhere: pyOpenSSL (needs cryptography, so not in
-# requirements.in) and jieba (no wheel on PyPI)
-ls "$WHEELS"/pyopenssl-$PYOPENSSL_VERSION-*.whl > /dev/null 2>&1 ||
-    python3 -m pip download -q --no-deps --only-binary :all: --platform any --python-version "$PYTHON_VERSION" \
-        --implementation py --abi none -d "$WHEELS" "pyopenssl==$PYOPENSSL_VERSION"
+# pure Python, the same everywhere: pyOpenSSL and pycparser (they need
+# cryptography and cffi, so not in requirements.in) and jieba (no wheel on PyPI)
+for pure in "pyopenssl==$PYOPENSSL_VERSION" "pycparser==$PYCPARSER_VERSION"; do
+    ls "$WHEELS"/${pure%%==*}-${pure##*==}-*.whl > /dev/null 2>&1 ||
+        python3 -m pip download -q --no-deps --only-binary :all: --platform any \
+            --python-version "$PYTHON_VERSION" --implementation py --abi none -d "$WHEELS" "$pure"
+done
 ls "$WHEELS"/jieba-$JIEBA_VERSION-*.whl > /dev/null 2>&1 ||
     python3 -m pip wheel -q --no-deps -w "$WHEELS" "jieba==$JIEBA_VERSION"
 
