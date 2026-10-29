@@ -13,7 +13,8 @@
 #                 the name it was started as
 #   macos:        libkiokuprog.dylib with the module, to test the in-app runs
 #                 on the build machine
-# Output: build/programs/<target>/lib
+# Output: build/programs/<target>/lib, and build/programs/data (programs' data
+# files; the apps bundle it as kioku_programs_data in site-packages)
 # Usage: build_programs.sh ios|ios-sim|android|macos
 # Env: ANDROID_NDK_ROOT (android), JOBS (default: all cores)
 set -euo pipefail
@@ -52,7 +53,8 @@ ios | ios-sim | macos)
     if [ "$TARGET" = macos ]; then
         CMAKE_TARGET+=(-DCMAKE_OSX_DEPLOYMENT_TARGET=13.0)
     else
-        CMAKE_TARGET+=(-DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_DEPLOYMENT_TARGET=17.0)
+        # no app bundles for the libraries' own programs (libaom's)
+        CMAKE_TARGET+=(-DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_DEPLOYMENT_TARGET=17.0 -DCMAKE_MACOSX_BUNDLE=OFF)
     fi
     PYINC=$ROOT/ios/deps/python-ios/Python.xcframework/ios-arm64/include/python$PYTHON_VERSION
     [ "$TARGET" = macos ] && PYINC=$(python$PYTHON_VERSION -c 'import sysconfig; print(sysconfig.get_path("include"))')
@@ -125,6 +127,11 @@ fetch "https://downloads.xiph.org/releases/opus/opus-$OPUS_VERSION.tar.gz" opus-
 fetch "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-$WEBP_VERSION.tar.gz" libwebp-$WEBP_VERSION
 fetch "https://github.com/webmproject/libvpx/archive/refs/tags/v$VPX_VERSION.tar.gz" libvpx-$VPX_VERSION
 fetch "https://storage.googleapis.com/aom-releases/libaom-$AOM_VERSION.tar.gz" libaom-$AOM_VERSION
+fetch "https://downloads.sourceforge.net/project/libpng/libpng16/$PNG_VERSION/libpng-$PNG_VERSION.tar.xz" libpng-$PNG_VERSION
+fetch "https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/$JPEG_VERSION/libjpeg-turbo-$JPEG_VERSION.tar.gz" libjpeg-turbo-$JPEG_VERSION
+fetch "https://github.com/DanBloomberg/leptonica/releases/download/$LEPTONICA_VERSION/leptonica-$LEPTONICA_VERSION.tar.gz" leptonica-$LEPTONICA_VERSION
+fetch "https://github.com/tesseract-ocr/tesseract/archive/refs/tags/$TESSERACT_VERSION.tar.gz" tesseract-$TESSERACT_VERSION
+fetch "https://github.com/espeak-ng/espeak-ng/archive/refs/tags/$ESPEAK_VERSION.tar.gz" espeak-ng-$ESPEAK_VERSION
 fetch "http://kakasi.namazu.org/stable/kakasi-$KAKASI_VERSION.tar.xz" kakasi-$KAKASI_VERSION
 fetch "https://github.com/taku910/mecab/archive/$MECAB_COMMIT.tar.gz" mecab-$MECAB_COMMIT
 fetch "https://code.videolan.org/videolan/x264/-/archive/$X264_COMMIT/x264-$X264_COMMIT.tar.bz2" x264-$X264_COMMIT
@@ -139,8 +146,10 @@ if ! grep -q 'kioku_fd(c->fd)' "$FILE_C"; then
 fi
 
 # Codec libraries -----------------------------------------------------------------
-# no mpg123 (FFmpeg decodes MP3): lame encodes only
-autotools_build lame "$SRC/lame-$LAME_VERSION" --disable-frontend --disable-gtktest --disable-decoder
+# no mpg123 (FFmpeg decodes MP3): lame encodes only; no terminal libraries
+# (the iOS SDK has curses without its headers)
+autotools_build lame "$SRC/lame-$LAME_VERSION" --disable-frontend --disable-gtktest --disable-decoder \
+    ac_cv_lib_termcap_initscr=no ac_cv_lib_curses_initscr=no ac_cv_lib_ncurses_initscr=no
 cmake_build ogg "$SRC/libogg-$OGG_VERSION" -DINSTALL_DOCS=OFF -DBUILD_TESTING=OFF
 cmake_build vorbis "$SRC/libvorbis-$VORBIS_VERSION"
 cmake_build opus "$SRC/opus-$OPUS_VERSION" -DOPUS_BUILD_PROGRAMS=OFF -DOPUS_BUILD_TESTING=OFF
@@ -185,9 +194,11 @@ FFBUILD=$BUILD/ffmpeg
 FFLIBS="avdevice avfilter avformat avcodec swresample swscale avutil"
 if step ffmpeg; then
     case $TARGET in
-    android) FFOS=(--target-os=android --disable-iconv --disable-vulkan) ;;
+    # libvorbis.pc leaves out -lm
+    android) FFOS=(--target-os=android --disable-iconv --disable-vulkan --extra-libs=-lm) ;;
     *) FFOS=(--target-os=darwin --enable-videotoolbox --enable-audiotoolbox) ;;
     esac
+    # devices: only lavfi (generated input: anullsrc, sine, testsrc)
     rm -rf "$FFBUILD" && mkdir -p "$FFBUILD"
     (cd "$FFBUILD" && "$SRC/ffmpeg-$FFMPEG_VERSION/configure" \
         --prefix="$PREFIX" --enable-cross-compile --arch=aarch64 "${FFOS[@]}" \
@@ -195,6 +206,7 @@ if step ffmpeg; then
         --extra-cflags="$CFLAGS -I$PREFIX/include" --extra-ldflags="-L$PREFIX/lib" \
         --pkg-config=pkg-config --pkg-config-flags=--static \
         --enable-gpl --enable-version3 --enable-static --disable-shared \
+        --disable-indevs --enable-indev=lavfi --disable-outdevs \
         --disable-doc --disable-debug --disable-ffplay --disable-sdl2 --disable-xlib \
         --disable-libxcb --disable-securetransport --disable-appkit --disable-avfoundation \
         --disable-coreimage --disable-metal \
@@ -346,12 +358,102 @@ if step $NAME; then
     done_step $NAME
 fi
 
+# Tesseract, with leptonica and its image libraries; only the program's own
+# file gets kioku_prog.h (tesseract_glue.c does the rest)
+cmake_build png "$SRC/libpng-$PNG_VERSION" -DPNG_SHARED=OFF -DPNG_TESTS=OFF -DPNG_TOOLS=OFF \
+    -DPNG_FRAMEWORK=OFF
+cmake_build jpeg "$SRC/libjpeg-turbo-$JPEG_VERSION" -DENABLE_SHARED=OFF -DWITH_TURBOJPEG=OFF \
+    -DWITH_TOOLS=OFF -DWITH_TESTS=OFF
+cmake_build leptonica "$SRC/leptonica-$LEPTONICA_VERSION" -DSW_BUILD=OFF -DBUILD_PROG=OFF \
+    -DENABLE_GIF=OFF -DENABLE_TIFF=OFF -DENABLE_OPENJPEG=OFF -DENABLE_WEBP=OFF
+NAME=tesseract
+if step $NAME; then
+    T=$SRC/tesseract-$TESSERACT_VERSION
+    # its check for leptonica's TIFF support runs a program (not possible
+    # when cross-compiling); there's no TIFF either way
+    grep -q 'if(NOT DISABLE_TIFF)\ncheck_leptonica' "$T/CMakeLists.txt" ||
+        perl -0pi -e 's/\ncheck_leptonica_tiff_support\(\)\n/\nif(NOT DISABLE_TIFF)\n  check_leptonica_tiff_support()\nendif()\n/' "$T/CMakeLists.txt"
+    O=$BUILD/$NAME
+    rm -rf "$O" && mkdir -p "$O" && : > "$BUILD/$NAME.log"
+    cmake -S "$T" -B "$O/build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
+        -DCMAKE_PREFIX_PATH="$PREFIX" -DCMAKE_FIND_ROOT_PATH="$PREFIX" \
+        -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DLeptonica_DIR="$PREFIX/lib/cmake/leptonica" \
+        -DBUILD_TRAINING_TOOLS=OFF -DGRAPHICS_DISABLED=ON -DOPENMP_BUILD=OFF \
+        -DDISABLE_TIFF=ON -DDISABLE_ARCHIVE=ON -DDISABLE_CURL=ON -DENABLE_CCACHE=OFF \
+        -DENABLE_PRECOMPILED_HEADERS=OFF -DENABLE_NATIVE=OFF -DINSTALL_CONFIGS=OFF \
+        "${CMAKE_TARGET[@]}" >> "$BUILD/$NAME.log" 2>&1
+    cmake --build "$O/build" -j"$JOBS" --target libtesseract >> "$BUILD/$NAME.log" 2>&1 || {
+        tail -30 "$BUILD/$NAME.log"; exit 1; }
+    cp "$T/src/tesseract.cpp" "$O/tesseract.cpp"
+    perl -pi -e 's/std::cout\b/kioku_cout()/g; s/std::cerr\b/kioku_cerr()/g' "$O/tesseract.cpp"
+    compile "$CXX $CFLAGS -std=c++17 -w $INCLUDE_PROG -DKIOKU_MAIN=kioku_tesseract_tool_main \
+        -I$T/include -I$O/build/include -I$T/src/ccutil -I$T/src/ccstruct -I$T/src/api \
+        -I$T/src/ccmain -I$T/src/viewer -I$T/src/dict -I$T/src/textord -I$T/src/wordrec \
+        -I$T/src/classify -I$T/src/cutil -I$T/src/arch -I$T/src/lstm -I$T/src/training \
+        -I$PREFIX/include/leptonica -I$PREFIX/include" "$O/tesseract.cpp" "$O/tesseract.o"
+    compile "$CXX $CFLAGS -std=c++17" "$SHARED/programs/kioku_iostream.cpp" "$O/kioku_iostream.o"
+    prelink "$PROG/tesseract.o" kioku_tesseract_tool_main "$O/tesseract.o" "$O/kioku_iostream.o"
+    cp "$(find "$O/build" -name 'libtesseract*.a' | head -1)" "$PREFIX/lib/libtesseract.a"
+    $CC $CFLAGS -c "$SHARED/programs/tesseract_glue.c" -o "$PROG/tesseract_glue.o"
+    done_step $NAME
+fi
+
+# espeak-ng: its data is compiled by running espeak-ng, so once on the build
+# machine (the data is the same everywhere); the targets build the library
+# and the program. No sound output: add-ons write WAV (-w, --stdout).
+ESPEAK=$SRC/espeak-ng-$ESPEAK_VERSION
+ESPEAK_OPTIONS=(-DUSE_MBROLA=OFF -DUSE_LIBSONIC=OFF -DUSE_LIBPCAUDIO=OFF -DUSE_ASYNC=OFF
+    -DUSE_SPEECHPLAYER=OFF -DESPEAK_BUILD_MANPAGES=OFF -DCOMPILE_INTONATIONS=ON)
+ESPEAK_DATA=$WORK/data/espeak-ng-data
+if [ ! -f "$ESPEAK_DATA/phondata" ]; then
+    echo "building espeak-ng data"
+    H=$WORK/host/espeak-ng
+    rm -rf "$H"
+    cmake -S "$ESPEAK" -B "$H" -G Ninja -DCMAKE_BUILD_TYPE=Release "${ESPEAK_OPTIONS[@]}" \
+        > "$WORK/espeak-data.log" 2>&1
+    cmake --build "$H" -j"$JOBS" >> "$WORK/espeak-data.log" 2>&1 || {
+        tail -30 "$WORK/espeak-data.log"; exit 1; }
+    rm -rf "$ESPEAK_DATA" && mkdir -p "$WORK/data"
+    cp -R "$H/espeak-ng-data" "$ESPEAK_DATA"
+fi
+NAME=espeak
+if step $NAME; then
+    O=$BUILD/$NAME
+    rm -rf "$O" && mkdir -p "$O" && : > "$BUILD/$NAME.log"
+    # the library's globals too: state_espeak.h only adds a pragma
+    STATE_ESPEAK=$(state_header espeak)
+    cmake -S "$ESPEAK" -B "$O/build" -G Ninja -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_POSITION_INDEPENDENT_CODE=ON "${ESPEAK_OPTIONS[@]}" "${CMAKE_TARGET[@]}" \
+        -DCMAKE_C_FLAGS_RELEASE="-O2 -DNDEBUG $STATE_ESPEAK" >> "$BUILD/$NAME.log" 2>&1
+    cmake --build "$O/build" -j"$JOBS" --target espeak-ng >> "$BUILD/$NAME.log" 2>&1 || {
+        tail -30 "$BUILD/$NAME.log"; exit 1; }
+    compile "$CC $CFLAGS -w $INCLUDE_PROG $STATE_ESPEAK -DKIOKU_MAIN=kioku_espeak_tool_main \
+        -I$ESPEAK/src/include -I$ESPEAK/src/include/compat -I$O/build/src/libespeak-ng/include" \
+        "$ESPEAK/src/espeak-ng.c" "$O/espeak-ng.o"
+    LIBS=$(find "$O/build" -name '*.a')
+    prelink "$PROG/espeak.o" kioku_espeak_tool_main "$O/espeak-ng.o" $LIBS
+    glue espeak espeak
+    done_step $NAME
+fi
+
+# Tesseract's language data (tessdata_fast): TESSDATA_PREFIX (programs.py)
+TESSDATA=$WORK/data/tessdata
+mkdir -p "$TESSDATA"
+# output configs: tsv, hocr, pdf, ... (pytesseract's image_to_data uses tsv)
+# and pdf.ttf for searchable PDFs
+cp -R "$SRC/tesseract-$TESSERACT_VERSION/tessdata/configs" "$SRC/tesseract-$TESSERACT_VERSION/tessdata/tessconfigs" \
+    "$SRC/tesseract-$TESSERACT_VERSION/tessdata/pdf.ttf" "$TESSDATA/"
+for lang in $TESSDATA_LANGS; do
+    [ -s "$TESSDATA/$lang.traineddata" ] || curl -fsSL --retry 3 -o "$TESSDATA/$lang.traineddata" \
+        "https://github.com/tesseract-ocr/tessdata_fast/raw/$TESSDATA_COMMIT/$lang.traineddata"
+done
+
 # The library or executable ----------------------------------------------------------
 FFLIB_FILES=()
 for l in $FFLIBS; do FFLIB_FILES+=("$FFBUILD/lib$l/lib$l.a"); done
-CODEC_LIBS=("$PREFIX"/lib/{libmp3lame,libvorbisenc,libvorbis,libogg,libopus,libwebpmux,libwebp,libsharpyuv,libvpx,libaom,libx264}.a)
+CODEC_LIBS=("$PREFIX"/lib/{libtesseract,libleptonica,libpng16,libjpeg,libmp3lame,libvorbisenc,libvorbis,libogg,libopus,libwebpmux,libwebpdemux,libwebp,libsharpyuv,libvpx,libaom,libx264}.a)
 OBJS=("$PROG/ffmpeg.o" "$PROG/ffprobe.o" "$PROG/ffmpeg_glue.o")
-for p in lame kakasi mecab; do OBJS+=("$PROG/$p.o" "$PROG/${p}_glue.o"); done
+for p in lame kakasi mecab tesseract espeak; do OBJS+=("$PROG/$p.o" "$PROG/${p}_glue.o"); done
 
 LIB=$OUT/lib
 rm -rf "$LIB" && mkdir -p "$LIB"

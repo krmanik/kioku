@@ -15,6 +15,12 @@ QT=$ROOT/deps/qt/$QT_VERSION
 "$ROOT/tools/build_rust.sh" aarch64-apple-ios-sim
 "$ROOT/tools/gen_pyqt.sh" > /dev/null
 "$ROOT/../shared/tools/prepare_site.sh" "$ROOT/.venv/bin/python" "$ROOT/deps/sdist" "$ROOT/build/site"
+"$ROOT/../shared/tools/build_pymupdf.sh" ios-sim > "$ROOT/build/pymupdf.log" 2>&1 || {
+    tail -30 "$ROOT/build/pymupdf.log"; exit 1; }
+cp -R "$ROOT/../build/pymupdf/ios-sim/site/" "$ROOT/build/site/"
+"$ROOT/../shared/tools/build_programs.sh" ios-sim > "$ROOT/build/programs.log" 2>&1 || {
+    tail -30 "$ROOT/build/programs.log"; exit 1; }
+rsync -a --delete "$ROOT/../build/programs/data/" "$ROOT/build/site/kioku_programs_data/"
 
 "$QT/iossim/bin/qt-cmake" -S "$ROOT" -B "$ROOT/build/xcode-sim" -G Xcode \
     -DQT_HOST_PATH="$QT/macos" -DCMAKE_OSX_SYSROOT=iphonesimulator \

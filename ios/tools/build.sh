@@ -23,6 +23,9 @@ QT=$ROOT/deps/qt/$QT_VERSION
 "$ROOT/../shared/tools/build_pymupdf.sh" ios > "$ROOT/build/pymupdf.log" 2>&1 || {
     tail -30 "$ROOT/build/pymupdf.log"; exit 1; }
 cp -R "$ROOT/../build/pymupdf/ios/site/" "$ROOT/build/site/"
+"$ROOT/../shared/tools/build_programs.sh" ios > "$ROOT/build/programs.log" 2>&1 || {
+    tail -30 "$ROOT/build/programs.log"; exit 1; }
+rsync -a --delete "$ROOT/../build/programs/data/" "$ROOT/build/site/kioku_programs_data/"
 
 "$QT/ios/bin/qt-cmake" -S "$ROOT" -B "$ROOT/build/xcode-dev" -G Xcode \
     -DQT_HOST_PATH="$QT/macos" -DCMAKE_OSX_SYSROOT=iphoneos -DCMAKE_OSX_ARCHITECTURES=arm64 \

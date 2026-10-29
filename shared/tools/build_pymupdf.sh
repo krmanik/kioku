@@ -3,18 +3,18 @@
 # libraries), the C++ and Python bindings MuPDF generates for itself
 # (scripts/mupdfwrap.py, run on the build machine with libclang and SWIG),
 # and PyMuPDF's own extension (src/extra.i).
-#   ios:     one static library with PyInit__mupdf and PyInit__extra, linked
+#   ios, ios-sim: one static library with PyInit__mupdf and PyInit__extra, linked
 #            into the app (pymupdf._mupdf and pymupdf._extra in main.mm)
 #   android: _mupdf.so and _extra.so over libmupdfcpp.so (MuPDF and the C++
 #            bindings; both modules need the same MuPDF), in site/pymupdf/
 # Output: build/pymupdf/<target>/ with lib/ and site/ (pymupdf/, fitz/).
-# Usage: build_pymupdf.sh ios|android
+# Usage: build_pymupdf.sh ios|ios-sim|android
 # Env: ANDROID_NDK_ROOT (android), JOBS (default: all cores)
 set -euo pipefail
 SHARED=$(cd "$(dirname "$0")/.." && pwd)
 ROOT=$(cd "$SHARED/.." && pwd)
 source "$SHARED/versions.env"
-TARGET=${1:?ios or android}
+TARGET=${1:?ios, ios-sim or android}
 WORK=$ROOT/build/pymupdf
 SRC=$WORK/src
 MUPDF=$SRC/mupdf-$MUPDF_VERSION-source
@@ -56,14 +56,22 @@ fi
 # TOFU_CJK_EXT: like PyPI's PyMuPDF, without the extended CJK font
 FLAGS="-fPIC -DTOFU_CJK_EXT"
 case $TARGET in
-ios)
-    SDK=$(xcrun --sdk iphoneos --show-sdk-path)
-    CC="$(xcrun --sdk iphoneos -f clang)"
-    CXX="$(xcrun --sdk iphoneos -f clang++)"
-    AR="$(xcrun --sdk iphoneos -f ar)"
-    RANLIB="$(xcrun --sdk iphoneos -f ranlib)"
-    FLAGS="$FLAGS -arch arm64 -isysroot $SDK -miphoneos-version-min=17.0"
-    PYINC=$ROOT/ios/deps/python-ios/Python.xcframework/ios-arm64/include/python$PYTHON_VERSION
+ios | ios-sim)
+    SDKNAME=iphoneos
+    PYSLICE=ios-arm64
+    VERSION_MIN=-miphoneos-version-min=17.0
+    if [ "$TARGET" = ios-sim ]; then
+        SDKNAME=iphonesimulator
+        PYSLICE=ios-arm64_x86_64-simulator
+        VERSION_MIN=-mios-simulator-version-min=17.0
+    fi
+    SDK=$(xcrun --sdk $SDKNAME --show-sdk-path)
+    CC="$(xcrun --sdk $SDKNAME -f clang)"
+    CXX="$(xcrun --sdk $SDKNAME -f clang++)"
+    AR="$(xcrun --sdk $SDKNAME -f ar)"
+    RANLIB="$(xcrun --sdk $SDKNAME -f ranlib)"
+    FLAGS="$FLAGS -arch arm64 -isysroot $SDK $VERSION_MIN"
+    PYINC=$ROOT/ios/deps/python-ios/Python.xcframework/$PYSLICE/include/python$PYTHON_VERSION
     ;;
 android)
     NDK=${ANDROID_NDK_ROOT:-${ANDROID_NDK:?set ANDROID_NDK_ROOT}}
@@ -115,7 +123,7 @@ for pid in "${PIDS[@]}"; do wait "$pid"; done
 LIB=$OUT/lib
 rm -rf "$LIB" && mkdir -p "$LIB"
 case $TARGET in
-ios)
+ios | ios-sim)
     # Qt links its own harfbuzz, libjpeg, ...: prelink into one object that
     # exports only the two module init functions, everything else local
     printf '%s\n' _PyInit__mupdf _PyInit__extra > "$OBJ/exports.txt"

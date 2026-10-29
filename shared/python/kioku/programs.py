@@ -81,6 +81,10 @@ def install(cache_dir: str) -> None:
             with open(path, "w") as f:
                 f.write("#!/bin/sh\n# bundled with Kioku\n")
             os.chmod(path, 0o755)
+    data = _data_dir()
+    if data:
+        os.environ.setdefault("TESSDATA_PREFIX", os.path.join(data, "tessdata"))
+        os.environ.setdefault("ESPEAK_DATA_PATH", data)
     os.environ["PATH"] = os.pathsep.join(
         [_bin_dir] + [p for p in os.environ.get("PATH", "").split(os.pathsep) if p and p != _bin_dir]
     )
@@ -89,6 +93,15 @@ def install(cache_dir: str) -> None:
 
 # the programs in libkiokuprog.so (shared/programs/kioku_prog.c)
 _ANDROID_PROGRAMS = {"ffmpeg", "ffprobe", "lame", "tesseract", "espeak-ng", "espeak", "kakasi", "mecab"}
+
+
+def _data_dir() -> str:
+    """The programs' data files (build/programs/data), in site-packages."""
+    for path in sys.path:
+        candidate = os.path.join(path, "kioku_programs_data")
+        if os.path.isdir(candidate):
+            return candidate
+    return ""
 
 
 def _android_executable() -> str:

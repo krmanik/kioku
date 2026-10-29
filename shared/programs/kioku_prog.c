@@ -12,6 +12,7 @@
  *       One run of a program at a time (programs keep global state); a run
  *       of ffmpeg also holds ffprobe's lock, since they share FFmpeg's
  *       libraries, whose log goes to the running tool's stderr. */
+#include <getopt.h>
 #include <libgen.h>
 #include <pthread.h>
 #include <stdarg.h>
@@ -134,6 +135,11 @@ void kioku_state_reset(char *data, char *data_end, char *bss, char *bss_end, cha
 static void *run_thread(void *arg) {
     struct session *s = arg;
     current = s;
+    /* libc's getopt state (espeak-ng parses its options with it) */
+    optind = 1;
+#ifdef __APPLE__
+    optreset = 1;
+#endif
     s->code = s->program->main(s->argc, s->argv);
     fflush(s->out);
     fflush(s->err);

@@ -201,8 +201,47 @@ def test_kakasi(tmp, ok):
     ok("kakasi again (state reset)", p.stdout.decode().strip() == "にほんご", p.stdout)
 
 
+# a page of English text (leptonica's sample) and Tesseract's language data
+OCR_IMAGE = os.environ.get("OCR_IMAGE") or os.path.join(
+    HERE, "..", "..", "build", "programs", "src", "leptonica-1.87.0", "prog", "1555.007.jpg")
+
+
+def test_tesseract(tmp, ok):
+    p = run("tesseract", "--list-langs")
+    ok("tesseract --list-langs", p.returncode == 0 and b"eng" in p.stdout and b"jpn" in p.stdout,
+       p.stdout[-200:] + p.stderr[-200:])
+    if not os.path.exists(OCR_IMAGE):
+        print("skip tesseract OCR: no " + OCR_IMAGE)
+        return
+    # pytesseract: <image> <output base> -l eng, then reads <base>.txt
+    base = os.path.join(tmp, "ocr")
+    p = run("tesseract", OCR_IMAGE, base, "-l", "eng")
+    text = open(base + ".txt").read() if os.path.exists(base + ".txt") else ""
+    ok("tesseract to a file (pytesseract)", p.returncode == 0 and len(text.split()) > 50, p.stderr[-300:])
+    p = run("tesseract", OCR_IMAGE, "stdout", "-l", "eng")
+    ok("tesseract to stdout", p.returncode == 0 and len(p.stdout.split()) > 50, p.stderr[-300:])
+    p = run("tesseract", "stdin", "stdout", "-l", "eng", input=open(OCR_IMAGE, "rb").read())
+    ok("tesseract from stdin", p.returncode == 0 and len(p.stdout.split()) > 50, p.stderr[-300:])
+    p = run("tesseract", OCR_IMAGE, base, "-l", "eng", "tsv")
+    ok("tesseract tsv, again", p.returncode == 0 and os.path.exists(base + ".tsv"), p.stderr[-300:])
+
+
+def test_espeak(tmp, ok):
+    wav = os.path.join(tmp, "speech.wav")
+    p = run("espeak-ng", "-v", "en", "-w", wav, "Hello from Kioku")
+    ok("espeak-ng -w file", p.returncode == 0 and os.path.getsize(wav) > 10000, p.stderr[-300:])
+    p = run("espeak", "-s", "150", "--stdout", "日本語", "-v", "ja")
+    ok("espeak --stdout, Japanese", p.returncode == 0 and p.stdout[:4] == b"RIFF", p.stderr[-300:])
+    p = run("espeak-ng", "--voices=fr")
+    ok("espeak-ng --voices (data found)", p.returncode == 0 and b"fr" in p.stdout, p.stderr[-300:])
+    for i in range(3):
+        p = run("espeak-ng", "-w", wav, f"run {i}")
+    ok("espeak-ng runs again (state reset)", p.returncode == 0, p.stderr[-300:])
+
+
 # (name, function(tmp, ok)), after ffmpeg's: lame reads the WAV made above
-TESTS = [("lame", test_lame), ("mecab", test_mecab), ("kakasi", test_kakasi)]
+TESTS = [("lame", test_lame), ("mecab", test_mecab), ("kakasi", test_kakasi),
+         ("tesseract", test_tesseract), ("espeak", test_espeak)]
 
 
 if __name__ == "__main__":
@@ -222,6 +261,9 @@ if __name__ == "__main__":
             open(path, "w").close()
             os.chmod(path, 0o755)
         os.environ["PATH"] = programs._bin_dir + os.pathsep + os.environ["PATH"]
+        data = os.path.join(HERE, "..", "..", "build", "programs", "data")
+        os.environ["TESSDATA_PREFIX"] = os.path.join(data, "tessdata")
+        os.environ["ESPEAK_DATA_PATH"] = data
         subprocess.Popen = programs.Popen
         work = os.path.join(tmp, "work")
         os.makedirs(work)

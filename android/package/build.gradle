@@ -82,7 +82,10 @@ android {
 
     packagingOptions {
         jniLibs {
-            useLegacyPackaging = legacyPackaging
+            // extracted on install: Android only runs executables from the
+            // app's native library folder (libkiokuprog.so, the programs
+            // add-ons start)
+            useLegacyPackaging = true
         }
     }
 
