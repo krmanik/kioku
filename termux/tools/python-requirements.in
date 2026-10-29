@@ -15,3 +15,8 @@ send2trash
 truststore
 typing_extensions
 waitress
+
+# Add-on extras, not anki/aqt dependencies (docs/addon-deps.md)
+pygments
+qtpy
+tqdm
