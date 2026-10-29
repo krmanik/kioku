@@ -30,9 +30,14 @@ FILE *kioku_stderr(void);
 KIOKU_NORETURN void kioku_exit(int code);
 kioku_sighandler_t kioku_signal(int sig, kioku_sighandler_t handler);
 
-/* -DKIOKU_MAIN=kioku_<name>_main on the file with the program's main */
+/* -DKIOKU_MAIN=kioku_<name>_main on the file with the program's main
+ * (-DKIOKU_MAIN_CONST_ARGV when it takes const char *argv[]) */
 #ifdef KIOKU_MAIN
+#ifdef KIOKU_MAIN_CONST_ARGV
+int KIOKU_MAIN(int argc, const char *argv[]);
+#else
 int KIOKU_MAIN(int argc, char **argv);
+#endif
 #define main KIOKU_MAIN
 #endif
 

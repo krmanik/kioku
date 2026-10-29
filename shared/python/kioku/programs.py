@@ -36,6 +36,58 @@ _android_exe = ""
 _cwd_lock = threading.Lock()
 
 
+def _chmod(argv, stdin, stdout, stderr) -> int:
+    """chmod [-R] MODE FILE...: add-ons make their bundled binaries
+    executable (AnkiOCR on macOS paths); iOS has no chmod to start."""
+    import stat
+
+    args = argv[1:]
+    recursive = bool(args) and args[0] == "-R"
+    if recursive:
+        args = args[1:]
+    if len(args) < 2:
+        stderr.write(b"usage: chmod [-R] mode file...\n")
+        return 1
+    mode, paths = args[0], args[1:]
+
+    def new_mode(old: int) -> int:
+        if mode.isdigit():
+            return int(mode, 8)
+        bits = {"r": 0o444, "w": 0o222, "x": 0o111}
+        result = old
+        for clause in mode.split(","):
+            who = clause.rstrip("rwx+-=").rstrip("+-=") or "a"
+            op = next((c for c in clause if c in "+-="), "+")
+            perms = clause.split(op, 1)[-1]
+            mask = sum(m for c, m in (("u", 0o700), ("g", 0o070), ("o", 0o007)) if c in who or "a" in who)
+            value = sum(bits.get(c, 0) for c in perms) & mask
+            if op == "+":
+                result |= value
+            elif op == "-":
+                result &= ~value
+            else:
+                result = (result & ~mask) | value
+        return result
+
+    code = 0
+    for path in paths:
+        targets = [path]
+        if recursive and os.path.isdir(path):
+            for root, dirs, files in os.walk(path):
+                targets += [os.path.join(root, n) for n in dirs + files]
+        for target in targets:
+            try:
+                os.chmod(target, new_mode(stat.S_IMODE(os.stat(target).st_mode)))
+            except OSError as e:
+                stderr.write(f"chmod: {target}: {e.strerror}\n".encode())
+                code = 1
+    return code
+
+
+if sys.platform == "ios":
+    PYTHON_PROGRAMS["chmod"] = _chmod
+
+
 def program_name(path: str) -> str:
     name = os.path.basename(path).lower()
     for suffix in (".exe", ".lin", ".mac"):
@@ -92,7 +144,8 @@ def install(cache_dir: str) -> None:
 
 
 # the programs in libkiokuprog.so (shared/programs/kioku_prog.c)
-_ANDROID_PROGRAMS = {"ffmpeg", "ffprobe", "lame", "tesseract", "espeak-ng", "espeak", "kakasi", "mecab"}
+_ANDROID_PROGRAMS = {"ffmpeg", "ffprobe", "lame", "tesseract", "espeak-ng", "espeak", "kakasi", "mecab",
+                     "cwebp", "dwebp"}
 
 
 def _data_dir() -> str:

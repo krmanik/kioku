@@ -155,10 +155,16 @@ autotools_build lame "$SRC/lame-$LAME_VERSION" --disable-frontend --disable-gtkt
 cmake_build ogg "$SRC/libogg-$OGG_VERSION" -DINSTALL_DOCS=OFF -DBUILD_TESTING=OFF
 cmake_build vorbis "$SRC/libvorbis-$VORBIS_VERSION"
 cmake_build opus "$SRC/opus-$OPUS_VERSION" -DOPUS_BUILD_PROGRAMS=OFF -DOPUS_BUILD_TESTING=OFF
-cmake_build webp "$SRC/libwebp-$WEBP_VERSION" -DWEBP_BUILD_ANIM_UTILS=OFF -DWEBP_BUILD_CWEBP=OFF \
-    -DWEBP_BUILD_DWEBP=OFF -DWEBP_BUILD_GIF2WEBP=OFF -DWEBP_BUILD_IMG2WEBP=OFF \
+# libpng and libjpeg-turbo: for libwebp's cwebp/dwebp, leptonica and Pillow
+cmake_build png "$SRC/libpng-$PNG_VERSION" -DPNG_SHARED=OFF -DPNG_TESTS=OFF -DPNG_TOOLS=OFF \
+    -DPNG_FRAMEWORK=OFF
+cmake_build jpeg "$SRC/libjpeg-turbo-$JPEG_VERSION" -DENABLE_SHARED=OFF -DWITH_TURBOJPEG=OFF \
+    -DWITH_TOOLS=OFF -DWITH_TESTS=OFF
+# libwebp, with cwebp and dwebp (AJT Media Converter converts images with cwebp)
+cmake_build webp "$SRC/libwebp-$WEBP_VERSION" -DWEBP_BUILD_ANIM_UTILS=OFF -DWEBP_BUILD_CWEBP=ON \
+    -DWEBP_BUILD_DWEBP=ON -DWEBP_BUILD_GIF2WEBP=OFF -DWEBP_BUILD_IMG2WEBP=OFF \
     -DWEBP_BUILD_VWEBP=OFF -DWEBP_BUILD_WEBPINFO=OFF -DWEBP_BUILD_WEBPMUX=OFF \
-    -DWEBP_BUILD_EXTRAS=OFF
+    -DWEBP_BUILD_EXTRAS=OFF -DWEBP_USE_THREAD=ON
 # Pillow (build_wheels.sh) links -lwebp alone: libwebp.a with libsharpyuv in it
 if [ "$TARGET" = android ] && ! "$NM" "$PREFIX/lib/libwebp.a" 2>/dev/null | grep -q " T SharpYuvInit"; then
     printf 'create %s\naddlib %s\naddlib %s\nsave\nend\n' "$PREFIX/lib/libwebp-all.a" \
@@ -366,12 +372,26 @@ if step $NAME; then
     done_step $NAME
 fi
 
-# Tesseract, with leptonica and its image libraries; only the program's own
+# cwebp and dwebp: libwebp's example programs, over its image I/O libraries
+NAME=webp-tools
+if step $NAME; then
+    W=$SRC/libwebp-$WEBP_VERSION
+    O=$BUILD/$NAME
+    rm -rf "$O" && mkdir -p "$O" && : > "$BUILD/$NAME.log"
+    for t in cwebp dwebp; do
+        compile "$CC $CFLAGS -w $INCLUDE_PROG $(state_header $t) -DKIOKU_MAIN=kioku_${t}_tool_main -DKIOKU_MAIN_CONST_ARGV \
+            -DWEBP_HAVE_PNG -DWEBP_HAVE_JPEG -I$W -I$W/src -I$W/examples -I$PREFIX/include" \
+            "$W/examples/$t.c" "$O/$t.o"
+        prelink "$PROG/$t.o" kioku_${t}_tool_main "$O/$t.o" \
+            "$BUILD/webp/libimagedec.a" "$BUILD/webp/libimageenc.a" "$BUILD/webp/libimageioutil.a" \
+            "$BUILD/webp/libexampleutil.a"
+        glue $t $t
+    done
+    done_step $NAME
+fi
+
+# Tesseract, with leptonica; only the program's own
 # file gets kioku_prog.h (tesseract_glue.c does the rest)
-cmake_build png "$SRC/libpng-$PNG_VERSION" -DPNG_SHARED=OFF -DPNG_TESTS=OFF -DPNG_TOOLS=OFF \
-    -DPNG_FRAMEWORK=OFF
-cmake_build jpeg "$SRC/libjpeg-turbo-$JPEG_VERSION" -DENABLE_SHARED=OFF -DWITH_TURBOJPEG=OFF \
-    -DWITH_TOOLS=OFF -DWITH_TESTS=OFF
 # FreeType: not for the programs, for Pillow's ImageFont (build_wheels.sh)
 cmake_build freetype "$SRC/freetype-$FREETYPE_VERSION" -DFT_DISABLE_HARFBUZZ=ON \
     -DFT_DISABLE_BROTLI=ON -DFT_DISABLE_BZIP2=ON -DFT_DISABLE_PNG=ON -DFT_DISABLE_ZLIB=ON
@@ -469,7 +489,7 @@ FFLIB_FILES=()
 for l in $FFLIBS; do FFLIB_FILES+=("$FFBUILD/lib$l/lib$l.a"); done
 CODEC_LIBS=("$PREFIX"/lib/{libtesseract,libleptonica,libpng16,libjpeg,libmp3lame,libvorbisenc,libvorbis,libogg,libopus,libwebpmux,libwebpdemux,libwebp,libsharpyuv,libvpx,libaom,libx264}.a)
 OBJS=("$PROG/ffmpeg.o" "$PROG/ffprobe.o" "$PROG/ffmpeg_glue.o")
-for p in lame kakasi mecab tesseract espeak; do OBJS+=("$PROG/$p.o" "$PROG/${p}_glue.o"); done
+for p in lame kakasi mecab tesseract espeak cwebp dwebp; do OBJS+=("$PROG/$p.o" "$PROG/${p}_glue.o"); done
 
 LIB=$OUT/lib
 rm -rf "$LIB" && mkdir -p "$LIB"

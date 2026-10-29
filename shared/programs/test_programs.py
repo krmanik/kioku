@@ -197,8 +197,10 @@ def test_kakasi(tmp, ok):
     ok("kakasi, Japanese Support's way", readings == ["かんじ", "かたかな"], readings)
     p.stdin.close()
     p.wait(timeout=10)
-    p = run("kakasi", "-iutf8", "-outf8", "-JH", input="日本語\n".encode())
-    ok("kakasi again (state reset)", p.stdout.decode().strip() == "にほんご", p.stdout)
+    # (Shift-JIS, as every add-on that uses kakasi: Android's iconv has no
+    # Japanese encodings for -iutf8)
+    p = run("kakasi", "-isjis", "-osjis", "-JH", input="日本語\n".encode("sjis"))
+    ok("kakasi again (state reset)", p.stdout.decode("sjis").strip() == "にほんご", p.stdout)
 
 
 # a page of English text (leptonica's sample) and Tesseract's language data
@@ -239,9 +241,23 @@ def test_espeak(tmp, ok):
     ok("espeak-ng runs again (state reset)", p.returncode == 0, p.stderr[-300:])
 
 
+def test_webp(tmp, ok):
+    # AJT Media Converter: cwebp <args> -o out.webp -- in.png
+    png = os.path.join(tmp, "a.png")
+    webp = os.path.join(tmp, "cwebp.webp")
+    p = run("cwebp", "-q", "70", "-resize", "100", "0", "-o", webp, "--", png)
+    ok("cwebp png to webp", p.returncode == 0 and open(webp, "rb").read(12)[8:] == b"WEBP", p.stderr[-300:])
+    jpg = os.path.join(tmp, "a.jpg")
+    p = run("cwebp", "-quiet", jpg, "-o", webp)
+    ok("cwebp jpeg, again", p.returncode == 0, p.stderr[-300:])
+    out = os.path.join(tmp, "dwebp.png")
+    p = run("dwebp", webp, "-o", out)
+    ok("dwebp webp to png", p.returncode == 0 and open(out, "rb").read(4) == b"\x89PNG", p.stderr[-300:])
+
+
 # (name, function(tmp, ok)), after ffmpeg's: lame reads the WAV made above
 TESTS = [("lame", test_lame), ("mecab", test_mecab), ("kakasi", test_kakasi),
-         ("tesseract", test_tesseract), ("espeak", test_espeak)]
+         ("tesseract", test_tesseract), ("espeak", test_espeak), ("webp", test_webp)]
 
 
 if __name__ == "__main__":

@@ -32,6 +32,8 @@ PROGRAM(tesseract)
 PROGRAM(espeak)
 PROGRAM(kakasi)
 PROGRAM(mecab)
+PROGRAM(cwebp)
+PROGRAM(dwebp)
 #undef PROGRAM
 
 struct program {
@@ -50,6 +52,8 @@ static struct program programs[] = {
     {"espeak", kioku_espeak_main, 4},
     {"kakasi", kioku_kakasi_main, 6},
     {"mecab", kioku_mecab_main, -1},
+    {"cwebp", kioku_cwebp_main, 8},
+    {"dwebp", kioku_dwebp_main, 9},
 };
 #define NPROGRAMS (int)(sizeof(programs) / sizeof(programs[0]))
 
@@ -76,7 +80,8 @@ static struct session *family_session[NPROGRAMS];
 static pthread_mutex_t family_lock[NPROGRAMS] = {
     PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER,
     PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER,
-    PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER,
+    PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER,
+    PTHREAD_MUTEX_INITIALIZER,
 };
 
 /* the calling program's session; FFmpeg's own threads use ffmpeg's/ffprobe's */

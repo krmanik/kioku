@@ -9,6 +9,7 @@ the platforms comes from kioku_platform.
 from __future__ import annotations
 
 import logging
+import os
 import types
 
 import kioku_platform as platform
@@ -67,6 +68,8 @@ def apply() -> None:
     _patch_docks()
     _patch_update_check()
     _patch_page_html()
+    _python_313_compat()
+    _addon_platform()
 
 
 def _dark_mode() -> bool:
@@ -450,3 +453,51 @@ def _patch_audio() -> None:
         aqt.sound.av_player.players.append(platform.tts_player(taskman))
 
     aqt.sound.setup_audio = setup_audio
+
+
+def _python_313_compat() -> None:
+    """Desktop Anki runs Python 3.13; the apps run 3.14, which dropped
+    pkgutil.find_loader() and get_loader(). Add-ons' bundled libraries still
+    call them (pytesseract in AnkiOCR)."""
+    import importlib.util
+    import pkgutil
+
+    def find_loader(fullname):  # type: ignore[no-untyped-def]
+        try:
+            spec = importlib.util.find_spec(fullname)
+        except (ImportError, ValueError):
+            return None
+        return spec.loader if spec else None
+
+    def get_loader(module_or_name):  # type: ignore[no-untyped-def]
+        if isinstance(module_or_name, types.ModuleType):
+            spec = getattr(module_or_name, "__spec__", None)
+            return spec.loader if spec else None
+        return find_loader(module_or_name)
+
+    if not hasattr(pkgutil, "find_loader"):
+        pkgutil.find_loader = find_loader
+    if not hasattr(pkgutil, "get_loader"):
+        pkgutil.get_loader = get_loader
+
+
+def _addon_platform() -> None:
+    """platform.system() is "Android"/"iOS" since Python 3.13; add-ons pick
+    programs and paths from tables keyed "Windows"/"Darwin"/"Linux" (and
+    KeyError on anything else). Code in add-ons gets the answer older Pythons
+    gave there: "Linux" on Android, "Darwin" on iOS; everything else (Anki's
+    own platform description, truststore) the real one."""
+    import platform
+    import sys
+
+    system = platform.system
+    answer = {"android": "Linux", "ios": "Darwin"}.get(sys.platform)
+    if not answer:
+        return
+    marker = f"{os.sep}addons21{os.sep}"
+
+    def addon_system() -> str:
+        caller = sys._getframe(1).f_globals.get("__file__") or ""
+        return answer if marker in caller else system()
+
+    platform.system = addon_system

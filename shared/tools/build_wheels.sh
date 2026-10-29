@@ -89,7 +89,9 @@ android)
     build_wheel pillow "$PILLOW_VERSION" CIBW_BEFORE_ALL= \
         CIBW_CONFIG_SETTINGS="raqm=disable imagequant=disable xcb=disable avif=disable" \
         CIBW_ENVIRONMENT="CFLAGS=-I$PREFIX/include PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig ZLIB_ROOT=$ZLIB"
-    build_wheel cryptography "$CRYPTOGRAPHY_VERSION"
+    # Rust ignores LDFLAGS: 16 KB pages (Android 15+ devices) need it in RUSTFLAGS
+    build_wheel cryptography "$CRYPTOGRAPHY_VERSION" \
+        CIBW_ENVIRONMENT="RUSTFLAGS='-C link-arg=-Wl,-z,max-page-size=16384'"
     ;;
 esac
 
