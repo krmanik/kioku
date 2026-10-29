@@ -666,3 +666,5 @@ focus object. Fix: [fixes.md](fixes.md#runtime-platform)
 
 Not found: which path in the tester's app left the focus null without the
 signal. The patch covers every such path for this crash.
+
+Which AnkiWeb add-ons need libraries or programs Kioku doesn't bundle: [addon-deps.md](addon-deps.md).

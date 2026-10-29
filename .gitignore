@@ -13,3 +13,4 @@ build-testdata/
 .env
 *.p8
 docs/manual/book/
+addons-dump/
