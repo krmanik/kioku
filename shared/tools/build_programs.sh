@@ -54,7 +54,8 @@ ios | ios-sim | macos)
         CMAKE_TARGET+=(-DCMAKE_OSX_DEPLOYMENT_TARGET=13.0)
     else
         # no app bundles for the libraries' own programs (libaom's)
-        CMAKE_TARGET+=(-DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_DEPLOYMENT_TARGET=17.0 -DCMAKE_MACOSX_BUNDLE=OFF)
+        CMAKE_TARGET+=(-DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_DEPLOYMENT_TARGET=17.0 -DCMAKE_MACOSX_BUNDLE=OFF
+            -DCMAKE_SYSTEM_PROCESSOR=aarch64)
     fi
     PYINC=$ROOT/ios/deps/python-ios/Python.xcframework/ios-arm64/include/python$PYTHON_VERSION
     [ "$TARGET" = macos ] && PYINC=$(python$PYTHON_VERSION -c 'import sysconfig; print(sysconfig.get_path("include"))')
@@ -129,6 +130,7 @@ fetch "https://github.com/webmproject/libvpx/archive/refs/tags/v$VPX_VERSION.tar
 fetch "https://storage.googleapis.com/aom-releases/libaom-$AOM_VERSION.tar.gz" libaom-$AOM_VERSION
 fetch "https://downloads.sourceforge.net/project/libpng/libpng16/$PNG_VERSION/libpng-$PNG_VERSION.tar.xz" libpng-$PNG_VERSION
 fetch "https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/$JPEG_VERSION/libjpeg-turbo-$JPEG_VERSION.tar.gz" libjpeg-turbo-$JPEG_VERSION
+fetch "https://download.savannah.gnu.org/releases/freetype/freetype-$FREETYPE_VERSION.tar.xz" freetype-$FREETYPE_VERSION
 fetch "https://github.com/DanBloomberg/leptonica/releases/download/$LEPTONICA_VERSION/leptonica-$LEPTONICA_VERSION.tar.gz" leptonica-$LEPTONICA_VERSION
 fetch "https://github.com/tesseract-ocr/tesseract/archive/refs/tags/$TESSERACT_VERSION.tar.gz" tesseract-$TESSERACT_VERSION
 fetch "https://github.com/espeak-ng/espeak-ng/archive/refs/tags/$ESPEAK_VERSION.tar.gz" espeak-ng-$ESPEAK_VERSION
@@ -157,6 +159,12 @@ cmake_build webp "$SRC/libwebp-$WEBP_VERSION" -DWEBP_BUILD_ANIM_UTILS=OFF -DWEBP
     -DWEBP_BUILD_DWEBP=OFF -DWEBP_BUILD_GIF2WEBP=OFF -DWEBP_BUILD_IMG2WEBP=OFF \
     -DWEBP_BUILD_VWEBP=OFF -DWEBP_BUILD_WEBPINFO=OFF -DWEBP_BUILD_WEBPMUX=OFF \
     -DWEBP_BUILD_EXTRAS=OFF
+# Pillow (build_wheels.sh) links -lwebp alone: libwebp.a with libsharpyuv in it
+if [ "$TARGET" = android ] && ! "$NM" "$PREFIX/lib/libwebp.a" 2>/dev/null | grep -q " T SharpYuvInit"; then
+    printf 'create %s\naddlib %s\naddlib %s\nsave\nend\n' "$PREFIX/lib/libwebp-all.a" \
+        "$PREFIX/lib/libwebp.a" "$PREFIX/lib/libsharpyuv.a" | "$AR" -M
+    mv "$PREFIX/lib/libwebp-all.a" "$PREFIX/lib/libwebp.a"
+fi
 # runtime CPU detection (libvpx and libaom): newer instructions (SVE, i8mm)
 # only where the phone has them
 cmake_build aom "$SRC/libaom-$AOM_VERSION" -DENABLE_DOCS=0 -DENABLE_EXAMPLES=0 -DENABLE_TESTS=0 \
@@ -364,6 +372,9 @@ cmake_build png "$SRC/libpng-$PNG_VERSION" -DPNG_SHARED=OFF -DPNG_TESTS=OFF -DPN
     -DPNG_FRAMEWORK=OFF
 cmake_build jpeg "$SRC/libjpeg-turbo-$JPEG_VERSION" -DENABLE_SHARED=OFF -DWITH_TURBOJPEG=OFF \
     -DWITH_TOOLS=OFF -DWITH_TESTS=OFF
+# FreeType: not for the programs, for Pillow's ImageFont (build_wheels.sh)
+cmake_build freetype "$SRC/freetype-$FREETYPE_VERSION" -DFT_DISABLE_HARFBUZZ=ON \
+    -DFT_DISABLE_BROTLI=ON -DFT_DISABLE_BZIP2=ON -DFT_DISABLE_PNG=ON -DFT_DISABLE_ZLIB=ON
 cmake_build leptonica "$SRC/leptonica-$LEPTONICA_VERSION" -DSW_BUILD=OFF -DBUILD_PROG=OFF \
     -DENABLE_GIF=OFF -DENABLE_TIFF=OFF -DENABLE_OPENJPEG=OFF -DENABLE_WEBP=OFF
 NAME=tesseract
@@ -373,6 +384,8 @@ if step $NAME; then
     # when cross-compiling); there's no TIFF either way
     grep -q 'if(NOT DISABLE_TIFF)\ncheck_leptonica' "$T/CMakeLists.txt" ||
         perl -0pi -e 's/\ncheck_leptonica_tiff_support\(\)\n/\nif(NOT DISABLE_TIFF)\n  check_leptonica_tiff_support()\nendif()\n/' "$T/CMakeLists.txt"
+    # Google's cpu_features, for NEON on 32-bit ARM only (arm64 always has it)
+    perl -0pi -e 's/  find_package\(CpuFeaturesNdkCompat REQUIRED\)\n.*?CpuFeatures::ndk_compat\)\n//s' "$T/CMakeLists.txt"
     O=$BUILD/$NAME
     rm -rf "$O" && mkdir -p "$O" && : > "$BUILD/$NAME.log"
     cmake -S "$T" -B "$O/build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
@@ -420,11 +433,14 @@ NAME=espeak
 if step $NAME; then
     O=$BUILD/$NAME
     rm -rf "$O" && mkdir -p "$O" && : > "$BUILD/$NAME.log"
-    # the library's globals too: state_espeak.h only adds a pragma
+    # the library's globals too: state_espeak.h only adds a pragma. iOS has
+    # le16toh() and co. in sys/endian.h, which its configure misses
     STATE_ESPEAK=$(state_header espeak)
+    case $TARGET in ios | ios-sim) STATE_ESPEAK="$STATE_ESPEAK -include sys/endian.h" ;; esac
     cmake -S "$ESPEAK" -B "$O/build" -G Ninja -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON "${ESPEAK_OPTIONS[@]}" "${CMAKE_TARGET[@]}" \
-        -DCMAKE_C_FLAGS_RELEASE="-O2 -DNDEBUG $STATE_ESPEAK" >> "$BUILD/$NAME.log" 2>&1
+        -DCMAKE_C_FLAGS_RELEASE="-O2 -DNDEBUG $STATE_ESPEAK" \
+        >> "$BUILD/$NAME.log" 2>&1
     cmake --build "$O/build" -j"$JOBS" --target espeak-ng >> "$BUILD/$NAME.log" 2>&1 || {
         tail -30 "$BUILD/$NAME.log"; exit 1; }
     compile "$CC $CFLAGS -w $INCLUDE_PROG $STATE_ESPEAK -DKIOKU_MAIN=kioku_espeak_tool_main \

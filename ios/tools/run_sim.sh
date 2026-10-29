@@ -21,6 +21,10 @@ cp -R "$ROOT/../build/pymupdf/ios-sim/site/" "$ROOT/build/site/"
 "$ROOT/../shared/tools/build_programs.sh" ios-sim > "$ROOT/build/programs.log" 2>&1 || {
     tail -30 "$ROOT/build/programs.log"; exit 1; }
 rsync -a --delete "$ROOT/../build/programs/data/" "$ROOT/build/site/kioku_programs_data/"
+# Python packages with native code (numpy, Pillow, cryptography, lxml, ...)
+"$ROOT/../shared/tools/build_wheels.sh" ios-sim > "$ROOT/build/wheels.log" 2>&1 || {
+    tail -30 "$ROOT/build/wheels.log"; exit 1; }
+rsync -a "$ROOT/../build/wheels/ios-sim/site/" "$ROOT/build/site/"
 
 "$QT/iossim/bin/qt-cmake" -S "$ROOT" -B "$ROOT/build/xcode-sim" -G Xcode \
     -DQT_HOST_PATH="$QT/macos" -DCMAKE_OSX_SYSROOT=iphonesimulator \
