@@ -104,11 +104,11 @@ esac
 # cryptography and cffi, so not in requirements.in) and jieba (no wheel on PyPI)
 for pure in "pyopenssl==$PYOPENSSL_VERSION" "pycparser==$PYCPARSER_VERSION"; do
     ls "$WHEELS"/${pure%%==*}-${pure##*==}-*.whl > /dev/null 2>&1 ||
-        python3 -m pip download -q --no-deps --only-binary :all: --platform any \
+        uvx pip download -q --no-deps --only-binary :all: --platform any \
             --python-version "$PYTHON_VERSION" --implementation py --abi none -d "$WHEELS" "$pure"
 done
 ls "$WHEELS"/jieba-$JIEBA_VERSION-*.whl > /dev/null 2>&1 ||
-    python3 -m pip wheel -q --no-deps -w "$WHEELS" "jieba==$JIEBA_VERSION"
+    uvx pip wheel -q --no-deps -w "$WHEELS" "jieba==$JIEBA_VERSION"
 
 rm -rf "$SITE" && mkdir -p "$SITE"
 for w in "$WHEELS"/*.whl; do unzip -qo -DD "$w" -d "$SITE"; done

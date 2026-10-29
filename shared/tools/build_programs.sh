@@ -93,6 +93,14 @@ step() {  # step <name>: true if <name> still has to be built
     [ ! -f "$STAMPS/$1" ] && echo "building $1 ($TARGET)"
 }
 done_step() { touch "$STAMPS/$1"; }
+# the programs' own steps also follow shared/programs (kioku_prog.h, the glue;
+# not the tests)
+program_step() {
+    if [ -f "$STAMPS/$1" ] && [ -n "$(find "$SHARED/programs" -newer "$STAMPS/$1" -type f -not -name "test_*" | head -1)" ]; then
+        rm "$STAMPS/$1"
+    fi
+    step "$1"
+}
 
 cmake_build() {  # cmake_build <name> <source dir> [cmake args]
     local name=$1 src=$2; shift 2
@@ -264,7 +272,7 @@ prelink() {  # prelink <output object> <entry symbol> <objects and archives...>
     esac
 }
 
-if step fftools; then
+if program_step fftools; then
     # a variable of FFmpeg's Makefile (print.mk: see above)
     ffvar() { make -s -C "$FFBUILD" -f Makefile -f print.mk "print-$1" | tail -1; }
     # without the tools' own ffmpeg.o/ffprobe.o and the shared objects, which
@@ -299,7 +307,7 @@ compile() {  # compile <compiler and flags> <source> <object>
 
 # lame's command-line encoder (AwesomeTTS and others encode WAV with it)
 NAME=lame-cli
-if step $NAME; then
+if program_step $NAME; then
     L=$SRC/lame-$LAME_VERSION
     O=$BUILD/$NAME
     rm -rf "$O" && mkdir -p "$O" && : > "$BUILD/$NAME.log"
@@ -323,7 +331,7 @@ fi
 
 # kakasi (Japanese Support): its dictionaries come with the add-on
 NAME=kakasi
-if step $NAME; then
+if program_step $NAME; then
     K=$SRC/kakasi-$KAKASI_VERSION/src
     O=$BUILD/$NAME
     rm -rf "$O" && mkdir -p "$O" && : > "$BUILD/$NAME.log"
@@ -349,7 +357,7 @@ fi
 # MeCab: several runs at once (add-ons keep one open), so no state reset;
 # std::cin/cout/cerr become the run's streams (kioku_iostream.cpp)
 NAME=mecab
-if step $NAME; then
+if program_step $NAME; then
     M=$SRC/mecab-$MECAB_COMMIT/mecab/src
     O=$BUILD/$NAME
     rm -rf "$O" && mkdir -p "$O/src" && : > "$BUILD/$NAME.log"
@@ -375,7 +383,7 @@ fi
 
 # cwebp and dwebp: libwebp's example programs, over its image I/O libraries
 NAME=webp-tools
-if step $NAME; then
+if program_step $NAME; then
     W=$SRC/libwebp-$WEBP_VERSION
     O=$BUILD/$NAME
     rm -rf "$O" && mkdir -p "$O" && : > "$BUILD/$NAME.log"
@@ -404,7 +412,7 @@ cmake_build freetype "$SRC/freetype-$FREETYPE_VERSION" -DFT_DISABLE_HARFBUZZ=ON 
 cmake_build leptonica "$SRC/leptonica-$LEPTONICA_VERSION" -DSW_BUILD=OFF -DBUILD_PROG=OFF \
     -DENABLE_GIF=OFF -DENABLE_TIFF=OFF -DENABLE_OPENJPEG=OFF -DENABLE_WEBP=OFF
 NAME=tesseract
-if step $NAME; then
+if program_step $NAME; then
     T=$SRC/tesseract-$TESSERACT_VERSION
     # its check for leptonica's TIFF support runs a program (not possible
     # when cross-compiling); there's no TIFF either way
@@ -456,7 +464,7 @@ if [ ! -f "$ESPEAK_DATA/phondata" ]; then
     cp -R "$H/espeak-ng-data" "$ESPEAK_DATA"
 fi
 NAME=espeak
-if step $NAME; then
+if program_step $NAME; then
     O=$BUILD/$NAME
     rm -rf "$O" && mkdir -p "$O" && : > "$BUILD/$NAME.log"
     # the library's globals too: state_espeak.h only adds a pragma. Room for

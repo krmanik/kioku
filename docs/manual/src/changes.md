@@ -2,6 +2,16 @@
 
 All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
 
+## Next release: add-ons that start programs (iOS, Android)
+
+- The apps include FFmpeg, MeCab, KAKASI, Tesseract (English, Japanese,
+  Chinese, Korean), eSpeak NG, LAME and cwebp, the programs add-ons such as
+  Japanese Support, AJT Media Converter and OCR add-ons start. An add-on's
+  own copy of one of them (made for Windows, macOS or Linux) is replaced by
+  Kioku's.
+- numpy, Pillow and cryptography for add-ons that import them.
+- The app is larger: about 140 MB on Android.
+
 ## Self-hosted server (Docker)
 
 New: `ghcr.io/krmanik/kioku-desktop`, Anki desktop 26.09.3 on your server

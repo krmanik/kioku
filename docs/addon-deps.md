@@ -19,6 +19,46 @@ programs can't run on iOS at all, need a bundled binary on native Android,
 and are a `pkg install` away on Termux. Modules removed from Python 3.13+
 break on desktop Anki too.
 
+## What the native apps bundle now
+
+Added after this sweep, in both native apps (iOS and Android). Add-ons use
+them as on the desktop: programs through `subprocess` by name or by the
+add-on's own copy (`support/mecab.lin`, `cwebp.mac`, ...), which Kioku swaps
+for its own; packages by `import`.
+
+| | What | How |
+| --- | --- | --- |
+| Programs | ffmpeg, ffprobe (FFmpeg 9.0.2: lame, vorbis, opus, webp, x264, vpx, aom), lame, mecab, kakasi, tesseract (eng, jpn, jpn_vert, chi_sim, chi_tra, kor), espeak-ng / espeak, cwebp, dwebp | [shared/tools/build_programs.sh](../shared/tools/build_programs.sh), [shared/programs](../shared/programs), [kioku/programs.py](../shared/python/kioku/programs.py). Android: one executable; iOS: run inside the app on a thread of their own (iOS apps can't start processes) |
+| Native packages | numpy, Pillow (JPEG, PNG, WebP, FreeType), cryptography with cffi and pyOpenSSL | [shared/tools/build_wheels.sh](../shared/tools/build_wheels.sh): iOS from BeeWare's and PyPI's iOS wheels, Android built with cibuildwheel |
+| Pure Python | pygments, qtpy, tqdm, jieba | `shared/requirements.in`, `build_wheels.sh` (jieba) |
+| Compatibility | `platform.system()` answers "Linux" (Android) / "Darwin" (iOS) to add-ons, as before Python 3.13; `pkgutil.find_loader()` is back (removed in 3.14, which the apps run; desktop Anki runs 3.13); `chmod` on iOS | [kioku/patches.py](../shared/python/kioku/patches.py), `programs.py` |
+
+Not bundled, and why:
+
+| Need | Add-ons | Why not |
+| --- | --- | --- |
+| mpv, mplayer | 27 | they open their own window or are driven over a socket; Anki's own playback already goes to the system player |
+| osascript, node | 14 | macOS-only; Node.js is mostly build tooling in add-on repos |
+| pdftotext | 4 | the add-ons that use it fall back to PyMuPDF or their own code, or call it with `shell=True` and a list (broken outside Windows) |
+| sox | 4 | only in bundled copies of old Anki 2.0 code |
+| scipy | 4 | needs a Fortran compiler for iOS/Android; Pomodium (66 likes), the main user, needs only `scipy.io.wavfile` |
+| lxml, psutil | 4, 5 | optional in every add-on that imports them; neither builds for these platforms as it is |
+| ntlm, importlib_metadata | 4, 3 | only imported by libraries add-ons bundle (urllib3, setuptools), or as fallbacks for Python < 3.8 |
+| sentence_transformers, langchain | 3 | PyTorch / Rust-heavy, far too large |
+| Windows/macOS/Linux desktop APIs | 31 | not on phones; usually behind a platform check |
+| pip at runtime | 25 | the apps can't install native code at runtime |
+
+Size: the APK grew from 70 to 142 MB, mostly the programs (43 MB:
+three video encoders), jieba (37 MB of dictionaries), espeak-ng's and
+Tesseract's data (19 + 18 MB) and numpy (18 MB).
+
+Tested through add-ons' own code in the apps (`shared/programs/test_addons.py`):
+Japanese Support (mecab, kakasi), AJT Media Converter (cwebp, ffmpeg),
+AnkiOCR's OCR (tesseract through pytesseract; its GUI imports PyQt5, which
+fails on Qt 6 Anki anywhere). Results: [testing.md](testing.md).
+
+## The sweep
+
 Scripts: [shared/tools/addon_sweep](../shared/tools/addon_sweep) (`names.py`,
 `fetch_github.sh`, `scan.py`, `classify.py`, `table.py`; usage at the top of
 each).

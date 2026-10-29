@@ -709,4 +709,39 @@ Simulator sees the Mac's Homebrew. Two Incremento instances on one device
 (native app and Termux variant) can't both open its browser bridge
 (127.0.0.1:8766); the second logs "Address already in use".
 
+## Programs and packages for add-ons, both native apps (2026-10-29)
+
+What's bundled and why: [addon-deps.md](addon-deps.md). Three test scripts
+in `shared/programs`, run inside the app through devcmd (Android emulator,
+Android 17, 16 KB pages; iOS Simulator, iPhone 16 Pro) and on the Mac
+(`python3.14 shared/programs/test_programs.py build/programs/macos/lib`,
+every program run inside the process, as on iOS):
+
+| Script | What | Mac | Android | iOS Simulator |
+| --- | --- | --- | --- | --- |
+| `test_programs.py` | ffmpeg/ffprobe (every encoder, pipes as pydub uses them, `cwd=`, `shell=True`, `terminate()`, `timeout=`, runs at once), lame, mecab (two open at once, a line at a time), kakasi (Japanese Support's way; a second one while it stays open), tesseract (file, stdout, stdin, tsv), espeak-ng, cwebp, dwebp | 51/51 | 51/51 | 51/51 |
+| `test_packages.py` | numpy (linalg, fft, random), Pillow (PNG, JPEG, WebP, GIF, FreeType), cryptography, pyOpenSSL, jieba | – | 15/15 | 15/15 |
+| `test_addons.py` | Japanese Support's mecab and kakasi controllers, AJT Media Converter's `FileConverter` (image to WebP with cwebp, audio to Opus with ffmpeg), AnkiOCR's OCR (pytesseract) | – | 7/7 | 7/7 |
+
+The add-ons came from AnkiWeb (Anki's update check replaced the copies from
+the dump with the current packages, with their own `support/` binaries,
+which Kioku swaps for its own). AnkiOCR's package fails to load on any Qt 6
+Anki (its GUI imports PyQt5); its OCR module was loaded on its own.
+
+Found on the way and fixed:
+
+- Android refused cryptography's Rust library (4 KB pages on a 16 KB-page
+  device), then couldn't resolve its Python symbols (PyO3's abi3 build
+  doesn't link libpython): `RUSTFLAGS` in `build_wheels.sh`.
+- AnkiOCR: `KeyError: 'Android'` (its tesseract table has Windows, Darwin,
+  Linux; `platform.system()` changed in Python 3.13), then pytesseract's
+  `pkgutil.find_loader` (removed in 3.14): `kioku/patches.py`.
+- iOS: a second kakasi waited forever while Japanese Support kept its own
+  open, freezing the app: runs now give up their lock while they wait for
+  input, their globals saved (`kioku_prog.c`).
+- iOS Simulator: espeak-ng found no data (its 160-byte path buffer cut the
+  bundle path).
+- kakasi 2.3.6 misread Japanese Support's dictionaries (older format): read
+  6 bytes off.
+
 Which AnkiWeb add-ons need libraries or programs Kioku doesn't bundle: [addon-deps.md](addon-deps.md).
