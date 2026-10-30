@@ -160,11 +160,12 @@ def _patch_app() -> None:
 
     import sys
 
-    from kioku import advanced, ankidroid, devtools, mediaserver, syncserver, windows
+    from kioku import advanced, ankidroid, ankiwebsync, devtools, mediaserver, syncserver, windows
 
     advanced.install()
     if sys.platform == "android":
         ankidroid.install()
+        ankiwebsync.install()
     original_init = aqt.AnkiApp.__init__
 
     def init(self, argv):  # type: ignore[no-untyped-def]

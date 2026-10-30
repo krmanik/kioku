@@ -221,6 +221,14 @@ def sync_server_running(running: bool, text: str) -> None:
 _sync_stop_listening: list[bool] = []
 
 
+def ankiweb_sync_running(running: bool) -> None:
+    """A foreground service keeps the network of a sync with AnkiWeb while
+    Kioku is in the background."""
+    from . import bridge
+
+    bridge.call("ankiWebService", running=running)
+
+
 def _on_sync_stop(event: dict) -> None:
     # the notification's Stop: for this run only, the setting stays on
     import threading

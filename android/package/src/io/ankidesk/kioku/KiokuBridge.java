@@ -366,6 +366,9 @@ public class KiokuBridge {
             case "syncService":
                 syncService(a.getBoolean("running"), a.optString("text"));
                 break;
+            case "ankiWebService":
+                KiokuAnkiWebService.update(activity, a.getBoolean("running"));
+                break;
             case "storage.requestAllFiles":
                 requestAllFilesAccess();
                 break;

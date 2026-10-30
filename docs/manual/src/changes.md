@@ -2,6 +2,14 @@
 
 All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
 
+## Next release: AnkiWeb sync in the background (Android)
+
+- Syncing with AnkiWeb keeps going when you leave the app, with a
+  notification while it runs. Leaving during the first download used to fail
+  it with a network error and leave the deck list empty.
+- A sync error while switching profiles is now shown. It used to stay hidden
+  and block the app until a restart.
+
 ## Next release: add-ons that start programs (iOS, Android)
 
 - The apps include FFmpeg, MeCab, KAKASI, Tesseract (English, Japanese,

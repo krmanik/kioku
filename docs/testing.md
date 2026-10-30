@@ -745,3 +745,33 @@ Found on the way and fixed:
   6 bytes off.
 
 Which AnkiWeb add-ons need libraries or programs Kioku doesn't bundle: [addon-deps.md](addon-deps.md).
+
+## AnkiWeb login, empty deck list, Android (2026-10-30)
+
+Emulator (Android 17, `-gpu swiftshader_indirect`), test AnkiWeb account of
+40,359 cards. Not run on a physical phone.
+
+| Test | Before the fix | With the fix |
+| --- | --- | --- |
+| User 1 (41 local cards): Sync, log in, conflict, Download | works | not repeated |
+| New empty profile: Sync, log in, "Download from AnkiWeb?", Yes | works | not repeated |
+| New empty profile: Preferences, log in, "sync now?", Yes | reaches the same prompt | not repeated |
+| Empty profile: Yes, then Home after 3 s, back after 60 s | **fails**: network error, 0 cards, empty list | works: 40,359 cards, `procState=FGS`, no firewall change for the app |
+| Service during and after a sync | none | `dataSync` foreground while syncing, gone after |
+| Message open while the profile switches | **unseen**, blocks taps | drawn above the deck list |
+| User 2 (258,431 local cards): log in, conflict, Cancel | not run | cards unchanged |
+| Restart after the download | decks still there | not repeated |
+| Home and back, 8 times | not run | no crash |
+
+The diagnosis: `dumpsys netpolicy` logged `10232-background-default` 8 s after
+Home and `10232-background-allow` on the way back.
+
+Open:
+
+- One SIGSEGV on the way back from Home, before the fix, in the emulator's GPU
+  driver (`libEGL_emulation.so`, `createNativeSync`, from `eglSwapBuffers`).
+  Not seen again in 8 cycles. On restart the profile was still logged in and
+  empty, and asked to download again.
+- The box shown while waiting for media sync when a profile closes is cut off
+  on the right, with an empty log line (`19:02:14: , ,`).
+- A dialog's first frame can be black (seen once, on the conflict dialog).

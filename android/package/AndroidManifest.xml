@@ -11,6 +11,8 @@
     <!-- the sync server's service (KiokuSyncService) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- syncs with AnkiWeb (KiokuAnkiWebService) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- a profile can use AnkiDroid's folder in shared storage (kioku/ankidroid.py) -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
@@ -79,6 +81,12 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="A local Anki sync server that other apps and devices sync with" />
         </service>
+
+        <!-- keeps the network while a sync with AnkiWeb runs in the background -->
+        <service
+            android:name="io.ankidesk.kioku.KiokuAnkiWebService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
