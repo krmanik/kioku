@@ -85,7 +85,9 @@ fetch() {  # fetch <url> <directory it unpacks to>
     echo "fetching $2"
     local tmp=$SRC/.tmp-$2
     rm -rf "$tmp" && mkdir -p "$tmp"
-    curl -fsSL --retry 3 "$1" | tar xf - -C "$tmp"
+    # from a file: GNU tar only detects the compression of a file, not of a pipe
+    curl -fsSL --retry 3 -o "$tmp.tar" "$1"
+    tar xf "$tmp.tar" -C "$tmp" && rm "$tmp.tar"
     mv "$tmp"/* "$SRC/$2" && rmdir "$tmp"
 }
 
