@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import errno
 import os
+import re
 import shlex
 import shutil
 import signal
@@ -88,19 +89,25 @@ if sys.platform == "ios":
     PYTHON_PROGRAMS["chmod"] = _chmod
 
 
+# what add-ons append to their copies: mecab.lin, cwebp.mac, ffmpeg.exe,
+# Migaku's mecab-linux / mecab-windows.exe, ...-x86_64
+_PLATFORM_SUFFIX = re.compile(
+    r"([-_.](lin|linux|mac|macos|osx|darwin|win|win32|win64|windows|x64|x86_64|amd64|arm64|aarch64))+$"
+)
+
+
 def program_name(path: str) -> str:
     name = os.path.basename(path).lower()
-    for suffix in (".exe", ".lin", ".mac"):
-        if name.endswith(suffix):
-            name = name[: -len(suffix)]
-    return name
+    if name.endswith(".exe"):
+        name = name[:-4]
+    return _PLATFORM_SUFFIX.sub("", name)
 
 
 def bundled(name: str) -> bool:
     return name in _native or name in PYTHON_PROGRAMS
 
 
-def install(cache_dir: str) -> None:
+def install(base_dir: str) -> None:
     global _bin_dir, _android_exe
     if sys.platform == "android":
         _android_exe = _android_executable()
@@ -116,7 +123,9 @@ def install(cache_dir: str) -> None:
         # Popen refuses at once on iOS; _execute_child below decides
         subprocess._can_fork_exec = True
 
-    _bin_dir = os.path.join(cache_dir, "kioku-bin")
+    # not in the cache folder: Android empties that while the app runs when
+    # storage is low, and every program would fail until the next start
+    _bin_dir = os.path.join(base_dir, "kioku-bin")
     os.makedirs(_bin_dir, exist_ok=True)
     for name in sorted(_native | set(PYTHON_PROGRAMS)):
         path = os.path.join(_bin_dir, name)

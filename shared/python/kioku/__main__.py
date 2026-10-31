@@ -82,7 +82,7 @@ def main() -> None:
         except Exception:
             traceback.print_exc()
         try:
-            programs.install(platform.cache_dir())
+            programs.install(platform.config_dir())
         except Exception:
             traceback.print_exc()
 

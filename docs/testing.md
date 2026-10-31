@@ -829,3 +829,58 @@ iOS binary and frameworks, Android wheels' `.so` files stripped.
 | `markdown` with codehilite (probes pygments) outside add-ons: no offer | works | — |
 | Pygments pack from GitHub, then `highlight()` | — | works |
 | HTTPS after `pm trim-caches` (CA bundle no longer in the cache) | n/a | works; failed before the fix |
+
+## Add-ons that use bundled programs, in the app's own screens (2026-10-31)
+
+Emulator (Android 17), add-ons installed from AnkiWeb (current packages, with
+their own `support/` binaries, which Kioku swaps), profile AddonTest, note
+type with Expression, Reading, VocabKanji, … fields. Each feature was run
+the way a user reaches it: the Add window's editor (field focus lost, toolbar
+buttons, paste), the Browser's menus on selected notes, the reviewer, the
+Tools menu, the image occlusion editor. Scripts drove the screens through
+devcmd (focus sent as the WebView sends it on a tap).
+
+| Add-on | Where | What ran | Result |
+| --- | --- | --- | --- |
+| Japanese Support (3918629684) | editor: focus lost | mecab reading into Reading | works |
+| | Browser › Edit › Bulk-add Readings | mecab | works |
+| AJT Japanese (1344485230) | editor: focus lost | furigana and pitch accent (mecab, its pitch table) | works |
+| | Browser › AJT Japanese: Bulk-generate | furigana, pitch | works |
+| | reviewer | answer shows the generated furigana and pitch | works |
+| JapaneseFurigana (678316993) | editor toolbar button | furigana for the focused field (mecab) | works |
+| | Browser › Bulk Generate Furigana | mecab, chosen source/destination fields | works |
+| SimpleFurigana (1444055400) | editor toolbar button | its mecab works; the button finds no selection | **add-on**: its script uses jQuery and the page's selection, both gone from Anki's editor since 2.1.50 (desktop too) |
+| Syntax Highlighting NG (566351439) | editor toolbar button | Pygments (pack) into the focused field | works |
+| AJT Media Converter (1151815987) | editor: paste an image | cwebp → `.webp` | works |
+| | Browser › Bulk-convert | image → WebP (cwebp), WAV → Ogg/Opus (ffmpeg) | works |
+| AnkiOCR, Shige's fork (546383173) | Browser › Cards › AnkiOCR › Run | tesseract text into the image's `title` | works ("Kioku reads this text") |
+| Auto Image Occlusion (1414192727) | Add › Image Occlusion, its Auto-detect button | tesseract word boxes → regions | works |
+| AnkiMorphs (472573498) + ankimorphs-japanese-mecab (1974309724) | Recalc (toolbar) | Japanese morphemizer (mecab), `am-*` tags on 9 notes | works |
+| FrequencyMan (909420026) | its Japanese tokenizers (used when it reorders) | AnkiMorphs MeCab, AJT Japanese MeCab | works |
+| KanjiVocab (1600796261) | its splitter | mecab with Japanese Support's dictionary | works |
+| MeCab UniDic Dictionary (13462835) | its MeCab process | mecab with UniDic | works |
+| Migaku Kanji GOD (1872210448) | start-up, reviewer (answer hook), its MeCab parser | `mecab-linux` | **failed to load** before the fix (name not swapped), works after |
+| Migaku Japanese (278530045), AwesomeTTS (814349176) | — | — | not on AnkiWeb for 26.09; the old copies import PyQt5 (desktop too) |
+
+Not run: Batch Download Pictures From Google Images (PIL, needs Google
+search results), Incremento (tested 2026-10-28).
+
+Found and fixed (docs/fixes.md, Add-ons):
+
+- Program copies named `mecab-linux` / `-macos` / `-windows.exe` weren't
+  swapped (Migaku Kanji GOD).
+- Android emptied the cache folder while the app ran (the emulator's storage
+  was full) and took the program links with it: every program failed until a
+  restart, Anki dropped Japanese Support's focus-lost hook after the error,
+  and a later import of Kanji GOD aborted the app (`QThread: Destroyed while
+  thread is still running`, from its earlier failed import). The links moved
+  to the config folder; checked on a fresh build.
+- Qt's Android clipboard couldn't hold links (Qt 6.11.0 bug); an https link
+  copies and reads back now. `file://` links are refused by Android itself,
+  and Qt on Android has no images on the clipboard: the paste test fed the
+  editor the same data a paste gives it.
+
+Seen, not changed: Anki's `send2trash` fails on Android's shared storage
+(`.Trash-<uid>` missing) when an add-on is replaced; Anki deletes the old
+folder instead, so updates work. Programmatic `focusField()` doesn't reach
+Python without a tap (the WebView has no native focus); users tap fields.
