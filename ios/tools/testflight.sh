@@ -3,6 +3,8 @@
 #
 #   KIOKU_TEAM=<team id> tools/testflight.sh                build, archive, upload
 #   KIOKU_TEAM=<team id> tools/testflight.sh --upload-only  upload the last archive
+#   KIOKU_TEAM=<team id> tools/testflight.sh --archive-only build and archive only
+#                                                         (upload from Xcode's Organizer)
 #
 # Signs with your team's distribution certificate through Xcode's automatic
 # signing, authenticated with an App Store Connect API key (no Xcode sign-in):
@@ -34,9 +36,20 @@ AUTH=(-allowProvisioningUpdates -authenticationKeyPath "$KEY"
 
 if [ "${1:-}" != --upload-only ]; then
     "$ROOT/tools/fetch_deps.sh"
+    "$ROOT/tools/build_qt_plugin.sh"
     "$ROOT/tools/build_rust.sh" aarch64-apple-ios
     "$ROOT/tools/gen_pyqt.sh" > /dev/null
     "$ROOT/../shared/tools/prepare_site.sh" "$ROOT/.venv/bin/python" "$ROOT/deps/sdist" "$ROOT/build/site"
+    # the same extras as tools/build.sh
+    "$ROOT/../shared/tools/build_pymupdf.sh" ios > "$ROOT/build/pymupdf.log" 2>&1 || {
+        tail -30 "$ROOT/build/pymupdf.log"; exit 1; }
+    cp -R "$ROOT/../build/pymupdf/ios/site/" "$ROOT/build/site/"
+    "$ROOT/../shared/tools/build_programs.sh" ios > "$ROOT/build/programs.log" 2>&1 || {
+        tail -30 "$ROOT/build/programs.log"; exit 1; }
+    rsync -a --delete "$ROOT/../build/programs/data/" "$ROOT/build/site/kioku_programs_data/"
+    "$ROOT/../shared/tools/build_wheels.sh" ios > "$ROOT/build/wheels.log" 2>&1 || {
+        tail -30 "$ROOT/build/wheels.log"; exit 1; }
+    rsync -a "$ROOT/../build/wheels/ios/site/" "$ROOT/build/site/"
 
     "$QT/ios/bin/qt-cmake" -S "$ROOT" -B "$ROOT/build/xcode-dist" -G Xcode \
         -DQT_HOST_PATH="$QT/macos" -DCMAKE_OSX_SYSROOT=iphoneos -DCMAKE_OSX_ARCHITECTURES=arm64 \
@@ -50,6 +63,10 @@ if [ "${1:-}" != --upload-only ]; then
         grep -E 'error:|^ld: |Undefined' "$ROOT/build/xcode-archive.log" | sort -u | head -40
         exit 1
     }
+fi
+if [ "${1:-}" = --archive-only ]; then
+    echo "Archived $OUT/Kioku.xcarchive"
+    exit 0
 fi
 
 cat > "$OUT/ExportOptions.plist" <<EOF
