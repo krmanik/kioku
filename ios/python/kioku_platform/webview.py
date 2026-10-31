@@ -51,6 +51,7 @@ UIPrintPageRenderer = ObjCClass("UIPrintPageRenderer")
 UIGraphicsPDFRenderer = ObjCClass("UIGraphicsPDFRenderer")
 WKWebsiteDataStore = ObjCClass("WKWebsiteDataStore")
 NSHTTPCookie = ObjCClass("NSHTTPCookie")
+NSNull = ObjCClass("NSNull")
 
 # WKUserScriptInjectionTime; the same values as kioku.webscripts
 AT_DOCUMENT_START = 0
@@ -58,6 +59,18 @@ AT_DOCUMENT_END = 1
 POLICY_CANCEL = 0
 POLICY_ALLOW = 1
 FLEXIBLE_SIZE = 2 | 16  # UIViewAutoresizingFlexibleWidth | FlexibleHeight
+
+
+def _js_value(value: Any) -> Any:
+    """JavaScript null arrives as NSNull, which py_from_ns leaves as an
+    ObjCInstance (also inside arrays and objects); QtWebEngine gives None."""
+    if isinstance(value, ObjCInstance):
+        return None if value.isKindOfClass_(NSNull) else value
+    if isinstance(value, list):
+        return [_js_value(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _js_value(v) for k, v in value.items()}
+    return value
 NO_INSET_ADJUSTMENT = 2  # UIScrollViewContentInsetAdjustmentNever
 A4 = (595.2, 841.8)  # points
 PDF_MARGIN = 36.0
@@ -418,7 +431,7 @@ class WebView:
             value = None
             if result:
                 try:
-                    value = py_from_ns(ObjCInstance(result))
+                    value = _js_value(py_from_ns(ObjCInstance(result)))
                 except Exception:
                     value = None
             if callback is not None:

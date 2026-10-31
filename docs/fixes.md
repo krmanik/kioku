@@ -158,6 +158,7 @@ Results on iOS with Anki 26.8.1 (October 2026): see [testing.md](testing.md).
 | Migaku Kanji GOD failed to load: `PermissionError` on `mecab/mecab-linux` | Kioku swapped an add-on's program copy only when its name ended in `.lin`, `.mac` or `.exe` | `kioku/programs.py` also strips `-linux`, `-macos`, `-windows`, `-x86_64` and the like |
 | Android: every bundled program failed (`FileNotFoundError: …/cache/kioku-bin/mecab`) until a restart; Japanese Support's focus-lost hook stayed dropped after its error, and add-ons that failed to import left Qt threads that later aborted the app | the program links lived in the cache folder, which Android empties while the app runs when storage is low | the links live in the config folder (`files/.config/kioku-bin`, iOS `Library/kioku-bin`) |
 | Android: copying a link to the clipboard did nothing (`NoSuchMethodError: QtClipboardManager.setClipboardUri(Context, byte[])`) | Qt 6.11.0's plugin passes a `QByteArray`; the Java side takes a `String` | `android/patches/qtforandroid-clipboard-uri.patch` (`file://` links stay refused: Android's `FileUriExposedException`) |
+| iOS: JapaneseFurigana's editor button failed (`TypeError: expected string or bytes-like object, got 'ObjCInstance'`) | JavaScript `null` from `runJavaScript` arrived as `NSNull`, which rubicon's `py_from_ns` leaves as an ObjC object (QtWebEngine gives `None`) | `kioku_platform/webview.py` turns `NSNull` into `None`, also inside arrays and objects |
 
 ## Sync server and AnkiDroid's folder (Preferences › Advanced)
 

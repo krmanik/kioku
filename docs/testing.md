@@ -884,3 +884,40 @@ Seen, not changed: Anki's `send2trash` fails on Android's shared storage
 (`.Trash-<uid>` missing) when an add-on is replaced; Anki deletes the old
 folder instead, so updates work. Programmatic `focusField()` doesn't reach
 Python without a tap (the WebView has no native focus); users tap fields.
+
+### Same add-ons on the iOS Simulator (2026-10-31)
+
+iPhone 15 Pro Max simulator (iOS 26.4), the same 13 add-ons installed from
+AnkiWeb, profile AddonTest, note type "Japanese (Kioku test)". The same
+screens were driven as on Android: the Add window's editor (focus lost,
+toolbar buttons with the field focused and its text selected in the
+WebView, image paste), the Browser's menus, Tools › Recalc, the Image
+Occlusion editor, the reviewer. Programs run inside the app on iOS.
+
+| Add-on | Where | Result |
+| --- | --- | --- |
+| Japanese Support | editor: focus lost (mecab, kakasi); Browser › Bulk-add Readings | works |
+| AJT Japanese | editor: focus lost (furigana, pitch); Browser › Bulk-generate; reviewer shows the pitch | works |
+| JapaneseFurigana | editor button; Browser › Bulk Generate Furigana | button **failed** before the fix (below), works now; bulk works |
+| Syntax Highlighting NG | editor button, code from the clipboard (Pygments) | works |
+| AJT Media Converter | image paste → WebP (needs its "copy_paste" option, off by default); Browser › Bulk-convert: images → WebP, WAV → Ogg/Opus | works |
+| AnkiOCR (Shige) | Browser › Run AnkiOCR (its own tessdata) | works (text in the image's `title`) |
+| Auto Image Occlusion | Image Occlusion editor, Auto-detect (Tesseract, tessdata extra files downloaded) | works (1 region) |
+| AnkiMorphs + Japanese MeCab | Recalc | works (`am-not-ready` tags) |
+| FrequencyMan | its AnkiMorphs and AJT MeCab tokenizers | works |
+| KanjiVocab | its splitter | works (its `--node-format="…"` quotes reach mecab literally, desktop too) |
+| MeCab UniDic | its MeCab process | works |
+| Migaku Kanji GOD | start-up (downloads its 446 MB dictionary), reviewer, its MeCab parser | works |
+
+Found and fixed: JavaScript `null` from `runJavaScript` came back as an
+`NSNull` object instead of `None`, so JapaneseFurigana's selection check
+(null when WebKit has no `ShadowRoot.getSelection`) crashed it
+(docs/fixes.md, Add-ons).
+
+Seen, not changed: Anki's editor script logs `TypeError: null is not an
+object (evaluating 'e.anchor')` when a field takes focus in WebKit (its
+selection save gets no selection from the shadow root); editing works.
+Anki's editor saves every field about 600 ms after it shows a note; an
+add-on that writes the same note within that time (a script running OCR
+right after selecting it) gets overwritten, on desktop too.
+
