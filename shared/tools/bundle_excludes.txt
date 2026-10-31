@@ -15,3 +15,6 @@ xxsubtype*.so
 # needs tkinter, which the apps don't have
 /PIL/_imagingtk*.so
 *.pyi
+# static libraries for building C extensions (numpy's libnpymath.a); the App
+# Store rejects any library outside a framework
+*.a
