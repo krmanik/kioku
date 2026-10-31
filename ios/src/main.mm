@@ -6,6 +6,7 @@
 #import <Foundation/Foundation.h>
 #import <JavaScriptCore/JavaScriptCore.h>
 #include <Python.h>
+#include <pthread.h>
 #include <sys/resource.h>
 
 extern "C" {
@@ -18,6 +19,9 @@ PyObject *PyInit_QtSvg(void);
 PyObject *PyInit__rsbridge(void);
 PyObject *PyInit_orjson(void);
 PyObject *PyInit_rpds(void);
+PyObject *PyInit__mupdf(void);
+PyObject *PyInit__extra(void);
+PyObject *PyInit__kioku_programs(void);
 }
 
 static void fail(const char *what, PyStatus status) {
@@ -70,6 +74,9 @@ int main(int argc, char *argv[]) {
         PyImport_AppendInittab("anki._rsbridge", PyInit__rsbridge);
         PyImport_AppendInittab("orjson.orjson", PyInit_orjson);
         PyImport_AppendInittab("rpds", PyInit_rpds);
+        PyImport_AppendInittab("pymupdf._mupdf", PyInit__mupdf);
+        PyImport_AppendInittab("pymupdf._extra", PyInit__extra);
+        PyImport_AppendInittab("_kioku_programs", PyInit__kioku_programs);
 
         PyPreConfig preconfig;
         PyPreConfig_InitIsolatedConfig(&preconfig);
@@ -105,6 +112,19 @@ int main(int argc, char *argv[]) {
         status = Py_InitializeFromConfig(&config);
         PyConfig_Clear(&config);
         if (PyStatus_Exception(status)) fail("init", status);
+
+        // Python takes the main thread's stack bounds from pthread here, inside
+        // Qt's 512 KB block, and then runs below it in exec(). Seeing the stack
+        // pointer under its limit, it took every object freed on the main thread
+        // for deep recursion and parked it in its trashcan for good: nothing was
+        // freed, and add-ons' sqlite3 statements stayed active. Give it the
+        // whole stack, as WebKit has above.
+        char *stack_top = (char *)pthread_get_stackaddr_np(pthread_self());
+        rlim_t stack_size = stack_limit_at_start && stack_limit_at_start != RLIM_INFINITY
+            ? stack_limit_at_start : 8 * 1024 * 1024;
+        if (PyUnstable_ThreadState_SetStackProtection(PyThreadState_Get(),
+                                                      stack_top - stack_size, stack_size) < 0)
+            PyErr_Print();
     }
     return Py_RunMain();
 }

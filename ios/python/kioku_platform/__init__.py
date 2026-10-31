@@ -68,6 +68,14 @@ def cache_dir() -> str:
     return os.path.join(HOME, "Library", "Caches")
 
 
+def exclude_from_backup(path: str) -> None:
+    """Files Kioku can download again (kioku.packs) stay out of backups."""
+    url = ObjCClass("NSURL").fileURLWithPath_(path)
+    url.setResourceValue_forKey_error_(
+        ObjCClass("NSNumber").numberWithBool_(True), at("NSURLIsExcludedFromBackupKey"), None
+    )
+
+
 def dark_mode() -> bool:
     screen = prop(ObjCClass("UIScreen"), "mainScreen")
     traits = prop(screen, "traitCollection")

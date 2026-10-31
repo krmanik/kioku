@@ -116,6 +116,9 @@ check "collection on /config" '[[ "$(echo "$out" | field path)" == /config/Anki2
 check "main window shows the deck list" '[ "$(echo "$out" | field state)" = deckBrowser ]'
 check "mpv plays sound" '[[ "$(echo "$out" | field players)" == *Mpv* ]]'
 check "Anki has Arial and Webdings" '[ "$(echo "$out" | field arial)$(echo "$out" | field webdings)" = TrueTrue ]'
+check "Arial Greek falls back to Arial" \
+    '[ "$(docker exec -u abc -e HOME=/config $NAME fc-match -f "%{family}" "Arial Greek")" = Arial ]'
+check "font installers removed after installing" '[ ! -e "$cfg/.cache/anki-ms-fonts" ]'
 check "SELKIES_DESKTOP: taskbar running" 'docker exec $NAME pgrep -f selkies-desktop >/dev/null'
 check "one anki-session" '[ "$(docker exec $NAME pgrep -fc "^/bin/bash /usr/local/bin/anki-session")" = 1 ]'
 

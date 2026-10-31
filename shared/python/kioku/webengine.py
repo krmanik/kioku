@@ -19,13 +19,14 @@ from PyQt6.QtCore import (
     QByteArray,
     QEvent,
     QObject,
+    QPoint,
     QSize,
     QTimer,
     QUrl,
     Qt,
     pyqtSignal,
 )
-from PyQt6.QtGui import QAction, QColor, QGuiApplication, QIcon
+from PyQt6.QtGui import QAction, QColor, QCursor, QGuiApplication, QIcon
 from PyQt6.QtNetwork import QNetworkCookie
 from PyQt6.QtWidgets import QApplication, QWidget
 
@@ -510,8 +511,12 @@ class QWebEnginePage(QObject, _Lenient):
         self._web = platform.WebView()
         self._last_load: tuple[str, dict[str, str]] | None = None
         self._retried = False
+        # (shown, requested) while load() runs: the platform views report the
+        # requested URL at once, Qt only once the new page is there
+        self._loading: tuple[QUrl, QUrl] | None = None
         self._web.on_console = self._on_console  # type: ignore[method-assign]
         self._web.on_selection = self._on_selection  # type: ignore[method-assign]
+        self._web.on_tap = self._on_tap  # type: ignore[method-assign]
         self._web.on_pdf_finished = self.pdfPrintingFinished.emit  # type: ignore[method-assign]
         self._web.on_channel_call = self._on_channel_call  # type: ignore[method-assign]
         self._web.on_navigation = self._on_navigation  # type: ignore[method-assign]
@@ -583,8 +588,8 @@ class QWebEnginePage(QObject, _Lenient):
         self._install_scripts()
         self._last_load = (qurl.toString(), self._profile._headers_for(qurl))
         self._retried = False
+        self._loading = (self.url(), qurl)
         self._web.load_url(*self._last_load)
-        self.urlChanged.emit(qurl)
 
     def setUrl(self, url: QUrl) -> None:
         self.load(url)
@@ -601,9 +606,13 @@ class QWebEnginePage(QObject, _Lenient):
         self.setHtml(bytes(data).decode("utf8", "replace"), baseUrl)
 
     def url(self) -> QUrl:
+        if self._loading is not None:
+            return self._loading[0]
         return QUrl(self._web.url())
 
     def requestedUrl(self) -> QUrl:
+        if self._loading is not None:
+            return self._loading[1]
         return self.url()
 
     def title(self) -> str:
@@ -746,6 +755,13 @@ class QWebEnginePage(QObject, _Lenient):
             if self._view is not None:
                 self._view.selectionChanged.emit()
 
+    def _on_tap(self, x: float, y: float) -> None:
+        global _tap
+        if self._view is not None:
+            view = self._view
+            at = QPoint(round(x * view.width()), round(y * view.height()))
+            _tap = (view.mapToGlobal(at), _qt_cursor_pos())
+
     def _on_channel_call(self, obj: str, method: str, args: list) -> Any:
         if self._channel is None:
             raise RuntimeError("no web channel")
@@ -763,6 +779,11 @@ class QWebEnginePage(QObject, _Lenient):
     def _on_load_finished(self, ok: bool) -> None:
         if not ok and self._retry_local_load():
             return
+        if self._loading is not None:
+            shown = self._loading[0]
+            self._loading = None
+            if self.url() != shown:
+                self.urlChanged.emit(self.url())
         self.loadProgress.emit(100)
         self.loadFinished.emit(ok)
         self.titleChanged.emit(self._web.title())
@@ -845,6 +866,57 @@ def _auth_script(headers: dict[str, str]) -> str:
 # View ------------------------------------------------------------------------
 
 
+class _PopupWatcher(QObject):
+    """Qt closes a popup (a menu, a combo box's list) on a tap outside it,
+    but taps on a page go to the native web view, not to Qt: the review
+    screen's More menu could not be closed on an iPad. While a popup is
+    open, the web views leave taps to Qt (kioku_platform.WebView)."""
+
+    def __init__(self, app: QApplication) -> None:
+        super().__init__(app)
+        self._touchable = True
+        app.installEventFilter(self)
+
+    def eventFilter(self, obj: QObject | None, event: QEvent | None) -> bool:
+        if (
+            event is not None
+            and event.type() in (QEvent.Type.Show, QEvent.Type.Hide)
+            and isinstance(obj, QWidget)
+            and obj.windowType() == Qt.WindowType.Popup
+        ):
+            # the popup list changes after the event
+            QTimer.singleShot(0, self._update)
+        return False
+
+    def _update(self) -> None:
+        touchable = QApplication.activePopupWidget() is None
+        if touchable != self._touchable:
+            self._touchable = touchable
+            platform.WebView.set_touchable(touchable)
+
+
+_popup_watcher: _PopupWatcher | None = None
+
+
+# Where a page was last tapped, and what Qt's QCursor.pos() said then
+_tap: tuple[QPoint, QPoint] | None = None
+_qt_cursor_pos = QCursor.pos
+
+
+def _cursor_pos(*args: Any) -> QPoint:
+    """Taps on a page go to the native web view, so Qt's cursor stays where
+    Qt last saw a tap: Anki opens menus at QCursor.pos() (the review
+    screen's More), and they showed at the top left. Until Qt sees a tap
+    again, the cursor is where the page was tapped."""
+    qt = _qt_cursor_pos(*args)
+    if _tap is not None and qt == _tap[1]:
+        return QPoint(_tap[0])
+    return qt
+
+
+QCursor.pos = staticmethod(_cursor_pos)  # type: ignore[method-assign]
+
+
 class QWebEngineView(QWidget, _Lenient):
     loadStarted = pyqtSignal()
     loadProgress = pyqtSignal(int)
@@ -860,6 +932,9 @@ class QWebEngineView(QWidget, _Lenient):
             if isinstance(a, QWidget):
                 parent = a
         super().__init__(parent)
+        global _popup_watcher
+        if _popup_watcher is None:
+            _popup_watcher = _PopupWatcher(QApplication.instance())
         platform.WebView.prepare_host(self)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self._page: QWebEnginePage | None = None

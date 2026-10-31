@@ -61,5 +61,7 @@ set_target_properties(Kioku PROPERTIES
     QT_ANDROID_COMPILE_SDK_VERSION 36
     QT_ANDROID_VERSION_CODE ${KIOKU_BUILD}
     QT_ANDROID_VERSION_NAME ${KIOKU_VERSION}
-    QT_ANDROID_EXTRA_LIBS "${PYTHON_PREFIX}/lib/libpython${PYTHON_VERSION}.so;${PYTHON_PREFIX}/lib/libssl_python.so;${PYTHON_PREFIX}/lib/libcrypto_python.so;${PYTHON_PREFIX}/lib/libsqlite3_python.so"
+    # libkiokuprog.so: the programs add-ons start (an executable, see
+    # shared/tools/build_programs.sh)
+    QT_ANDROID_EXTRA_LIBS "${PYTHON_PREFIX}/lib/libpython${PYTHON_VERSION}.so;${PYTHON_PREFIX}/lib/libssl_python.so;${PYTHON_PREFIX}/lib/libcrypto_python.so;${PYTHON_PREFIX}/lib/libsqlite3_python.so;${CMAKE_SOURCE_DIR}/../build/programs/android/lib/libkiokuprog.so"
 )

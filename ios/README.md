@@ -26,7 +26,8 @@ See [../docs/fixes.md](../docs/fixes.md) for every problem met on the way and
 ## Building
 
 Requirements: macOS with Xcode, [uv](https://docs.astral.sh/uv/), rustup,
-`protoc` (`brew install protobuf`), about 20 GB of disk.
+`protoc` (`brew install protobuf`), SWIG (`brew install swig`, for PyMuPDF),
+about 20 GB of disk.
 
 ```sh
 cd ios
@@ -36,7 +37,8 @@ KIOKU_TEAM=<team id> tools/build.sh  # signed for your devices (Xcode account)
 
 `tools/build.sh` runs, in order: `fetch_deps.sh` (Qt, Python, Anki source,
 PyQt6/sip and other sources into `deps/`), `build_rust.sh`, `gen_pyqt.sh`,
-`../shared/tools/prepare_site.sh`, then CMake (Xcode generator) and
+`../shared/tools/prepare_site.sh`, `../shared/tools/build_pymupdf.sh` (MuPDF
+and PyMuPDF into `../build/pymupdf/`), then CMake (Xcode generator) and
 `xcodebuild`. Versions come from `../shared/versions.env`.
 
 The unsigned `.ipa` can be installed with a sideloading tool that re-signs

@@ -22,6 +22,10 @@ iPhone 15 Pro Max, iOS 26.
 | :---: |
 | <img src="images/ios-add.png" width="240" alt="Add on iPhone"> |
 
+| Add-ons with Extra Files | Extra Files |
+| :---: | :---: |
+| <img src="images/addons-extra-files.png" width="240" alt="Add-ons window with the Extra Files button on iPhone"> | <img src="images/extra-files.png" width="240" alt="Extra Files: download, update or remove files add-ons need, on iPhone"> |
+
 ## Android, native variant
 
 Emulator, Android 17. Every Anki window opens full screen; popups are cards

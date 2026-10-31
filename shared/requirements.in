@@ -15,3 +15,8 @@ truststore>=0.10.4
 waitress>=2.0.0
 markupsafe
 rubicon-objc
+
+# Add-on extras, pure Python (docs/addon-deps.md)
+pygments
+qtpy
+tqdm

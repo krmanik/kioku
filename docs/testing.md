@@ -667,4 +667,311 @@ focus object. Fix: [fixes.md](fixes.md#runtime-platform)
 Not found: which path in the tester's app left the focus null without the
 signal. The patch covers every such path for this crash.
 
+## Incremento add-on, all variants (2026-10-28)
+
+[Incremento](https://ankiweb.net/shared/info/1013949798) (incremental
+reading, 2026.10.26) failed to load everywhere: `No module named
+'PyQt6.QtPdf'`. Fixes in [fixes.md](fixes.md) and, for Termux,
+[termux/docs/building.md](../termux/docs/building.md) ("Known gaps").
+Tested on the iOS Simulator (iPhone 16 Pro) and the Android emulator
+(Android 17), both native apps and the Termux variant.
+
+| Step | iOS Simulator | Android (native) | Termux |
+| --- | --- | --- | --- |
+| Add-on loads (menu, timer bar, Topics deck, getting-started guide) | ✅ | ✅ | ✅ (also needed the accessible-name fallback) |
+| `QPdfDocument`: page count, sizes, title and dates, text, render, worker threads, error codes | ✅ PDFKit | ✅ PdfRenderer (text from Android 15 on) | ✅ real bindings |
+| Import a PDF as a topic card (cover image, text) | ✅ | ✅ | ✅ (through PyMuPDF) |
+| Review it: pdf.js reader in the dock, "PDF 1 / 2" | ✅ | ✅ | ✅ |
+| Reader stacked under the main view in portrait, beside it in landscape | ✅ | ✅ (rotated both ways) | ✅ |
+| Optional tools (PyMuPDF, Tesseract, DjVuLibre, FFmpeg) | PyMuPDF ✅ built in; the others – (iOS can't start processes) | PyMuPDF ✅ built in; the others – | ✅ installed from the Termux repositories with the app installer (`python-pymupdf tesseract djvulibre`); FFmpeg is in the runtime |
+
+On the iPhone 15 Pro Max (device build with the stack fix): objects freed
+on the main thread are deallocated and an sqlite3 commit after a finished
+statement works; `QPdfDocument` over PDFKit gives page count, sizes,
+title, text and renders; Incremento installed from AnkiWeb loads, imports
+a PDF as a topic card with its cover, and the review shows the pdf.js
+reader stacked under the main view ("PDF 1 / 2"). Its dependency setup
+dialog lists PyMuPDF, Tesseract, FFmpeg and DjVuLibre as missing (before
+PyMuPDF was built in). Landscape wasn't tried on the phone.
+
+PyMuPDF built in (`shared/tools/build_pymupdf.sh`): on the iPhone and the
+Android emulator `import pymupdf` takes 0.5 s, writing, reading, text,
+words and rendering work, Incremento's dependency window shows PyMuPDF as
+installed and its PDF import extracts the text through it. The reader's
+tools on the iPhone: Read to here and Bookmark save; Extract with a
+selection highlights it and fills the Add Card panel, which is now a tab
+beside the reader; Annotate's colours and capture tools show once the
+reader is expanded (▲ in its title bar). Sizes: APK 50.3 → 70.1 MB; iOS
+binary +35 MB unstripped.
+
+On the Simulator the add-on reports Tesseract and FFmpeg as found: the
+Simulator sees the Mac's Homebrew. Two Incremento instances on one device
+(native app and Termux variant) can't both open its browser bridge
+(127.0.0.1:8766); the second logs "Address already in use".
+
+## Programs and packages for add-ons, both native apps (2026-10-29)
+
+What's bundled and why: [addon-deps.md](addon-deps.md). Three test scripts
+in `shared/programs`, run inside the app through devcmd (Android emulator,
+Android 17, 16 KB pages; iOS Simulator, iPhone 16 Pro) and on the Mac
+(`python3.14 shared/programs/test_programs.py build/programs/macos/lib`,
+every program run inside the process, as on iOS):
+
+| Script | What | Mac | Android | iOS Simulator |
+| --- | --- | --- | --- | --- |
+| `test_programs.py` | ffmpeg/ffprobe (every encoder, pipes as pydub uses them, `cwd=`, `shell=True`, `terminate()`, `timeout=`, runs at once), lame, mecab (two open at once, a line at a time), kakasi (Japanese Support's way; a second one while it stays open), tesseract (file, stdout, stdin, tsv), espeak-ng, cwebp, dwebp | 51/51 | 51/51 | 51/51 |
+| `test_packages.py` | numpy (linalg, fft, random), Pillow (PNG, JPEG, WebP, GIF, FreeType), cryptography, pyOpenSSL, jieba | – | 15/15 | 15/15 |
+| `test_addons.py` | Japanese Support's mecab and kakasi controllers, AJT Media Converter's `FileConverter` (image to WebP with cwebp, audio to Opus with ffmpeg), AnkiOCR's OCR (pytesseract) | – | 7/7 | 7/7 |
+
+The add-ons came from AnkiWeb (Anki's update check replaced the copies from
+the dump with the current packages, with their own `support/` binaries,
+which Kioku swaps for its own). AnkiOCR's package fails to load on any Qt 6
+Anki (its GUI imports PyQt5); its OCR module was loaded on its own.
+
+Found on the way and fixed:
+
+- Android refused cryptography's Rust library (4 KB pages on a 16 KB-page
+  device), then couldn't resolve its Python symbols (PyO3's abi3 build
+  doesn't link libpython): `RUSTFLAGS` in `build_wheels.sh`.
+- AnkiOCR: `KeyError: 'Android'` (its tesseract table has Windows, Darwin,
+  Linux; `platform.system()` changed in Python 3.13), then pytesseract's
+  `pkgutil.find_loader` (removed in 3.14): `kioku/patches.py`.
+- iOS: a second kakasi waited forever while Japanese Support kept its own
+  open, freezing the app: runs now give up their lock while they wait for
+  input, their globals saved (`kioku_prog.c`).
+- iOS Simulator: espeak-ng found no data (its 160-byte path buffer cut the
+  bundle path).
+- kakasi 2.3.6 misread Japanese Support's dictionaries (older format): read
+  6 bytes off.
+
 Which AnkiWeb add-ons need libraries or programs Kioku doesn't bundle: [addon-deps.md](addon-deps.md).
+
+## AnkiWeb login, empty deck list, Android (2026-10-30)
+
+Emulator (Android 17, `-gpu swiftshader_indirect`), test AnkiWeb account of
+40,359 cards. Not run on a physical phone.
+
+| Test | Before the fix | With the fix |
+| --- | --- | --- |
+| User 1 (41 local cards): Sync, log in, conflict, Download | works | not repeated |
+| New empty profile: Sync, log in, "Download from AnkiWeb?", Yes | works | not repeated |
+| New empty profile: Preferences, log in, "sync now?", Yes | reaches the same prompt | not repeated |
+| Empty profile: Yes, then Home after 3 s, back after 60 s | **fails**: network error, 0 cards, empty list | works: 40,359 cards, `procState=FGS`, no firewall change for the app |
+| Service during and after a sync | none | `dataSync` foreground while syncing, gone after |
+| Message open while the profile switches | **unseen**, blocks taps | drawn above the deck list |
+| User 2 (258,431 local cards): log in, conflict, Cancel | not run | cards unchanged |
+| Restart after the download | decks still there | not repeated |
+| Home and back, 8 times | not run | no crash |
+
+The diagnosis: `dumpsys netpolicy` logged `10232-background-default` 8 s after
+Home and `10232-background-allow` on the way back.
+
+Open:
+
+- One SIGSEGV on the way back from Home, before the fix, in the emulator's GPU
+  driver (`libEGL_emulation.so`, `createNativeSync`, from `eglSwapBuffers`).
+  Not seen again in 8 cycles. On restart the profile was still logged in and
+  empty, and asked to download again.
+- The box shown while waiting for media sync when a profile closes is cut off
+  on the right, with an empty log line (`19:02:14: , ,`).
+- A dialog's first frame can be black (seen once, on the conflict dialog).
+
+## Extra files for add-ons, downloaded on demand (2026-10-31)
+
+jieba, Tesseract's languages and eSpeak NG's data left the app bundles
+(`kioku/packs.py`, `shared/tools/packs.py`); the zips are on the `packs`
+branch and served from raw.githubusercontent.com. Also left out: test-only
+extension modules (CPython `_test*`, `xxlimited*`, numpy `*_tests`, `_simd`,
+`PIL._imagingtk`) and `.pyi` stubs.
+
+| Size | Before | After |
+| --- | --- | --- |
+| iOS app, installed (dev build) | 325 MB | 251 MB |
+| iOS app, zipped (≈ download) | 127 MB | 88 MB |
+| Android APK | 142 MB | 102 MB |
+| Packs (jieba, Tesseract, eSpeak) | — | 5.2 + 10.0 + 9.2 MB |
+
+jieba's pack leaves out `lac_small/` (paddle mode, needs paddlepaddle) and
+the `.p` pickles (read only on Jython): 37 → 18.5 MB unpacked. Checked on
+the Mac: cut, POS tags, keyword extraction, `importlib.metadata`.
+
+| Test | iPhone 15 Pro Max | Emulator (Android 17) |
+| --- | --- | --- |
+| Start with Incremento installed: offer for Tesseract names the add-on | works | works |
+| Download from the offer; `tesseract --list-langs` lists the 6 languages from the pack | works | works, with Home pressed right after Download |
+| `import jieba` with no pack: second offer queued after the first | works | — |
+| Download, then `jieba.lcut` without a restart | works | works |
+| Install an unknown add-on (`.ankiaddon`, lazy `import jieba`): offer at once | — | works ("Chinese Segment Probe needs…") |
+| Not now: remembered; Extra Files shows "(1 needed)" on the add-on | — | works |
+| Tools › Add-ons › Extra Files: needed first, Download / Remove, sizes | works | works (real taps) |
+| eSpeak from the pack (`espeak-ng -v zh/ja --ipa`) | works | works |
+| Remove: status back to "Not downloaded" | works | works |
+| Foreground service while downloading (`ankiwebsync.hold`) | n/a | runs; notification hidden only because the emulator never granted POST_NOTIFICATIONS |
+
+Host tests: `shared/tests/test_packs.py` (scan, sys.path and variables,
+import offer, download over a local HTTP server, checksum and path checks,
+updates, remove, Not now, dialog and Add-ons button, shipped manifest).
+
+Second round (same day): Pygments as a pack (1.2 MB); rsbridge with fat LTO
+(the translations were in the binary twice); local symbols stripped from the
+iOS binary and frameworks, Android wheels' `.so` files stripped.
+
+| Size | Start | After packs | After round 2 |
+| --- | --- | --- | --- |
+| iOS app, installed | 325 MB | 251 MB | 215 MB |
+| iOS app, zipped | 127 MB | 88 MB | 80 MB |
+| Android APK | 142 MB | 102 MB | 94 MB |
+
+| Test | iPhone | Emulator |
+| --- | --- | --- |
+| numpy, Pillow, cryptography, pymupdf import and run (stripped modules) | works | works |
+| Collection opens, `tr` strings (LTO build), ffmpeg, tesseract | works | works |
+| `markdown` with codehilite (probes pygments) outside add-ons: no offer | works | — |
+| Pygments pack from GitHub, then `highlight()` | — | works |
+| HTTPS after `pm trim-caches` (CA bundle no longer in the cache) | n/a | works; failed before the fix |
+
+## Add-ons that use bundled programs, in the app's own screens (2026-10-31)
+
+Emulator (Android 17), add-ons installed from AnkiWeb (current packages, with
+their own `support/` binaries, which Kioku swaps), profile AddonTest, note
+type with Expression, Reading, VocabKanji, … fields. Each feature was run
+the way a user reaches it: the Add window's editor (field focus lost, toolbar
+buttons, paste), the Browser's menus on selected notes, the reviewer, the
+Tools menu, the image occlusion editor. Scripts drove the screens through
+devcmd (focus sent as the WebView sends it on a tap).
+
+| Add-on | Where | What ran | Result |
+| --- | --- | --- | --- |
+| Japanese Support (3918629684) | editor: focus lost | mecab reading into Reading | works |
+| | Browser › Edit › Bulk-add Readings | mecab | works |
+| AJT Japanese (1344485230) | editor: focus lost | furigana and pitch accent (mecab, its pitch table) | works |
+| | Browser › AJT Japanese: Bulk-generate | furigana, pitch | works |
+| | reviewer | answer shows the generated furigana and pitch | works |
+| JapaneseFurigana (678316993) | editor toolbar button | furigana for the focused field (mecab) | works |
+| | Browser › Bulk Generate Furigana | mecab, chosen source/destination fields | works |
+| SimpleFurigana (1444055400) | editor toolbar button | its mecab works; the button finds no selection | **add-on**: its script uses jQuery and the page's selection, both gone from Anki's editor since 2.1.50 (desktop too) |
+| Syntax Highlighting NG (566351439) | editor toolbar button | Pygments (pack) into the focused field | works |
+| AJT Media Converter (1151815987) | editor: paste an image | cwebp → `.webp` | works |
+| | Browser › Bulk-convert | image → WebP (cwebp), WAV → Ogg/Opus (ffmpeg) | works |
+| AnkiOCR, Shige's fork (546383173) | Browser › Cards › AnkiOCR › Run | tesseract text into the image's `title` | works ("Kioku reads this text") |
+| Auto Image Occlusion (1414192727) | Add › Image Occlusion, its Auto-detect button | tesseract word boxes → regions | works |
+| AnkiMorphs (472573498) + ankimorphs-japanese-mecab (1974309724) | Recalc (toolbar) | Japanese morphemizer (mecab), `am-*` tags on 9 notes | works |
+| FrequencyMan (909420026) | its Japanese tokenizers (used when it reorders) | AnkiMorphs MeCab, AJT Japanese MeCab | works |
+| KanjiVocab (1600796261) | its splitter | mecab with Japanese Support's dictionary | works |
+| MeCab UniDic Dictionary (13462835) | its MeCab process | mecab with UniDic | works |
+| Migaku Kanji GOD (1872210448) | start-up, reviewer (answer hook), its MeCab parser | `mecab-linux` | **failed to load** before the fix (name not swapped), works after |
+| Migaku Japanese (278530045), AwesomeTTS (814349176) | — | — | not on AnkiWeb for 26.09; the old copies import PyQt5 (desktop too) |
+
+Not run: Batch Download Pictures From Google Images (PIL, needs Google
+search results), Incremento (tested 2026-10-28).
+
+Found and fixed (docs/fixes.md, Add-ons):
+
+- Program copies named `mecab-linux` / `-macos` / `-windows.exe` weren't
+  swapped (Migaku Kanji GOD).
+- Android emptied the cache folder while the app ran (the emulator's storage
+  was full) and took the program links with it: every program failed until a
+  restart, Anki dropped Japanese Support's focus-lost hook after the error,
+  and a later import of Kanji GOD aborted the app (`QThread: Destroyed while
+  thread is still running`, from its earlier failed import). The links moved
+  to the config folder; checked on a fresh build.
+- Qt's Android clipboard couldn't hold links (Qt 6.11.0 bug); an https link
+  copies and reads back now. `file://` links are refused by Android itself,
+  and Qt on Android has no images on the clipboard: the paste test fed the
+  editor the same data a paste gives it.
+
+Seen, not changed: Anki's `send2trash` fails on Android's shared storage
+(`.Trash-<uid>` missing) when an add-on is replaced; Anki deletes the old
+folder instead, so updates work. Programmatic `focusField()` doesn't reach
+Python without a tap (the WebView has no native focus); users tap fields.
+
+### Same add-ons on the iOS Simulator (2026-10-31)
+
+iPhone 15 Pro Max simulator (iOS 26.4), the same 13 add-ons installed from
+AnkiWeb, profile AddonTest, note type "Japanese (Kioku test)". The same
+screens were driven as on Android: the Add window's editor (focus lost,
+toolbar buttons with the field focused and its text selected in the
+WebView, image paste), the Browser's menus, Tools › Recalc, the Image
+Occlusion editor, the reviewer. Programs run inside the app on iOS.
+
+| Add-on | Where | Result |
+| --- | --- | --- |
+| Japanese Support | editor: focus lost (mecab, kakasi); Browser › Bulk-add Readings | works |
+| AJT Japanese | editor: focus lost (furigana, pitch); Browser › Bulk-generate; reviewer shows the pitch | works |
+| JapaneseFurigana | editor button; Browser › Bulk Generate Furigana | button **failed** before the fix (below), works now; bulk works |
+| Syntax Highlighting NG | editor button, code from the clipboard (Pygments) | works |
+| AJT Media Converter | image paste → WebP (needs its "copy_paste" option, off by default); Browser › Bulk-convert: images → WebP, WAV → Ogg/Opus | works |
+| AnkiOCR (Shige) | Browser › Run AnkiOCR (its own tessdata) | works (text in the image's `title`) |
+| Auto Image Occlusion | Image Occlusion editor, Auto-detect (Tesseract, tessdata extra files downloaded) | works (1 region) |
+| AnkiMorphs + Japanese MeCab | Recalc | works (`am-not-ready` tags) |
+| FrequencyMan | its AnkiMorphs and AJT MeCab tokenizers | works |
+| KanjiVocab | its splitter | works (its `--node-format="…"` quotes reach mecab literally, desktop too) |
+| MeCab UniDic | its MeCab process | works |
+| Migaku Kanji GOD | start-up (downloads its 446 MB dictionary), reviewer, its MeCab parser | works |
+
+Found and fixed: JavaScript `null` from `runJavaScript` came back as an
+`NSNull` object instead of `None`, so JapaneseFurigana's selection check
+(null when WebKit has no `ShadowRoot.getSelection`) crashed it
+(docs/fixes.md, Add-ons).
+
+Seen, not changed: Anki's editor script logs `TypeError: null is not an
+object (evaluating 'e.anchor')` when a field takes focus in WebKit (its
+selection save gets no selection from the shadow root); editing works.
+Anki's editor saves every field about 600 ms after it shows a note; an
+add-on that writes the same note within that time (a script running OCR
+right after selecting it) gets overwritten, on desktop too.
+
+
+## Menus over pages, first-run language list (2026-10-31)
+
+Android emulator (Android 17, dark mode) and iPad Pro 11-inch (M4)
+simulator (iOS 26.4).
+
+| Test | Android | iPad sim |
+| --- | --- | --- |
+| First-run language list in dark mode, Qt's own palette (before a profile loads) | the selected row was blank (`#e4e5f0` on `#dae2ff`); after: black text | light mode: readable before and after |
+| Anki's palette after a profile loads | highlight text stays white | — |
+| Tools menu open, tap on the deck list page | the menu stayed open; after: it closes and the page's button under the tap does nothing; the next tap opens Create Deck | — |
+| Review screen's More menu open, hit test where the card is | — | before: the WKWebView; after: Qt's view (taps can't be sent on the simulator) |
+| Review screen's More (bottom right) tapped (Android: landscape, the button is hidden below 583 px) | before: menu at Qt's last tap; after: at the tap, (864, 359), the menu's right edge at the screen's | before: top left; after: above the button (a `pointerdown` and `click()` sent from the page) |
+| Page tapped, then the menu bar's Edit | `QCursor.pos()` is Qt's again | — |
+
+### Hardware keyboard on the review screen (2026-10-31)
+
+iPad Pro 11-inch (M4) simulator. The simulator here has no window to type
+into and synthetic HID events (`UIApplication _enqueueHIDEvent:`) didn't
+arrive, so presses were stand-in `UIPress` objects handed to the same
+methods UIKit calls; a tap on the card was `becomeFirstResponder` on the
+WKWebView's content view.
+
+| Test | Before | After |
+| --- | --- | --- |
+| No tap yet (Qt's view first responder), Space to Qt's view | card turns over | same |
+| After a tap: Qt's focus window / active window | none / none | none until a key, then Qt's window |
+| After a tap: Qt's key commands | 67, Space as `e`, Return as `n`, Enter as `r`; `I` and Space commands match nothing | none |
+| After a tap: Space to WebKit's content view | (WebKit scrolls) | Qt's view first responder, card turns over |
+| Then 3 to Qt's view | — | card graded, next card |
+
+Not run: a real keyboard (needs an iPad with a keyboard, or the Mac's
+keyboard on "My Mac (Designed for iPad)", started from Xcode), a key typed
+into a page's text field (kept by WebKit, `isFocusingElement`).
+
+Seen, not changed: Android has the same symptom with a different cause.
+After a tap on the card, `adb shell input keyevent` Space and I reach no Qt
+shortcut (the WebView keeps Android's key focus).
+
+## Desktop image: Microsoft fonts download (2026-10-31)
+
+Codespace (Ubuntu, curl 8.5). The script alone, with `HOME` in a scratch
+folder, and the image built from `desktop/`.
+
+| Test | Result |
+| --- | --- |
+| Fresh download from SourceForge | 31 files installed in 3 s; installers' folder removed |
+| "Arial Greek" with and without the alias file | Arial / DejaVu Sans |
+| Local server with 5 of 11 installers and one corrupt (`ANKI_MS_FONTS_URL`) | three rounds, then "couldn't download" the 6; the 5 good ones kept in `.cache/anki-ms-fonts` |
+| Same server, now complete | fetched only the 6 missing ones (server log), installed |
+| Container, `ANKI_MS_FONTS=true` | fonts after 10 s, `fc-match "Arial Greek"` → Arial as `abc`; no download after a restart |
+
+Not run: the full `desktop/test/run.sh` (its two new checks were run by
+hand in the container above).

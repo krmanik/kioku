@@ -4,7 +4,7 @@ The backends differ only in how a page talks to Python; each one installs a
 small BRIDGE script first that defines window.__kiokuNative:
 
     __kiokuNative.send(name, text)   fire-and-forget message ("console",
-                                     "selection")
+                                     "selection", "tap")
     __kiokuNative.call(text)         a web channel call; returns a Promise of
                                      the JSON-encoded result
 """
@@ -15,9 +15,10 @@ import re
 # Event names used with __kiokuNative.send()
 CONSOLE = "console"
 SELECTION = "selection"
+TAP = "tap"
 
 # Stand-in for qwebchannel.js: calls on channel.objects.<name>.<method>(...)
-# go to Python. Also console capture and selection tracking.
+# go to Python. Also console capture, selection and tap tracking.
 PRELUDE = r"""
 (function () {
     if (window.__kioku) return;
@@ -52,6 +53,21 @@ PRELUDE = r"""
         try { native.send("selection", String(window.getSelection())); }
         catch (e) {}
     });
+    // Qt doesn't see taps on a page, so QCursor.pos() stayed where Qt last
+    // saw one: menus a page opens there (the review screen's More) showed
+    // at the top left. Where in the view, as fractions of its size.
+    window.addEventListener("pointerdown", function (e) {
+        try {
+            var v = window.visualViewport;
+            var x = v ? e.clientX - v.offsetLeft : e.clientX;
+            var y = v ? e.clientY - v.offsetTop : e.clientY;
+            var w = v ? v.width : window.innerWidth;
+            var h = v ? v.height : window.innerHeight;
+            if (w > 0 && h > 0) {
+                native.send("tap", JSON.stringify({x: x / w, y: y / h}));
+            }
+        } catch (e) {}
+    }, true);
 
     window.qt = window.qt || {};
     window.qt.webChannelTransport = window.qt.webChannelTransport || {};

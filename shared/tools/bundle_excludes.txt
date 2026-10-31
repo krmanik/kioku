@@ -1,0 +1,17 @@
+# rsync patterns left out of the app bundles (ios/tools/bundle_python.sh,
+# android/tools/pack_python.sh): extension modules only test suites import,
+# and type stubs. The extra files for add-ons: shared/tools/packs.py excludes.
+_test*.so
+_ctypes_test*.so
+_xxtestfuzz*.so
+xxlimited*.so
+xxsubtype*.so
+/numpy/_core/_multiarray_tests*.so
+/numpy/_core/_operand_flag_tests*.so
+/numpy/_core/_rational_tests*.so
+/numpy/_core/_struct_ufunc_tests*.so
+/numpy/_core/_umath_tests*.so
+/numpy/_core/_simd*.so
+# needs tkinter, which the apps don't have
+/PIL/_imagingtk*.so
+*.pyi

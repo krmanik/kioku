@@ -67,8 +67,13 @@ Upload / Files panel ◀───────────────▶ /config
   SourceForge (in parallel: a mirror can take a minute for each file),
   checked against Debian's `ttf-mscorefonts-installer` sums, unpacked with
   `cabextract` into `/config/.local/share/fonts/msttcorefonts` (fontconfig
-  reads it) and kept there; a failed download is tried again at the next
-  start.
+  reads it) and kept there, with "Arial Greek" (older decks) as an alias of
+  Arial. SourceForge's mirrors sometimes reset connections, so each file is
+  tried again within the start (curl `--retry-all-errors`, then up to two
+  more rounds for the missing ones); installers that arrived wait in
+  `/config/.cache/anki-ms-fonts`, and the next start fetches only the
+  missing ones. `ANKI_MS_FONTS_URL` replaces the SourceForge address (a
+  folder with the same `.exe` files).
 - **Compose file:** `SELKIES_DESKTOP=true` (the base's taskbar, to switch
   between Anki's windows) and, commented out, `/dev/dri` for the server's
   GPU (the base then renders and encodes on it; without it everything is

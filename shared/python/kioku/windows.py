@@ -432,9 +432,16 @@ class WindowManager(QObject):
                 return True
             return False
         if kind == QEvent.Type.Show and obj.isWindow():
+            import aqt
+
             if self._manageable(obj):
                 # after the window's own show logic (e.g. restoring geometry)
                 QTimer.singleShot(0, lambda w=obj: self._adopt(w))
+            elif obj is aqt.mw:
+                # after loadProfile's raise_(): a message that came up while
+                # the main window was hidden (a sync error while switching
+                # profiles) was left under it, unseen but blocking every tap
+                QTimer.singleShot(0, _raise_modal)
         elif kind == QEvent.Type.Resize and obj.isWindow():
             if self._bar(obj) is not None:
                 self._layout(obj)
@@ -669,6 +676,12 @@ class EnterKeyFilter(QObject):
 
 
 _enter_key_filter: EnterKeyFilter | None = None
+
+
+def _raise_modal() -> None:
+    modal = QApplication.activeModalWidget()
+    if modal is not None:
+        modal.raise_()
 
 
 def install(app: QApplication) -> None:

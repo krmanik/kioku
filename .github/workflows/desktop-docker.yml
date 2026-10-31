@@ -19,6 +19,8 @@ permissions:
 
 jobs:
   image:
+    # prereleases test the apps; they'd only push the same image as :latest
+    if: ${{ !github.event.release.prerelease }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

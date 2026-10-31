@@ -16,11 +16,14 @@ jsonschema-specifications==2025.9.1
 markdown==3.11.1
 packaging==26.3
 protobuf==7.36.2
+pygments==2.21.0
 pysocks==1.7.1
+qtpy==2.4.3
 referencing==0.37.0
 requests==2.34.2
 send2trash==2.1.0
 soupsieve==3.0.3
+tqdm==4.70.1
 truststore==0.10.5
 typing-extensions==4.16.0
 urllib3==2.8.0

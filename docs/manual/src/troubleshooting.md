@@ -13,7 +13,7 @@ templates), see [Anki: Troubleshooting](https://docs.ankiweb.net/troubleshooting
 | The sync conflict box (Upload/Download) has a large empty gap | iOS | it works; tap a button |
 | Review Heatmap is slightly wider than the screen | iOS, Android | drag sideways |
 | History button shows "History ▯" in Add | Android | cosmetic |
-| Add-ons that start programs (MeCab readings) | iOS, Android | use the Termux variant or the Docker image |
+| Add-ons that start a program Kioku doesn't bundle (mpv, osascript, ...; bundled: FFmpeg, MeCab, KAKASI, Tesseract, eSpeak NG, LAME, cwebp) | iOS, Android | use the Termux variant or the Docker image |
 
 iOS = iPhone/iPad, Android = Android native, Termux = Android Termux.
 

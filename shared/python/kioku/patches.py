@@ -9,6 +9,7 @@ the platforms comes from kioku_platform.
 from __future__ import annotations
 
 import logging
+import os
 import types
 
 import kioku_platform as platform
@@ -64,8 +65,11 @@ def apply() -> None:
     _patch_full_screen()
     _patch_screen_edges()
     _patch_splitters()
+    _patch_docks()
     _patch_update_check()
     _patch_page_html()
+    _python_313_compat()
+    _addon_platform()
 
 
 def _dark_mode() -> bool:
@@ -156,21 +160,54 @@ def _patch_app() -> None:
 
     import sys
 
-    from kioku import advanced, ankidroid, devtools, mediaserver, syncserver, windows
+    from kioku import advanced, ankidroid, ankiwebsync, devtools, mediaserver, packs, syncserver, windows
 
     advanced.install()
+    packs.install()
     if sys.platform == "android":
         ankidroid.install()
+        ankiwebsync.install()
     original_init = aqt.AnkiApp.__init__
 
     def init(self, argv):  # type: ignore[no-untyped-def]
         original_init(self, argv)
+        _fix_highlighted_text(self)
         windows.install(self)
         mediaserver.install()
         syncserver.install()
         devtools.install()
 
     aqt.AnkiApp.__init__ = init
+
+
+def _fix_highlighted_text(app) -> None:  # type: ignore[no-untyped-def]
+    """Until a profile loads, Anki's palette is not applied and Qt's own is
+    used. On Android in dark mode, that one has light text on a light
+    highlight, so the selected row of the first-run language list was
+    blank. Such text becomes black or white, whichever reads on it."""
+    from aqt.qt import QColor, QPalette
+
+    def luminance(color: QColor) -> float:
+        return 0.2126 * color.redF() + 0.7152 * color.greenF() + 0.0722 * color.blueF()
+
+    def fix() -> None:
+        palette = app.palette()
+        role = QPalette.ColorRole
+        # Anki's highlight is half transparent, over the list's background
+        highlight = palette.color(role.Highlight)
+        alpha = highlight.alphaF()
+        background = alpha * luminance(highlight) + (1 - alpha) * luminance(
+            palette.color(role.Base)
+        )
+        if abs(background - luminance(palette.color(role.HighlightedText))) >= 0.4:
+            return
+        dark = background > 0.5
+        palette.setColor(role.HighlightedText, QColor("black" if dark else "white"))
+        app.setPalette(palette)
+
+    fix()
+    # the system's dark mode can change before then
+    app.paletteChanged.connect(lambda _palette: fix())
 
 
 def _patch_profile_saving() -> None:
@@ -405,6 +442,12 @@ def _patch_splitters() -> None:
     QSplitter.insertWidget = insert_widget
 
 
+def _patch_docks() -> None:
+    from . import maindocks
+
+    maindocks.install()
+
+
 def _patch_page_html() -> None:
     """Anki serves its pages (deck list, overview, reviewer, the bars) from
     its media server as /_anki/legacyPageData, without a viewport meta: put
@@ -443,3 +486,51 @@ def _patch_audio() -> None:
         aqt.sound.av_player.players.append(platform.tts_player(taskman))
 
     aqt.sound.setup_audio = setup_audio
+
+
+def _python_313_compat() -> None:
+    """Desktop Anki runs Python 3.13; the apps run 3.14, which dropped
+    pkgutil.find_loader() and get_loader(). Add-ons' bundled libraries still
+    call them (pytesseract in AnkiOCR)."""
+    import importlib.util
+    import pkgutil
+
+    def find_loader(fullname):  # type: ignore[no-untyped-def]
+        try:
+            spec = importlib.util.find_spec(fullname)
+        except (ImportError, ValueError):
+            return None
+        return spec.loader if spec else None
+
+    def get_loader(module_or_name):  # type: ignore[no-untyped-def]
+        if isinstance(module_or_name, types.ModuleType):
+            spec = getattr(module_or_name, "__spec__", None)
+            return spec.loader if spec else None
+        return find_loader(module_or_name)
+
+    if not hasattr(pkgutil, "find_loader"):
+        pkgutil.find_loader = find_loader
+    if not hasattr(pkgutil, "get_loader"):
+        pkgutil.get_loader = get_loader
+
+
+def _addon_platform() -> None:
+    """platform.system() is "Android"/"iOS" since Python 3.13; add-ons pick
+    programs and paths from tables keyed "Windows"/"Darwin"/"Linux" (and
+    KeyError on anything else). Code in add-ons gets the answer older Pythons
+    gave there: "Linux" on Android, "Darwin" on iOS; everything else (Anki's
+    own platform description, truststore) the real one."""
+    import platform
+    import sys
+
+    system = platform.system
+    answer = {"android": "Linux", "ios": "Darwin"}.get(sys.platform)
+    if not answer:
+        return
+    marker = f"{os.sep}addons21{os.sep}"
+
+    def addon_system() -> str:
+        caller = sys._getframe(1).f_globals.get("__file__") or ""
+        return answer if marker in caller else system()
+
+    platform.system = addon_system

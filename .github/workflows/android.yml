@@ -59,8 +59,10 @@ jobs:
       - name: Tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq protobuf-compiler ninja-build zip rsync > /dev/null
+          sudo apt-get install -y -qq protobuf-compiler ninja-build zip rsync swig pkg-config > /dev/null
           rustup --version
+          # cryptography for add-ons (shared/tools/build_wheels.sh)
+          rustup target add aarch64-linux-android
 
       - uses: actions/setup-java@v4
         with:
@@ -83,6 +85,18 @@ jobs:
             android/deps/qt
             android/deps/python-android
           key: android-deps-${{ hashFiles('shared/versions.env') }}
+
+      # programs and packages for add-ons (shared/tools/build_programs.sh,
+      # build_wheels.sh): FFmpeg and co. take a while to build
+      - name: Cache add-on programs and packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/programs/src
+            build/programs/data
+            build/programs/android
+            build/wheels/android
+          key: android-programs-${{ hashFiles('shared/versions.env', 'shared/programs/*', 'shared/tools/build_programs.sh', 'shared/tools/build_wheels.sh') }}
 
       - name: Cache Rust builds
         uses: actions/cache@v4

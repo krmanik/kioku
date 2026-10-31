@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import weakref
 from ctypes import c_bool, c_long, c_void_p
 from typing import Any, Callable
@@ -41,6 +42,7 @@ WKUserScript = ObjCClass("WKUserScript")
 WKContentWorld = ObjCClass("WKContentWorld")
 NSURL = ObjCClass("NSURL")
 NSMutableURLRequest = ObjCClass("NSMutableURLRequest")
+NSNumber = ObjCClass("NSNumber")
 UIColor = ObjCClass("UIColor")
 NSData = ObjCClass("NSData")
 NSDictionary = ObjCClass("NSDictionary")
@@ -49,6 +51,7 @@ UIPrintPageRenderer = ObjCClass("UIPrintPageRenderer")
 UIGraphicsPDFRenderer = ObjCClass("UIGraphicsPDFRenderer")
 WKWebsiteDataStore = ObjCClass("WKWebsiteDataStore")
 NSHTTPCookie = ObjCClass("NSHTTPCookie")
+NSNull = ObjCClass("NSNull")
 
 # WKUserScriptInjectionTime; the same values as kioku.webscripts
 AT_DOCUMENT_START = 0
@@ -56,6 +59,18 @@ AT_DOCUMENT_END = 1
 POLICY_CANCEL = 0
 POLICY_ALLOW = 1
 FLEXIBLE_SIZE = 2 | 16  # UIViewAutoresizingFlexibleWidth | FlexibleHeight
+
+
+def _js_value(value: Any) -> Any:
+    """JavaScript null arrives as NSNull, which py_from_ns leaves as an
+    ObjCInstance (also inside arrays and objects); QtWebEngine gives None."""
+    if isinstance(value, ObjCInstance):
+        return None if value.isKindOfClass_(NSNull) else value
+    if isinstance(value, list):
+        return [_js_value(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _js_value(v) for k, v in value.items()}
+    return value
 NO_INSET_ADJUSTMENT = 2  # UIScrollViewContentInsetAdjustmentNever
 A4 = (595.2, 841.8)  # points
 PDF_MARGIN = 36.0
@@ -63,6 +78,7 @@ PDF_MARGIN = 36.0
 CHANNEL_HANDLER = "kiokuChannel"
 CONSOLE_HANDLER = "kiokuConsole"
 SELECTION_HANDLER = "kiokuSelection"
+TAP_HANDLER = "kiokuTap"
 
 def prop(obj: Any, name: str) -> Any:
     """Read an Objective-C property. Rubicon only treats a name as a property
@@ -165,6 +181,9 @@ class KiokuScriptHandler(NSObject):
                 view.on_console(json.loads(text))
             elif name == SELECTION_HANDLER:
                 view.on_selection(text)
+            elif name == TAP_HANDLER:
+                tap = json.loads(text)
+                view.on_tap(tap["x"], tap["y"])
         except Exception:
             logger.exception("script message %s", name)
 
@@ -290,7 +309,8 @@ class WebView:
     BRIDGE = (
         "window.__kiokuNative = {"
         "send: function (name, text) {"
-        " var h = {console: 'kiokuConsole', selection: 'kiokuSelection'}[name];"
+        " var h = {console: 'kiokuConsole', selection: 'kiokuSelection',"
+        " tap: 'kiokuTap'}[name];"
         " window.webkit.messageHandlers[h].postMessage(text); },"
         "call: function (text) {"
         " return window.webkit.messageHandlers.kiokuChannel.postMessage(text); }"
@@ -306,9 +326,17 @@ class WebView:
         widget.setAttribute(Qt.WidgetAttribute.WA_DontCreateNativeAncestors, True)
 
     def __init__(self) -> None:
+        from . import keys
+
+        keys.install()
         config = WKWebViewConfiguration.alloc().init()
         config.setAllowsInlineMediaPlayback_(True)
         config.setMediaTypesRequiringUserActionForPlayback_(0)
+        # like QtWebEngine (LocalContentCanAccessFileUrls): local pages may
+        # read other local files, e.g. an add-on's pdf.js reading a PDF
+        prop(config, "preferences").setValue_forKey_(
+            NSNumber.numberWithBool_(True), at("allowFileAccessFromFileURLs")
+        )
         self.controller = prop(config, "userContentController")
         page_world = prop(WKContentWorld, "pageWorld")
         self.controller.addScriptMessageHandlerWithReply_contentWorld_name_(
@@ -319,6 +347,9 @@ class WebView:
         )
         self.controller.addScriptMessageHandler_name_(
             _script_handler, at(SELECTION_HANDLER)
+        )
+        self.controller.addScriptMessageHandler_name_(
+            _script_handler, at(TAP_HANDLER)
         )
         webview = WKWebView.alloc().initWithFrame_configuration_(
             CGRect(CGPoint(0, 0), CGSize(100, 100)), config
@@ -357,6 +388,11 @@ class WebView:
         nsurl = NSURL.URLWithString_(at(url))
         if nsurl is None:
             logger.warning("bad url %s", url)
+            return
+        if prop(nsurl, "isFileURL"):
+            # loadRequest lets a local page read only itself
+            home = NSURL.fileURLWithPath_isDirectory_(at(os.path.expanduser("~")), True)
+            self.webview.loadFileURL_allowingReadAccessToURL_(nsurl, home)
             return
         request = NSMutableURLRequest.requestWithURL_(nsurl)
         for key, value in (headers or {}).items():
@@ -406,7 +442,7 @@ class WebView:
             value = None
             if result:
                 try:
-                    value = py_from_ns(ObjCInstance(result))
+                    value = _js_value(py_from_ns(ObjCInstance(result)))
                 except Exception:
                     value = None
             if callback is not None:
@@ -480,6 +516,13 @@ class WebView:
         self.webview.setFrame_(prop(host, "bounds"))
         host.addSubview_(self.webview)
 
+    @staticmethod
+    def set_touchable(on: bool) -> None:
+        """Off while a Qt popup (a menu) is open: a tap on a page then goes
+        to the Qt view under it, and Qt closes the popup."""
+        for view in list(_views.values()):
+            view.webview.setUserInteractionEnabled_(on)
+
     def detach(self) -> None:
         self.webview.removeFromSuperview()
 
@@ -492,6 +535,7 @@ class WebView:
 
     def on_console(self, entry: dict) -> None: ...
     def on_selection(self, text: str) -> None: ...
+    def on_tap(self, x: float, y: float) -> None: ...
     def on_channel_call(self, obj: str, method: str, args: list) -> Any: ...
     def on_navigation(self, url: str, nav_type: int, main_frame: bool) -> bool:
         return True

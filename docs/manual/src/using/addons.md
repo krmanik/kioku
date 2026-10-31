@@ -22,6 +22,32 @@ On the native apps (iPhone, Android) add-ons work unless they need one of:
 
 On the Termux variant, add-ons behave as on Linux.
 
+## Extra files for add-ons
+
+> **Applies to:** iPhone/iPad, Android native
+
+To keep the app small, some files that only a few add-ons use aren't part
+of the app. Kioku downloads them when an add-on needs them:
+
+| Extra files | Size | For add-ons that |
+| --- | --- | --- |
+| Chinese word segmentation (jieba) | 5 MB | split Chinese text into words |
+| Code highlighting (Pygments) | 1 MB | color source code |
+| Text recognition languages (Tesseract) | 10 MB | read text from images (OCR) |
+| Speech voices (eSpeak NG) | 9 MB | speak with eSpeak |
+
+- When you install an add-on that needs some, or start Kioku with one
+  installed, Kioku asks whether to download them. Downloading runs in the
+  background: keep using Kioku. If an add-on that loaded before the
+  download still can't find them, restart Kioku.
+- **Tools › Add-ons › Extra Files…** lists them: select an add-on first to
+  see what it needs. Download, update or remove them there; removing frees
+  the space until an add-on needs them again.
+- If you choose **Not now**, Kioku doesn't ask again at start-up. It asks
+  again when you install an add-on that needs them.
+
+The files come from the [Kioku repository on GitHub](https://github.com/krmanik/kioku/tree/packs).
+
 ## Tested
 
 All load on iPhone and Android:

@@ -1,0 +1,15 @@
+diff --git a/src/plugins/platforms/android/qandroidplatformclipboard.cpp b/src/plugins/platforms/android/qandroidplatformclipboard.cpp
+index 9bf18ff0..51816904 100644
+--- a/src/plugins/platforms/android/qandroidplatformclipboard.cpp
++++ b/src/plugins/platforms/android/qandroidplatformclipboard.cpp
+@@ -81,7 +81,9 @@ void QAndroidPlatformClipboard::setClipboardMimeData(QMimeData *data)
+     if (data->hasUrls()) {
+         QList<QUrl> urls = data->urls();
+         for (const auto &u : std::as_const(urls))
+-            m_clipboardManager.callMethod<void>("setClipboardUri", context, u.toEncoded());
++            // the Java side takes a String (Qt 6.11.0 passed a byte[]: NoSuchMethodError)
++            m_clipboardManager.callMethod<void>("setClipboardUri", context,
++                                                QString::fromUtf8(u.toEncoded()));
+     } else if (data->hasHtml()) { // html can contain text
+         m_clipboardManager.callMethod<void>("setClipboardHtml",
+                                             context, data->text(), data->html());

@@ -20,6 +20,16 @@ QT=$ROOT/deps/qt/$QT_VERSION
 "$ROOT/tools/build_rust.sh" aarch64-apple-ios
 "$ROOT/tools/gen_pyqt.sh" > /dev/null
 "$ROOT/../shared/tools/prepare_site.sh" "$ROOT/.venv/bin/python" "$ROOT/deps/sdist" "$ROOT/build/site"
+"$ROOT/../shared/tools/build_pymupdf.sh" ios > "$ROOT/build/pymupdf.log" 2>&1 || {
+    tail -30 "$ROOT/build/pymupdf.log"; exit 1; }
+cp -R "$ROOT/../build/pymupdf/ios/site/" "$ROOT/build/site/"
+"$ROOT/../shared/tools/build_programs.sh" ios > "$ROOT/build/programs.log" 2>&1 || {
+    tail -30 "$ROOT/build/programs.log"; exit 1; }
+rsync -a --delete "$ROOT/../build/programs/data/" "$ROOT/build/site/kioku_programs_data/"
+# Python packages with native code (numpy, Pillow, cryptography, lxml, ...)
+"$ROOT/../shared/tools/build_wheels.sh" ios > "$ROOT/build/wheels.log" 2>&1 || {
+    tail -30 "$ROOT/build/wheels.log"; exit 1; }
+rsync -a "$ROOT/../build/wheels/ios/site/" "$ROOT/build/site/"
 
 "$QT/ios/bin/qt-cmake" -S "$ROOT" -B "$ROOT/build/xcode-dev" -G Xcode \
     -DQT_HOST_PATH="$QT/macos" -DCMAKE_OSX_SYSROOT=iphoneos -DCMAKE_OSX_ARCHITECTURES=arm64 \

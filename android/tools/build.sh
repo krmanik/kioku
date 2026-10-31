@@ -29,6 +29,20 @@ BUILD=$ROOT/build/cmake
 "$ROOT/tools/build_rust.sh"
 "$ROOT/tools/gen_pyqt.sh" > /dev/null
 "$ROOT/../shared/tools/prepare_site.sh" "$ROOT/.venv/bin/python" "$ROOT/deps/sdist" "$ROOT/build/site"
+# PyMuPDF: its modules sit next to libmupdfcpp.so (RUNPATH $ORIGIN) and are
+# unpacked with the rest of the runtime
+"$ROOT/../shared/tools/build_pymupdf.sh" android > "$ROOT/build/pymupdf.log" 2>&1 || {
+    tail -30 "$ROOT/build/pymupdf.log"; exit 1; }
+cp -R "$ROOT/../build/pymupdf/android/site/" "$ROOT/build/site/"
+# the programs add-ons start (ffmpeg, mecab, ...): libkiokuprog.so, an extra
+# native library (CMakeLists.txt)
+"$ROOT/../shared/tools/build_programs.sh" android > "$ROOT/build/programs.log" 2>&1 || {
+    tail -30 "$ROOT/build/programs.log"; exit 1; }
+rsync -a --delete "$ROOT/../build/programs/data/" "$ROOT/build/site/kioku_programs_data/"
+# Python packages with native code (numpy, Pillow, cryptography, lxml, ...)
+"$ROOT/../shared/tools/build_wheels.sh" android > "$ROOT/build/wheels.log" 2>&1 || {
+    tail -30 "$ROOT/build/wheels.log"; exit 1; }
+rsync -a "$ROOT/../build/wheels/android/site/" "$ROOT/build/site/"
 
 # package/ plus the Python runtime as an asset
 mkdir -p "$BUILD/package"

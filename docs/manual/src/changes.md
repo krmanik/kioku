@@ -2,6 +2,36 @@
 
 All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
 
+## Next release: smaller app, extra files for add-ons on demand (iOS, Android)
+
+- Chinese word segmentation (jieba), code highlighting (Pygments),
+  Tesseract's OCR languages and eSpeak NG's voices are no longer in the app. Kioku offers to download them when
+  an add-on needs them, and **Tools › Add-ons › Extra Files…** downloads,
+  updates and removes them. [Details](using/addons.md#extra-files-for-add-ons)
+- Test-only Python modules are no longer in the app.
+- Smaller app code (link-time optimization, no debug symbols): about 215 MB
+  installed on iPhone, a 94 MB APK on Android.
+- Android: HTTPS (sync, downloads) no longer fails after Android frees
+  storage by clearing app caches.
+
+## Next release: AnkiWeb sync in the background (Android)
+
+- Syncing with AnkiWeb keeps going when you leave the app, with a
+  notification while it runs. Leaving during the first download used to fail
+  it with a network error and leave the deck list empty.
+- A sync error while switching profiles is now shown. It used to stay hidden
+  and block the app until a restart.
+
+## Next release: add-ons that start programs (iOS, Android)
+
+- The apps include FFmpeg, MeCab, KAKASI, Tesseract (English, Japanese,
+  Chinese, Korean), eSpeak NG, LAME and cwebp, the programs add-ons such as
+  Japanese Support, AJT Media Converter and OCR add-ons start. An add-on's
+  own copy of one of them (made for Windows, macOS or Linux) is replaced by
+  Kioku's.
+- numpy, Pillow and cryptography for add-ons that import them.
+- The app is larger: about 140 MB on Android.
+
 ## Self-hosted server (Docker)
 
 New: `ghcr.io/krmanik/kioku-desktop`, Anki desktop 26.09.3 on your server

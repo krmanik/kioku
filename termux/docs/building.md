@@ -50,7 +50,7 @@ git -C third_party/termux-x11 submodule update --init --depth 1
     patch -p1 -N -d "${p%%:*}" -i "$PWD/patches/${p##*:}.patch" </dev/null; done)
 
 # Runtime: Termux packages (+ the anki release of krmanik/termux-packages), cross-compiled
-# PyQt6.sip, pure-Python deps (tools/python-requirements.txt), pruned and zipped.
+# PyQt6.sip and PyQt6.QtPdf, pure-Python deps (tools/python-requirements.txt), pruned and zipped.
 tools/build_bootstrap.sh          # Linux: SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 
 ./gradlew :app:assembleDebug
@@ -215,6 +215,12 @@ perl, mesa + LLVM (Qt and Chromium run without OpenGL), gstreamer.
   krmanik/termux-packages would replace this once it is in the repositories.
 * `pyqt6` is built without the QtQuick bindings and Qt's OpenGL classes. Anki imports both but
   only uses them for GPU selection; `launch_anki.py` provides stand-ins.
+* `pyqt6` is built without the QtPdf and QtPdfWidgets bindings (it doesn't depend on
+  `qt6-qtwebengine`, which has `libQt6Pdf`), so add-ons that import `PyQt6.QtPdf` fail to load.
+  `tools/build_pyqt6_pdf.sh` generates them with sip against the prefix's PyQt6 bindings and
+  cross-compiles them.
+* `pyqt6` is built without `PyQt_Accessibility`, which drops `QWidget.setAccessibleName` and
+  similar accessors that add-ons call; `launch_anki.py` adds ones that keep the values.
 
 ## Local changes to third-party code
 

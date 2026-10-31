@@ -38,6 +38,17 @@ for _type in ("message", "channel", "navigate", "loadStarted", "loadFinished", "
     bridge.listen(_type, _route)
 
 
+def _close_popups(event: dict) -> None:
+    from PyQt6.QtWidgets import QApplication
+
+    popup = QApplication.activePopupWidget()
+    while popup is not None and popup.close():
+        popup = QApplication.activePopupWidget()
+
+
+bridge.listen("popupTap", _close_popups)
+
+
 def set_cookie(url: str, header: str) -> None:
     """Store a cookie given in Set-Cookie form for url (all pages share
     android.webkit.CookieManager's jar)."""
@@ -253,6 +264,12 @@ class WebView:
         self._container = container
         self._host = widget
 
+    @staticmethod
+    def set_touchable(on: bool) -> None:
+        """Off while a Qt popup (a menu) is open: Qt doesn't see taps on the
+        pages, so KiokuBridge reports them (popupTap) and the popup closes."""
+        bridge.call("webview.touchable", on=on)
+
     def detach(self) -> None:
         if self._container is not None:
             self._container.hide()
@@ -270,6 +287,9 @@ class WebView:
                 self.on_console(json.loads(event["text"]))
             elif event["name"] == "selection":
                 self.on_selection(event["text"])
+            elif event["name"] == "tap":
+                tap = json.loads(event["text"])
+                self.on_tap(tap["x"], tap["y"])
         elif kind == "channel":
             self._channel(event)
         elif kind == "eval":
@@ -317,6 +337,7 @@ class WebView:
 
     def on_console(self, entry: dict) -> None: ...
     def on_selection(self, text: str) -> None: ...
+    def on_tap(self, x: float, y: float) -> None: ...
     def on_channel_call(self, obj: str, method: str, args: list) -> Any: ...
     def on_navigation(self, url: str, nav_type: int, main_frame: bool) -> bool:
         return True

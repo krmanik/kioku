@@ -12,7 +12,7 @@ through AnkiWeb or [the phone's sync server](features/sync-server.md).
 | **Download size** | 39 MB | 48 MB | 235 MB |
 | **Looks like** | a phone app: every window full screen | a phone app: every window full screen | a small Linux desktop with a dock |
 | **Web pages** (cards, editor, stats) | the system web view | Android System WebView | Qt WebEngine, as on a PC |
-| **Add-ons** | yes, except ones that start programs | yes, except ones that start programs | yes, as on Linux |
+| **Add-ons** | yes; programs they start must be among the bundled ones (FFmpeg, MeCab, Tesseract, eSpeak, ...) | yes; programs they start must be among the bundled ones (FFmpeg, MeCab, Tesseract, eSpeak, ...) | yes, as on Linux |
 | **Other Linux apps** | no | no | yes, on demand |
 | **Sync server on the phone** | yes | yes | yes |
 | **AnkiDroid's media** | no | yes | yes |
