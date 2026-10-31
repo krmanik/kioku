@@ -91,9 +91,11 @@ android)
     mkdir -p "$ZLIB/include" "$ZLIB/lib"
     ln -sf "$SYSROOT/include/zlib.h" "$SYSROOT/include/zconf.h" "$ZLIB/include/"
     ln -sf "$SYSROOT/lib/aarch64-linux-android/28/libz.so" "$ZLIB/lib/"
+    # platform-guessing: on a Linux machine Pillow adds /usr/include and
+    # /usr/lib, the host's glibc headers ("bits/wordsize.h" not found)
     build_wheel pillow "$PILLOW_VERSION" CIBW_BEFORE_ALL= \
-        CIBW_CONFIG_SETTINGS="raqm=disable imagequant=disable xcb=disable avif=disable" \
-        CIBW_ENVIRONMENT="CFLAGS=-I$PREFIX/include PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig ZLIB_ROOT=$ZLIB"
+        CIBW_CONFIG_SETTINGS="raqm=disable imagequant=disable xcb=disable avif=disable platform-guessing=disable" \
+        CIBW_ENVIRONMENT="CFLAGS=-I$PREFIX/include LDFLAGS=-L$PREFIX/lib PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig ZLIB_ROOT=$ZLIB"
     # Rust ignores LDFLAGS: 16 KB pages (Android 15+ devices) and libpython
     # (Android resolves extension modules' Python symbols only through it;
     # PyO3's abi3 build leaves it out) go in RUSTFLAGS
