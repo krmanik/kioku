@@ -38,6 +38,17 @@ for _type in ("message", "channel", "navigate", "loadStarted", "loadFinished", "
     bridge.listen(_type, _route)
 
 
+def _close_popups(event: dict) -> None:
+    from PyQt6.QtWidgets import QApplication
+
+    popup = QApplication.activePopupWidget()
+    while popup is not None and popup.close():
+        popup = QApplication.activePopupWidget()
+
+
+bridge.listen("popupTap", _close_popups)
+
+
 def set_cookie(url: str, header: str) -> None:
     """Store a cookie given in Set-Cookie form for url (all pages share
     android.webkit.CookieManager's jar)."""
@@ -252,6 +263,12 @@ class WebView:
         bridge.call("webview.keyboardInsets", id=self.id, on=widget.window() is _main_window())
         self._container = container
         self._host = widget
+
+    @staticmethod
+    def set_touchable(on: bool) -> None:
+        """Off while a Qt popup (a menu) is open: Qt doesn't see taps on the
+        pages, so KiokuBridge reports them (popupTap) and the popup closes."""
+        bridge.call("webview.touchable", on=on)
 
     def detach(self) -> None:
         if self._container is not None:

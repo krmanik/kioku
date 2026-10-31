@@ -505,6 +505,13 @@ class WebView:
         self.webview.setFrame_(prop(host, "bounds"))
         host.addSubview_(self.webview)
 
+    @staticmethod
+    def set_touchable(on: bool) -> None:
+        """Off while a Qt popup (a menu) is open: a tap on a page then goes
+        to the Qt view under it, and Qt closes the popup."""
+        for view in list(_views.values()):
+            view.webview.setUserInteractionEnabled_(on)
+
     def detach(self) -> None:
         self.webview.removeFromSuperview()
 

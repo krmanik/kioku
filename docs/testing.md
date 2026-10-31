@@ -921,3 +921,15 @@ Anki's editor saves every field about 600 ms after it shows a note; an
 add-on that writes the same note within that time (a script running OCR
 right after selecting it) gets overwritten, on desktop too.
 
+
+## Menus over pages, first-run language list (2026-10-31)
+
+Android emulator (Android 17, dark mode) and iPad Pro 11-inch (M4)
+simulator (iOS 26.4).
+
+| Test | Android | iPad sim |
+| --- | --- | --- |
+| First-run language list in dark mode, Qt's own palette (before a profile loads) | the selected row was blank (`#e4e5f0` on `#dae2ff`); after: black text | light mode: readable before and after |
+| Anki's palette after a profile loads | highlight text stays white | — |
+| Tools menu open, tap on the deck list page | the menu stayed open; after: it closes and the page's button under the tap does nothing; the next tap opens Create Deck | — |
+| Review screen's More menu open, hit test where the card is | — | before: the WKWebView; after: Qt's view (taps can't be sent on the simulator) |

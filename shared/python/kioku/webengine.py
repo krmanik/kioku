@@ -857,6 +857,38 @@ def _auth_script(headers: dict[str, str]) -> str:
 # View ------------------------------------------------------------------------
 
 
+class _PopupWatcher(QObject):
+    """Qt closes a popup (a menu, a combo box's list) on a tap outside it,
+    but taps on a page go to the native web view, not to Qt: the review
+    screen's More menu could not be closed on an iPad. While a popup is
+    open, the web views leave taps to Qt (kioku_platform.WebView)."""
+
+    def __init__(self, app: QApplication) -> None:
+        super().__init__(app)
+        self._touchable = True
+        app.installEventFilter(self)
+
+    def eventFilter(self, obj: QObject | None, event: QEvent | None) -> bool:
+        if (
+            event is not None
+            and event.type() in (QEvent.Type.Show, QEvent.Type.Hide)
+            and isinstance(obj, QWidget)
+            and obj.windowType() == Qt.WindowType.Popup
+        ):
+            # the popup list changes after the event
+            QTimer.singleShot(0, self._update)
+        return False
+
+    def _update(self) -> None:
+        touchable = QApplication.activePopupWidget() is None
+        if touchable != self._touchable:
+            self._touchable = touchable
+            platform.WebView.set_touchable(touchable)
+
+
+_popup_watcher: _PopupWatcher | None = None
+
+
 class QWebEngineView(QWidget, _Lenient):
     loadStarted = pyqtSignal()
     loadProgress = pyqtSignal(int)
@@ -872,6 +904,9 @@ class QWebEngineView(QWidget, _Lenient):
             if isinstance(a, QWidget):
                 parent = a
         super().__init__(parent)
+        global _popup_watcher
+        if _popup_watcher is None:
+            _popup_watcher = _PopupWatcher(QApplication.instance())
         platform.WebView.prepare_host(self)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self._page: QWebEnginePage | None = None

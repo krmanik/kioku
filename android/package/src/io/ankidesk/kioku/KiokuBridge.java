@@ -27,6 +27,7 @@ import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
 import android.speech.tts.Voice;
 import android.util.Log;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowManager;
@@ -96,6 +97,13 @@ public class KiokuBridge {
     private static native boolean nativeLockUi();
     private static native void nativeUnlockUi();
     private static native void nativeAnswerUi();
+
+    /**
+     * Off while a Qt popup (a menu) is open (webview.touchable). Qt closes a
+     * popup on a tap outside it, but doesn't see taps on a WebView: such a
+     * tap goes to Python instead (popupTap), which closes the popup.
+     */
+    static volatile boolean pagesTouchable = true;
 
     private static void event(JSONObject json) {
         try {
@@ -314,6 +322,9 @@ public class KiokuBridge {
                 break;
             case "webview.zoom":
                 page(a).view.getSettings().setTextZoom((int) Math.round(a.getDouble("factor") * 100));
+                break;
+            case "webview.touchable":
+                pagesTouchable = a.getBoolean("on");
                 break;
             case "webview.keyboardInsets": {
                 Page p = page(a);
@@ -872,6 +883,15 @@ public class KiokuBridge {
             view.addJavascriptInterface(new JsInterface(), "kiokuAndroid");
             view.setWebViewClient(new Client());
             view.setWebChromeClient(new Chrome());
+            view.setOnTouchListener((v, e) -> {
+                if (pagesTouchable) {
+                    return false;
+                }
+                if (e.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                    event(obj("type", "popupTap"));
+                }
+                return true;
+            });
             // Without keyboardInsets (webview.keyboardInsets: views in windows
             // that Kioku keeps above the keyboard) the WebView doesn't see the
             // on-screen keyboard. It took the keyboard's inset itself: it
