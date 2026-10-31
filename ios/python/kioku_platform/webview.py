@@ -78,6 +78,7 @@ PDF_MARGIN = 36.0
 CHANNEL_HANDLER = "kiokuChannel"
 CONSOLE_HANDLER = "kiokuConsole"
 SELECTION_HANDLER = "kiokuSelection"
+TAP_HANDLER = "kiokuTap"
 
 def prop(obj: Any, name: str) -> Any:
     """Read an Objective-C property. Rubicon only treats a name as a property
@@ -180,6 +181,9 @@ class KiokuScriptHandler(NSObject):
                 view.on_console(json.loads(text))
             elif name == SELECTION_HANDLER:
                 view.on_selection(text)
+            elif name == TAP_HANDLER:
+                tap = json.loads(text)
+                view.on_tap(tap["x"], tap["y"])
         except Exception:
             logger.exception("script message %s", name)
 
@@ -305,7 +309,8 @@ class WebView:
     BRIDGE = (
         "window.__kiokuNative = {"
         "send: function (name, text) {"
-        " var h = {console: 'kiokuConsole', selection: 'kiokuSelection'}[name];"
+        " var h = {console: 'kiokuConsole', selection: 'kiokuSelection',"
+        " tap: 'kiokuTap'}[name];"
         " window.webkit.messageHandlers[h].postMessage(text); },"
         "call: function (text) {"
         " return window.webkit.messageHandlers.kiokuChannel.postMessage(text); }"
@@ -342,6 +347,9 @@ class WebView:
         )
         self.controller.addScriptMessageHandler_name_(
             _script_handler, at(SELECTION_HANDLER)
+        )
+        self.controller.addScriptMessageHandler_name_(
+            _script_handler, at(TAP_HANDLER)
         )
         webview = WKWebView.alloc().initWithFrame_configuration_(
             CGRect(CGPoint(0, 0), CGSize(100, 100)), config
@@ -527,6 +535,7 @@ class WebView:
 
     def on_console(self, entry: dict) -> None: ...
     def on_selection(self, text: str) -> None: ...
+    def on_tap(self, x: float, y: float) -> None: ...
     def on_channel_call(self, obj: str, method: str, args: list) -> Any: ...
     def on_navigation(self, url: str, nav_type: int, main_frame: bool) -> bool:
         return True

@@ -933,6 +933,8 @@ simulator (iOS 26.4).
 | Anki's palette after a profile loads | highlight text stays white | — |
 | Tools menu open, tap on the deck list page | the menu stayed open; after: it closes and the page's button under the tap does nothing; the next tap opens Create Deck | — |
 | Review screen's More menu open, hit test where the card is | — | before: the WKWebView; after: Qt's view (taps can't be sent on the simulator) |
+| Review screen's More (bottom right) tapped (Android: landscape, the button is hidden below 583 px) | before: menu at Qt's last tap; after: at the tap, (864, 359), the menu's right edge at the screen's | before: top left; after: above the button (a `pointerdown` and `click()` sent from the page) |
+| Page tapped, then the menu bar's Edit | `QCursor.pos()` is Qt's again | — |
 
 ### Hardware keyboard on the review screen (2026-10-31)
 

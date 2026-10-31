@@ -235,6 +235,9 @@ class WebView:
                 self.on_console(json.loads(event["text"]))
             elif event["name"] == "selection":
                 self.on_selection(event["text"])
+            elif event["name"] == "tap":
+                tap = json.loads(event["text"])
+                self.on_tap(tap["x"], tap["y"])
         elif kind == "channel":
             self._channel(event)
         elif kind == "eval":
@@ -268,6 +271,7 @@ class WebView:
 
     def on_console(self, entry: dict) -> None: ...
     def on_selection(self, text: str) -> None: ...
+    def on_tap(self, x: float, y: float) -> None: ...
     def on_channel_call(self, obj: str, method: str, args: list) -> Any: ...
     def on_navigation(self, url: str, nav_type: int, main_frame: bool) -> bool:
         return True
