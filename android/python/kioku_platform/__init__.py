@@ -59,14 +59,16 @@ def _ca_bundle() -> None:
     Android, and the system's folder cannot serve as SSL_CERT_DIR: its files
     are named with OpenSSL's old (MD5) subject hash, while OpenSSL 3 looks
     certificates up by the current one. Concatenate them into a bundle
-    (truststore, which Anki uses, then picks it up through SSL_CERT_FILE)."""
+    (truststore, which Anki uses, then picks it up through SSL_CERT_FILE).
+    Not in the cache folder: Android empties it when storage runs low, and
+    every HTTPS request failed from then on."""
     if "SSL_CERT_FILE" in os.environ:
         return
     folder = next((d for d in CA_DIRS if os.path.isdir(d)), None)
     if folder is None:
         return
     names = sorted(os.listdir(folder))
-    bundle = os.path.join(cache_dir(), "cacerts.pem")
+    bundle = os.path.join(config_dir(), "cacerts.pem")
     stamp = f"{folder} {len(names)} {os.stat(folder).st_mtime_ns}\n"
     try:
         with open(bundle, encoding="ascii", errors="replace") as f:
@@ -74,7 +76,7 @@ def _ca_bundle() -> None:
     except OSError:
         current = False
     if not current:
-        os.makedirs(cache_dir(), exist_ok=True)
+        os.makedirs(config_dir(), exist_ok=True)
         with open(bundle + ".tmp", "w", encoding="ascii", errors="replace") as out:
             out.write("# " + stamp)
             for name in names:
@@ -221,12 +223,12 @@ def sync_server_running(running: bool, text: str) -> None:
 _sync_stop_listening: list[bool] = []
 
 
-def ankiweb_sync_running(running: bool) -> None:
-    """A foreground service keeps the network of a sync with AnkiWeb while
-    Kioku is in the background."""
+def ankiweb_sync_running(running: bool, title: str = "") -> None:
+    """A foreground service keeps the network of a sync with AnkiWeb (or of
+    other work: title for its notification) while Kioku is in the background."""
     from . import bridge
 
-    bridge.call("ankiWebService", running=running)
+    bridge.call("ankiWebService", running=running, title=title)
 
 
 def _on_sync_stop(event: dict) -> None:

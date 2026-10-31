@@ -23,6 +23,8 @@ def calls(monkeypatch: pytest.MonkeyPatch) -> list[bool]:
     monkeypatch.setattr(ankiwebsync, "_collection", False)
     monkeypatch.setattr(ankiwebsync, "_media", False)
     monkeypatch.setattr(ankiwebsync, "_service_running", False)
+    monkeypatch.setattr(ankiwebsync, "_service_title", "")
+    monkeypatch.setattr(ankiwebsync, "_holders", {})
     # stop at once instead of through the timer
     monkeypatch.setattr(
         ankiwebsync.QTimer, "singleShot", lambda _ms, callback: callback(), raising=False
@@ -49,3 +51,15 @@ def test_media_only_sync(calls: list[bool]) -> None:
     ankiwebsync._on_media(True)
     ankiwebsync._on_media(False)
     assert calls == [True, False]
+
+
+def test_held_for_a_download(calls: list[bool], monkeypatch: pytest.MonkeyPatch) -> None:
+    titles: list[tuple[bool, str]] = []
+    monkeypatch.setattr(kioku_platform, "ankiweb_sync_running",
+                        lambda running, title="": titles.append((running, title)))
+    ankiwebsync.hold("packs", True)
+    ankiwebsync._on_collection(True)
+    ankiwebsync._on_collection(False)
+    ankiwebsync.hold("packs", False)
+    title = ankiwebsync.HOLD_TITLES["packs"]
+    assert titles == [(True, title), (True, ""), (True, title), (False, "")]

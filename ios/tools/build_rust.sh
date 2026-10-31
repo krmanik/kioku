@@ -26,6 +26,9 @@ HASH=$(git -C "$ROOT/deps/anki" rev-parse --short=8 HEAD)
     || echo "$HASH" > "$ROOT/deps/anki/out/buildhash"
 
 cd "$ROOT/deps/anki"
+# link-time optimization, as Anki's release-lto profile: the translations are
+# generated as consts, which without it end up in the binary twice (~8 MB)
+CARGO_PROFILE_RELEASE_LTO=fat CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 \
 PYO3_CONFIG_FILE=$ROOT/../shared/tools/pyo3/abi3.cfg cargo rustc -p rsbridge --lib --release \
     --target "$TARGET" --features rustls --crate-type staticlib
 

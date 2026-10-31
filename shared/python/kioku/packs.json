@@ -1,0 +1,102 @@
+{
+  "_comment": "Extra files for add-ons, downloaded on demand (kioku/packs.py). Any add-on whose code imports 'modules' or 'imports', or names one of 'programs', is offered the pack; 'own_files' in an add-on mean it brings its own. 'site': paths in site-packages that move from the app into the pack; 'drop': files left out of the pack. size/unpacked/sha256 are written by shared/tools/packs.py build. Change 'version' for new files (the file name follows it).",
+  "base_url": "https://raw.githubusercontent.com/krmanik/kioku/packs/",
+  "packs": [
+    {
+      "id": "jieba",
+      "title": "Chinese word segmentation (jieba)",
+      "description": "Splits Chinese text into words. Used by Chinese add-ons such as word frequency and dictionary tools.",
+      "version": "0.42.1-1",
+      "site": [
+        "jieba",
+        "jieba-*.dist-info"
+      ],
+      "drop": [
+        "jieba/lac_small/*",
+        "*.p"
+      ],
+      "modules": [
+        "jieba"
+      ],
+      "imports": [],
+      "programs": [],
+      "env": {},
+      "own_files": [],
+      "size": 5237161,
+      "unpacked": 18505815,
+      "sha256": "985670218a06c9a6fe57c5c0521648fd11d1a85c5971274747b10856cd3d877e"
+    },
+    {
+      "id": "pygments",
+      "title": "Code highlighting (Pygments)",
+      "description": "Colors source code. Used by add-ons that highlight code on cards.",
+      "version": "2.21.0-1",
+      "site": [
+        "pygments",
+        "pygments-*.dist-info"
+      ],
+      "drop": [],
+      "modules": [
+        "pygments"
+      ],
+      "imports": [],
+      "programs": [],
+      "env": {},
+      "own_files": [],
+      "size": 1242991,
+      "unpacked": 4621166,
+      "sha256": "96765cd0752fb304cd167eab50d5021cdfd433e73f934f15aeedd35c8a618c2c"
+    },
+    {
+      "id": "tesseract-data",
+      "title": "Text recognition languages (Tesseract)",
+      "description": "English, Japanese, Chinese and Korean models for OCR add-ons that read text from images.",
+      "version": "5.5.4-1",
+      "site": [
+        "kioku_programs_data/tessdata"
+      ],
+      "drop": [],
+      "modules": [],
+      "imports": [
+        "pytesseract"
+      ],
+      "programs": [
+        "tesseract"
+      ],
+      "env": {
+        "TESSDATA_PREFIX": "kioku_programs_data/tessdata"
+      },
+      "own_files": [
+        "*.traineddata"
+      ],
+      "size": 10010155,
+      "unpacked": 16139803,
+      "sha256": "6da6f1e2b0fdf9116dab4f6c26716c421c2832343a0339531bf0e9e48f03a0fc"
+    },
+    {
+      "id": "espeak-data",
+      "title": "Speech voices (eSpeak NG)",
+      "description": "Voices and dictionaries for text-to-speech add-ons that use eSpeak.",
+      "version": "1.52.0-1",
+      "site": [
+        "kioku_programs_data/espeak-ng-data"
+      ],
+      "drop": [],
+      "modules": [],
+      "imports": [],
+      "programs": [
+        "espeak-ng",
+        "espeak"
+      ],
+      "env": {
+        "ESPEAK_DATA_PATH": "kioku_programs_data"
+      },
+      "own_files": [
+        "phondata"
+      ],
+      "size": 9198541,
+      "unpacked": 18373365,
+      "sha256": "d71b1b7102e03b702a30c7e7819b7f9baed7c402f85752b6a83ad91a52bad227"
+    }
+  ]
+}

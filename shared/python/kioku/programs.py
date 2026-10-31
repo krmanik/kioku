@@ -148,6 +148,16 @@ _ANDROID_PROGRAMS = {"ffmpeg", "ffprobe", "lame", "tesseract", "espeak-ng", "esp
                      "cwebp", "dwebp"}
 
 
+def _program_started(name: str) -> None:
+    """Some programs' data is downloaded (kioku.packs): offer it."""
+    try:
+        from kioku import packs
+
+        packs.program_started(name)
+    except Exception:
+        pass
+
+
 def _data_dir() -> str:
     """The programs' data files (build/programs/data), in site-packages."""
     for path in sys.path:
@@ -207,6 +217,7 @@ class Popen(subprocess.Popen):
                                           p2cread, p2cwrite, c2pread, c2pwrite, errread,
                                           errwrite, *rest)
         name = program_name(command[0])
+        _program_started(name)
         if _android_exe and name in _native:
             command[0] = os.path.join(_bin_dir, name)
             return super()._execute_child(command, None, preexec_fn, close_fds, pass_fds,

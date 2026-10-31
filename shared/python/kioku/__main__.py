@@ -75,8 +75,12 @@ def main() -> None:
     print(f"Kioku: Python {sys.version} on {sys.platform}")
     try:
         platform.prepare()
-        from kioku import patches, programs
+        from kioku import packs, patches, programs
 
+        try:
+            packs.setup()
+        except Exception:
+            traceback.print_exc()
         try:
             programs.install(platform.cache_dir())
         except Exception:

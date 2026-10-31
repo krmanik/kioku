@@ -160,9 +160,10 @@ def _patch_app() -> None:
 
     import sys
 
-    from kioku import advanced, ankidroid, ankiwebsync, devtools, mediaserver, syncserver, windows
+    from kioku import advanced, ankidroid, ankiwebsync, devtools, mediaserver, packs, syncserver, windows
 
     advanced.install()
+    packs.install()
     if sys.platform == "android":
         ankidroid.install()
         ankiwebsync.install()

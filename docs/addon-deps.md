@@ -52,6 +52,14 @@ Size: the APK grew from 70 to 142 MB, mostly the programs (43 MB:
 three video encoders), jieba (37 MB of dictionaries), espeak-ng's and
 Tesseract's data (19 + 18 MB) and numpy (18 MB).
 
+Since then jieba, Tesseract's languages and eSpeak NG's data are downloaded
+when an add-on needs them ("extra files": `shared/python/kioku/packs.json`,
+`kioku/packs.py`; built and published by `shared/tools/packs.py` to the
+repository's `packs` branch). To move more files out of the apps: add an
+entry to packs.json (its `site` paths leave the bundles), run
+`shared/tools/packs.py build` and `publish`. Only files: iOS loads no native
+code from outside the app.
+
 Tested through add-ons' own code in the apps (`shared/programs/test_addons.py`):
 Japanese Support (mecab, kakasi), AJT Media Converter (cwebp, ffmpeg),
 AnkiOCR's OCR (tesseract through pytesseract; its GUI imports PyQt5, which

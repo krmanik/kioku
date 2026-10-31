@@ -16,17 +16,22 @@ import android.util.Log;
  * Held while a sync with AnkiWeb runs (shared/python/kioku/ankiwebsync.py).
  * A few seconds after an app leaves the foreground Android cuts its network,
  * which failed the download of a collection and left a new profile empty. The
- * service itself does nothing but show the notification.
+ * service itself does nothing but show the notification. Downloads of extra
+ * files for add-ons (kioku/packs.py) hold it too, with their own title.
  */
 public class KiokuAnkiWebService extends Service {
     private static final String TAG = "Kioku";
     private static final String CHANNEL = "ankiwebsync";
     private static final int NOTIFICATION = 0x6b77;
 
-    /** From KiokuBridge: show (running) or remove the service. */
-    static void update(Context context, boolean running) {
+    private static final String EXTRA_TITLE = "title";
+
+    /** From KiokuBridge: show (running) or remove the service; an empty title
+     * means a sync. Starting it again while it runs updates the notification. */
+    static void update(Context context, boolean running, String title) {
         Intent intent = new Intent(context, KiokuAnkiWebService.class);
         if (running) {
+            intent.putExtra(EXTRA_TITLE, title);
             try {
                 context.startForegroundService(intent);
             } catch (RuntimeException e) {
@@ -41,7 +46,9 @@ public class KiokuAnkiWebService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        Notification notification = notification();
+        String title = intent != null ? intent.getStringExtra(EXTRA_TITLE) : null;
+        Notification notification = notification(
+                title == null || title.isEmpty() ? "Syncing with AnkiWeb" : title);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(NOTIFICATION, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
         } else {
@@ -57,7 +64,7 @@ public class KiokuAnkiWebService extends Service {
         stopSelf();
     }
 
-    private Notification notification() {
+    private Notification notification(String title) {
         NotificationManager manager = getSystemService(NotificationManager.class);
         if (manager.getNotificationChannel(CHANNEL) == null) {
             NotificationChannel channel = new NotificationChannel(CHANNEL, "AnkiWeb sync",
@@ -71,7 +78,7 @@ public class KiokuAnkiWebService extends Service {
                 PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
         return new Notification.Builder(this, CHANNEL)
                 .setSmallIcon(android.R.drawable.stat_notify_sync)
-                .setContentTitle("Syncing with AnkiWeb")
+                .setContentTitle(title)
                 .setContentIntent(open)
                 .setOngoing(true)
                 .build();

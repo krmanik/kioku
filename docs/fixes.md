@@ -211,3 +211,14 @@ replaces (`shared/tools/anki_drift.py`).
 | 26.09: deck options, the editor, statistics and other pages got 403 from Anki's server | Anki's request interceptor adds the API key only when scheme, host **and port** match `mw.serverURL()`; the stand-in for Qt WebEngine asked it about `http://127.0.0.1/` | `webengine.py` asks about `mw.serverURL()` |
 | 26.09 (Termux): Anki came up at desktop size, ignoring the 2× phone scale | Anki now sets `QT_SCALE_FACTOR` after creating the `QApplication`, when Qt no longer reads it | `launch_anki.py` sets it right after the profile metadata loads (`ProfileManager.setupMeta`) |
 | 26.09 on iOS: `rsbridge and anki build hashes do not match: 29bb700b vs 39e4b0b4` | the app bundle kept 26.08.1's `anki/buildinfo.py`: Anki's wheels date every file 2020-02-02, the file kept its size, and `rsync -a` (`bundle_python.sh`) skips files with the same size and time | `prepare_site.sh` unpacks the wheels with `unzip -DD` (current time) |
+
+## App size: extra files on demand, symbols, LTO
+
+| Problem | Cause | Fix |
+| --- | --- | --- |
+| Apps grew to 325 MB (iOS, installed) and 142 MB (APK) with the add-on extras | jieba, Pygments, Tesseract's and eSpeak NG's data bundled for the few add-ons that use them; CPython's and numpy's test modules and `.pyi` stubs bundled too | packs downloaded on demand (`kioku/packs.py`, `shared/tools/packs.py`, the repository's `packs` branch); test modules and stubs left out (`shared/tools/bundle_excludes.txt`) |
+| An earlier build's extension frameworks stayed in the iOS bundle after their modules were left out | `bundle_python.sh` only adds frameworks | frameworks whose `.origin` points at a missing `.fwork` are deleted |
+| Anki's translations were in the binary twice (2 × 7.9 MB) | `write_strings.rs` generates them as `const`s; each codegen unit that uses one gets a copy | rsbridge is built with fat LTO and one codegen unit (`build_rust.sh`, as Anki's `release-lto` profile) |
+| The iOS binary carried 17 MB of local symbols, the frameworks 5 MB; Pillow's and cryptography's Android `.so` files 13 MB | nothing stripped them (archives keep them too) | `bundle_python.sh` strips local symbols (`strip -x`) after saving the binary with them to `ios/build/symbols/Kioku-<platform>` (use that one for `atos` and devcmd's Qt look-ups); `pack_python.sh` runs `llvm-strip --strip-unneeded` |
+| A download popup would show when a library tries an optional module (markdown → pygments) | the import hook reacted to every import | only imports and programs started from code under `addons21/` count |
+| Android: every HTTPS request (AnkiWeb sync, add-on and extra file downloads) failed with `CERTIFICATE_VERIFY_FAILED` until a restart | the CA bundle Kioku builds for OpenSSL lived in the cache folder, which Android empties when storage runs low (seen on the emulator at 94% full) | `kioku_platform._ca_bundle` writes it to the files folder (`.config/cacerts.pem`) |

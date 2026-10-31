@@ -13,16 +13,29 @@ SITE=$1
 OUT=$2
 PREFIX=$ROOT/deps/python-android/prefix
 STAGE=$ROOT/build/python-stage
-EXCLUDES=(--exclude '__pycache__' --exclude '*.pyc')
+# test-only modules and stubs; the extra files for add-ons are downloaded
+# (shared/tools/packs.py, kioku/packs.py)
+PACK_EXCLUDES=$(mktemp)
+trap 'rm -f "$PACK_EXCLUDES"' EXIT
+python3 "$ROOT/../shared/tools/packs.py" excludes > "$PACK_EXCLUDES"
+EXCLUDES=(--exclude '__pycache__' --exclude '*.pyc'
+    --exclude-from="$ROOT/../shared/tools/bundle_excludes.txt")
 
 mkdir -p "$STAGE/lib"
-rsync -a --delete "${EXCLUDES[@]}" \
+rsync -a --delete --delete-excluded "${EXCLUDES[@]}" \
     --exclude 'test/' --exclude 'idlelib/' --exclude 'tkinter/' \
     --exclude 'turtledemo/' --exclude 'ensurepip/' --exclude 'config-*/' \
     "$PREFIX/lib/python$PYTHON_VERSION/" "$STAGE/lib/python$PYTHON_VERSION/"
 rsync -a --delete "${EXCLUDES[@]}" "$ROOT/../shared/python/" "$STAGE/app/"
 rsync -a "${EXCLUDES[@]}" "$ROOT/python/" "$STAGE/app/"
-rsync -a --delete "${EXCLUDES[@]}" "$SITE/" "$STAGE/app_packages/"
+rsync -a --delete --delete-excluded "${EXCLUDES[@]}" --exclude-from="$PACK_EXCLUDES" "$SITE/" "$STAGE/app_packages/"
+
+# extension modules from wheels keep their symbol tables; the dynamic symbols
+# (PyInit_*) stay
+STRIP=$(ls "${ANDROID_NDK_ROOT:-}"/toolchains/llvm/prebuilt/*/bin/llvm-strip 2>/dev/null | head -1)
+if [ -n "$STRIP" ]; then
+    find "$STAGE" -name '*.so' -exec "$STRIP" --strip-unneeded {} +
+fi
 
 rm -f "$STAGE/dev-build"
 if [ "${KIOKU_DEV_BUILD:-}" = 1 ]; then touch "$STAGE/dev-build"; fi

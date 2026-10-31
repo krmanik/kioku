@@ -775,3 +775,57 @@ Open:
 - The box shown while waiting for media sync when a profile closes is cut off
   on the right, with an empty log line (`19:02:14: , ,`).
 - A dialog's first frame can be black (seen once, on the conflict dialog).
+
+## Extra files for add-ons, downloaded on demand (2026-10-31)
+
+jieba, Tesseract's languages and eSpeak NG's data left the app bundles
+(`kioku/packs.py`, `shared/tools/packs.py`); the zips are on the `packs`
+branch and served from raw.githubusercontent.com. Also left out: test-only
+extension modules (CPython `_test*`, `xxlimited*`, numpy `*_tests`, `_simd`,
+`PIL._imagingtk`) and `.pyi` stubs.
+
+| Size | Before | After |
+| --- | --- | --- |
+| iOS app, installed (dev build) | 325 MB | 251 MB |
+| iOS app, zipped (≈ download) | 127 MB | 88 MB |
+| Android APK | 142 MB | 102 MB |
+| Packs (jieba, Tesseract, eSpeak) | — | 5.2 + 10.0 + 9.2 MB |
+
+jieba's pack leaves out `lac_small/` (paddle mode, needs paddlepaddle) and
+the `.p` pickles (read only on Jython): 37 → 18.5 MB unpacked. Checked on
+the Mac: cut, POS tags, keyword extraction, `importlib.metadata`.
+
+| Test | iPhone 15 Pro Max | Emulator (Android 17) |
+| --- | --- | --- |
+| Start with Incremento installed: offer for Tesseract names the add-on | works | works |
+| Download from the offer; `tesseract --list-langs` lists the 6 languages from the pack | works | works, with Home pressed right after Download |
+| `import jieba` with no pack: second offer queued after the first | works | — |
+| Download, then `jieba.lcut` without a restart | works | works |
+| Install an unknown add-on (`.ankiaddon`, lazy `import jieba`): offer at once | — | works ("Chinese Segment Probe needs…") |
+| Not now: remembered; Extra Files shows "(1 needed)" on the add-on | — | works |
+| Tools › Add-ons › Extra Files: needed first, Download / Remove, sizes | works | works (real taps) |
+| eSpeak from the pack (`espeak-ng -v zh/ja --ipa`) | works | works |
+| Remove: status back to "Not downloaded" | works | works |
+| Foreground service while downloading (`ankiwebsync.hold`) | n/a | runs; notification hidden only because the emulator never granted POST_NOTIFICATIONS |
+
+Host tests: `shared/tests/test_packs.py` (scan, sys.path and variables,
+import offer, download over a local HTTP server, checksum and path checks,
+updates, remove, Not now, dialog and Add-ons button, shipped manifest).
+
+Second round (same day): Pygments as a pack (1.2 MB); rsbridge with fat LTO
+(the translations were in the binary twice); local symbols stripped from the
+iOS binary and frameworks, Android wheels' `.so` files stripped.
+
+| Size | Start | After packs | After round 2 |
+| --- | --- | --- | --- |
+| iOS app, installed | 325 MB | 251 MB | 215 MB |
+| iOS app, zipped | 127 MB | 88 MB | 80 MB |
+| Android APK | 142 MB | 102 MB | 94 MB |
+
+| Test | iPhone | Emulator |
+| --- | --- | --- |
+| numpy, Pillow, cryptography, pymupdf import and run (stripped modules) | works | works |
+| Collection opens, `tr` strings (LTO build), ffmpeg, tesseract | works | works |
+| `markdown` with codehilite (probes pygments) outside add-ons: no offer | works | — |
+| Pygments pack from GitHub, then `highlight()` | — | works |
+| HTTPS after `pm trim-caches` (CA bundle no longer in the cache) | n/a | works; failed before the fix |
