@@ -56,7 +56,9 @@ build_wheel() {
     sdist=$(curl -fsSL "https://pypi.org/pypi/$name/$version/json" | python3 -c \
         "import json,sys; print(next(u['url'] for u in json.load(sys.stdin)['urls'] if u['packagetype']=='sdist'))")
     [ -f "$SRC/$(basename "$sdist")" ] || curl -fsSL -o "$SRC/$(basename "$sdist")" "$sdist"
-    env CIBW_BUILD="$CIBW" CIBW_TEST_SKIP='*' "$@" \
+    # CIBW_ARCHS: the default (auto) is the machine's own, so an x86_64 Linux
+    # runner selected no arm64 Android build; CIBW_BUILD picks the one we want
+    env CIBW_BUILD="$CIBW" CIBW_ARCHS=all CIBW_TEST_SKIP='*' "$@" \
         uvx cibuildwheel@$CIBUILDWHEEL_VERSION --platform $PLATFORM --output-dir "$WHEELS" \
         "$SRC/$(basename "$sdist")" > "$WORK/$TARGET-$name.log" 2>&1 || {
         tail -30 "$WORK/$TARGET-$name.log"; exit 1; }
