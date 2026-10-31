@@ -933,3 +933,27 @@ simulator (iOS 26.4).
 | Anki's palette after a profile loads | highlight text stays white | — |
 | Tools menu open, tap on the deck list page | the menu stayed open; after: it closes and the page's button under the tap does nothing; the next tap opens Create Deck | — |
 | Review screen's More menu open, hit test where the card is | — | before: the WKWebView; after: Qt's view (taps can't be sent on the simulator) |
+
+### Hardware keyboard on the review screen (2026-10-31)
+
+iPad Pro 11-inch (M4) simulator. The simulator here has no window to type
+into and synthetic HID events (`UIApplication _enqueueHIDEvent:`) didn't
+arrive, so presses were stand-in `UIPress` objects handed to the same
+methods UIKit calls; a tap on the card was `becomeFirstResponder` on the
+WKWebView's content view.
+
+| Test | Before | After |
+| --- | --- | --- |
+| No tap yet (Qt's view first responder), Space to Qt's view | card turns over | same |
+| After a tap: Qt's focus window / active window | none / none | none until a key, then Qt's window |
+| After a tap: Qt's key commands | 67, Space as `e`, Return as `n`, Enter as `r`; `I` and Space commands match nothing | none |
+| After a tap: Space to WebKit's content view | (WebKit scrolls) | Qt's view first responder, card turns over |
+| Then 3 to Qt's view | — | card graded, next card |
+
+Not run: a real keyboard (needs an iPad with a keyboard, or the Mac's
+keyboard on "My Mac (Designed for iPad)", started from Xcode), a key typed
+into a page's text field (kept by WebKit, `isFocusingElement`).
+
+Seen, not changed: Android has the same symptom with a different cause.
+After a tap on the card, `adb shell input keyevent` Space and I reach no Qt
+shortcut (the WebView keeps Android's key focus).

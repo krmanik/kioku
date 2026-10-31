@@ -321,6 +321,9 @@ class WebView:
         widget.setAttribute(Qt.WidgetAttribute.WA_DontCreateNativeAncestors, True)
 
     def __init__(self) -> None:
+        from . import keys
+
+        keys.install()
         config = WKWebViewConfiguration.alloc().init()
         config.setAllowsInlineMediaPlayback_(True)
         config.setMediaTypesRequiringUserActionForPlayback_(0)
