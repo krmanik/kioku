@@ -6,5 +6,6 @@ Built by `shared/tools/packs.py` on the main branch; listed in `shared/python/ki
 | File | Contents | License |
 | --- | --- | --- |
 | jieba-*.zip | [jieba](https://github.com/fxsjy/jieba) | MIT |
+| pygments-*.zip | [Pygments](https://pygments.org) | BSD-2-Clause |
 | tesseract-data-*.zip | [tessdata_fast](https://github.com/tesseract-ocr/tessdata_fast) and Tesseract's configs | Apache-2.0 |
 | espeak-data-*.zip | [eSpeak NG](https://github.com/espeak-ng/espeak-ng)'s data, compiled by `shared/tools/build_programs.sh` | GPL-3.0-or-later |
