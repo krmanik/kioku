@@ -957,3 +957,19 @@ into a page's text field (kept by WebKit, `isFocusingElement`).
 Seen, not changed: Android has the same symptom with a different cause.
 After a tap on the card, `adb shell input keyevent` Space and I reach no Qt
 shortcut (the WebView keeps Android's key focus).
+
+## Desktop image: Microsoft fonts download (2026-10-31)
+
+Codespace (Ubuntu, curl 8.5). The script alone, with `HOME` in a scratch
+folder, and the image built from `desktop/`.
+
+| Test | Result |
+| --- | --- |
+| Fresh download from SourceForge | 31 files installed in 3 s; installers' folder removed |
+| "Arial Greek" with and without the alias file | Arial / DejaVu Sans |
+| Local server with 5 of 11 installers and one corrupt (`ANKI_MS_FONTS_URL`) | three rounds, then "couldn't download" the 6; the 5 good ones kept in `.cache/anki-ms-fonts` |
+| Same server, now complete | fetched only the 6 missing ones (server log), installed |
+| Container, `ANKI_MS_FONTS=true` | fonts after 10 s, `fc-match "Arial Greek"` → Arial as `abc`; no download after a restart |
+
+Not run: the full `desktop/test/run.sh` (its two new checks were run by
+hand in the container above).

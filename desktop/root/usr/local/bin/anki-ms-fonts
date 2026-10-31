@@ -7,7 +7,8 @@
 # so the image has none: they are downloaded once from the corefonts
 # project on SourceForge, checked against Debian's ttf-mscorefonts-installer
 # sums, and unpacked into ~/.local/share/fonts, where fontconfig (and so
-# Anki) finds them. A failed download is tried again at the next start.
+# Anki) finds them. Installers that arrived are kept until all have, so a
+# failed download only fetches the missing ones, at the next start.
 [ "${ANKI_MS_FONTS,,}" = true ] || exit 0
 [ "$(id -u)" = 0 ] && exec s6-setuidgid abc "$0"
 
@@ -28,30 +29,55 @@ declare -A sums=(
     [webdin32.exe]=64595b5abc1080fba8610c5c34fab5863408e806aafe84653ca8575bed17d75a
 )
 # SourceForge picks a mirror for each download
-root=https://downloads.sourceforge.net/corefonts/
+root=${ANKI_MS_FONTS_URL:-https://downloads.sourceforge.net/corefonts/}
+cache=$HOME/.cache/anki-ms-fonts
 
-tmp=$(mktemp -d) || exit 0
-trap 'rm -rf "$tmp"' EXIT
-cd "$tmp" || exit 0
+mkdir -p "$cache" && cd "$cache" || exit 0
+missing() {
+    local exe
+    for exe in "${!sums[@]}"; do
+        echo "${sums[$exe]}  $exe" | sha256sum -c --status 2>/dev/null || echo "$exe"
+    done
+}
 
 echo "[anki-ms-fonts] downloading Microsoft's core fonts"
 # all at once (a mirror can take a minute for each file), then again for
-# the ones that failed
-for _ in 1 2 3; do
+# the ones that failed. SourceForge's mirrors also reset connections ("curl:
+# (35) Recv failure: Connection reset by peer"), which curl's --retry alone
+# doesn't try again.
+for round in 1 2 3; do
+    todo=$(missing)
+    [ -z "$todo" ] && break
+    [ "$round" = 1 ] || { echo "[anki-ms-fonts] trying again:" $todo; sleep $((round * 10)); }
     args=()
-    for exe in "${!sums[@]}"; do
-        [ -f "$exe" ] || args+=(-o "$exe" "$root$exe")
+    for exe in $todo; do
+        rm -f "$exe"
+        args+=(-o "$exe" "$root$exe")
     done
-    [ ${#args[@]} = 0 ] && break
-    curl -fsSL --parallel --retry 2 --connect-timeout 15 --max-time 600 "${args[@]}"
-    for exe in "${!sums[@]}"; do
-        echo "${sums[$exe]}  $exe" | sha256sum -c --status 2>/dev/null || rm -f "$exe"
-    done
+    curl -fsSL --parallel --retry 3 --retry-all-errors --retry-delay 5 \
+        --connect-timeout 15 --max-time 600 "${args[@]}"
 done
-for exe in "${!sums[@]}"; do
-    [ -f "$exe" ] || { echo "[anki-ms-fonts] couldn't download $exe; trying again at the next start"; exit 0; }
-done
+todo=$(missing)
+if [ -n "$todo" ]; then
+    echo "[anki-ms-fonts] couldn't download" $todo"; trying again at the next start"
+    exit 0
+fi
 
-mkdir -p out && cabextract -q -L -d out ./*.exe || exit 0
-mkdir -p "$fonts" && mv out/*.ttf "$fonts/" && mv out/licen.txt "$fonts/" &&
-    echo "[anki-ms-fonts] installed in $fonts"
+rm -rf out && mkdir out && cabextract -q -L -d out ./*.exe || exit 0
+mkdir -p "$fonts" && mv out/*.ttf "$fonts/" && mv out/licen.txt "$fonts/" || exit 0
+rm -rf "$cache"
+
+# older decks name the Greek variant Windows once had
+mkdir -p "$HOME/.config/fontconfig/conf.d"
+cat > "$HOME/.config/fontconfig/conf.d/60-anki-ms-fonts.conf" <<'EOF'
+<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+<fontconfig>
+  <alias binding="same">
+    <family>Arial Greek</family>
+    <prefer><family>Arial</family></prefer>
+  </alias>
+</fontconfig>
+EOF
+fc-cache "$fonts" 2>/dev/null
+echo "[anki-ms-fonts] installed in $fonts"
