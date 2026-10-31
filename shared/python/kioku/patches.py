@@ -171,12 +171,43 @@ def _patch_app() -> None:
 
     def init(self, argv):  # type: ignore[no-untyped-def]
         original_init(self, argv)
+        _fix_highlighted_text(self)
         windows.install(self)
         mediaserver.install()
         syncserver.install()
         devtools.install()
 
     aqt.AnkiApp.__init__ = init
+
+
+def _fix_highlighted_text(app) -> None:  # type: ignore[no-untyped-def]
+    """Until a profile loads, Anki's palette is not applied and Qt's own is
+    used. On Android in dark mode, that one has light text on a light
+    highlight, so the selected row of the first-run language list was
+    blank. Such text becomes black or white, whichever reads on it."""
+    from aqt.qt import QColor, QPalette
+
+    def luminance(color: QColor) -> float:
+        return 0.2126 * color.redF() + 0.7152 * color.greenF() + 0.0722 * color.blueF()
+
+    def fix() -> None:
+        palette = app.palette()
+        role = QPalette.ColorRole
+        # Anki's highlight is half transparent, over the list's background
+        highlight = palette.color(role.Highlight)
+        alpha = highlight.alphaF()
+        background = alpha * luminance(highlight) + (1 - alpha) * luminance(
+            palette.color(role.Base)
+        )
+        if abs(background - luminance(palette.color(role.HighlightedText))) >= 0.4:
+            return
+        dark = background > 0.5
+        palette.setColor(role.HighlightedText, QColor("black" if dark else "white"))
+        app.setPalette(palette)
+
+    fix()
+    # the system's dark mode can change before then
+    app.paletteChanged.connect(lambda _palette: fix())
 
 
 def _patch_profile_saving() -> None:
