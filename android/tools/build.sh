@@ -33,7 +33,7 @@ BUILD=$ROOT/build/cmake
 # unpacked with the rest of the runtime
 "$ROOT/../shared/tools/build_pymupdf.sh" android > "$ROOT/build/pymupdf.log" 2>&1 || {
     tail -30 "$ROOT/build/pymupdf.log"; exit 1; }
-cp -R "$ROOT/../build/pymupdf/android/site/" "$ROOT/build/site/"
+rsync -a "$ROOT/../build/pymupdf/android/site/" "$ROOT/build/site/"
 # the programs add-ons start (ffmpeg, mecab, ...): libkiokuprog.so, an extra
 # native library (CMakeLists.txt)
 "$ROOT/../shared/tools/build_programs.sh" android > "$ROOT/build/programs.log" 2>&1 || {

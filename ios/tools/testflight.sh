@@ -43,7 +43,7 @@ if [ "${1:-}" != --upload-only ]; then
     # the same extras as tools/build.sh
     "$ROOT/../shared/tools/build_pymupdf.sh" ios > "$ROOT/build/pymupdf.log" 2>&1 || {
         tail -30 "$ROOT/build/pymupdf.log"; exit 1; }
-    cp -R "$ROOT/../build/pymupdf/ios/site/" "$ROOT/build/site/"
+    rsync -a "$ROOT/../build/pymupdf/ios/site/" "$ROOT/build/site/"
     "$ROOT/../shared/tools/build_programs.sh" ios > "$ROOT/build/programs.log" 2>&1 || {
         tail -30 "$ROOT/build/programs.log"; exit 1; }
     rsync -a --delete "$ROOT/../build/programs/data/" "$ROOT/build/site/kioku_programs_data/"
