@@ -2,27 +2,10 @@
 
 All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
 
-## Next release: smaller app, extra files for add-ons on demand (iOS, Android)
+## 0.2.6
 
-- Chinese word segmentation (jieba), code highlighting (Pygments),
-  Tesseract's OCR languages and eSpeak NG's voices are no longer in the app. Kioku offers to download them when
-  an add-on needs them, and **Tools › Add-ons › Extra Files…** downloads,
-  updates and removes them. [Details](using/addons.md#extra-files-for-add-ons)
-- Test-only Python modules are no longer in the app.
-- Smaller app code (link-time optimization, no debug symbols): about 215 MB
-  installed on iPhone, a 94 MB APK on Android.
-- Android: HTTPS (sync, downloads) no longer fails after Android frees
-  storage by clearing app caches.
-
-## Next release: AnkiWeb sync in the background (Android)
-
-- Syncing with AnkiWeb keeps going when you leave the app, with a
-  notification while it runs. Leaving during the first download used to fail
-  it with a network error and leave the deck list empty.
-- A sync error while switching profiles is now shown. It used to stay hidden
-  and block the app until a restart.
-
-## Next release: add-ons that start programs (iOS, Android)
+Add-ons that start programs, read PDFs or import native packages now work on
+iOS and Android.
 
 - The apps include FFmpeg, MeCab, KAKASI, Tesseract (English, Japanese,
   Chinese, Korean), eSpeak NG, LAME and cwebp, the programs add-ons such as
@@ -30,7 +13,32 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
   own copy of one of them (made for Windows, macOS or Linux) is replaced by
   Kioku's.
 - numpy, Pillow and cryptography for add-ons that import them.
-- The app is larger: about 140 MB on Android.
+- PDF add-ons such as Incremento: `PyQt6.QtPdf` and PyMuPDF 1.28 are built
+  in, and add-ons' pdf.js readers can open local files (also Termux).
+- Chinese word segmentation (jieba), code highlighting (Pygments),
+  Tesseract's OCR languages and eSpeak NG's voices are not in the app. Kioku
+  offers to download them when an add-on needs them, and
+  **Tools › Add-ons › Extra Files…** downloads, updates and removes them.
+  [Details](using/addons.md#extra-files-for-add-ons)
+- Smaller app despite all this: about 215 MB installed on iPhone, a 94 MB
+  APK on Android.
+- On phone screens, add-on panels that open on the side go under the main
+  view; several panels become tabs, and ▲ / ▼ expand a panel or split the
+  screen again (also Termux).
+- Syncing with AnkiWeb keeps going when you leave the app, with a
+  notification while it runs. Leaving during the first download used to fail
+  it with a network error and leave the deck list empty (Android).
+- A sync error while switching profiles is now shown. It used to stay hidden
+  and block the app until a restart (Android).
+- HTTPS (sync, downloads) no longer fails after Android frees storage by
+  clearing app caches (Android).
+- Menus opened from a page (the review screen's **More**) show where you
+  tapped and close on a tap outside them (iOS, Android).
+- A hardware keyboard's Space and Return turn cards over after a tap on the
+  card (iOS).
+- Database writes from some add-ons no longer fail with "SQL statements in
+  progress" (iOS).
+- The first-run language list shows the selected row in dark mode (Android).
 
 ## Self-hosted server (Docker)
 
