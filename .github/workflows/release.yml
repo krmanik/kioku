@@ -1,0 +1,144 @@
+# Publishes a Kioku release once every variant is built.
+#
+# Push a tag like v0.2.0: makes a draft release for it, builds the iOS,
+# Android and Termux variants (ios.yml, android.yml, termux.yml), which
+# attach their files to the draft, and publishes it only when all three
+# succeeded. A draft is hidden from users and from AltStore's
+# releases/latest source. Then the desktop image is built (desktop-docker.yml).
+#
+# If a build fails, the release stays a draft: fix it and "Re-run failed jobs"
+# here, or run that variant's workflow by hand with the tag and then this one
+# (Actions → Release → Run workflow) to publish.
+#
+# The notes are the version's section of docs/manual/src/changes.md
+# ("## 0.2.0") plus the install steps (shared/tools/release_notes.py); without
+# that section the release isn't published. Tags with a "-" (v0.3.0-beta.1)
+# are prereleases: GitHub's generated notes, no desktop image.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag whose draft release to publish (its files must be attached)"
+        required: true
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  draft:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version
+        id: version
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          {
+            echo "tag=$TAG"
+            echo "version=${TAG#v}"
+            case "$TAG" in *-*) echo "prerelease=true" ;; *) echo "prerelease=false" ;; esac
+          } >> "$GITHUB_OUTPUT"
+
+      # before the builds, not an hour later
+      - name: Notes
+        if: steps.version.outputs.prerelease == 'false'
+        run: |
+          python3 shared/tools/release_notes.py --version "${{ steps.version.outputs.version }}" \
+            --repo "$GITHUB_REPOSITORY" > /dev/null
+
+      - name: Draft release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          if gh release view "$TAG" -R "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "The release of $TAG exists already"
+            exit 0
+          fi
+          flags=(--draft --verify-tag --title "Kioku $VERSION")
+          if [ "$PRERELEASE" = true ]; then
+            flags+=(--prerelease --generate-notes)
+          else
+            flags+=(--notes "Building…")
+          fi
+          gh release create "$TAG" -R "$GITHUB_REPOSITORY" "${flags[@]}"
+
+  ios:
+    needs: draft
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/ios.yml
+    with:
+      tag: ${{ needs.draft.outputs.tag }}
+    secrets: inherit
+
+  android:
+    needs: draft
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/android.yml
+    with:
+      tag: ${{ needs.draft.outputs.tag }}
+    secrets: inherit
+
+  termux:
+    needs: draft
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/termux.yml
+    with:
+      tag: ${{ needs.draft.outputs.tag }}
+    secrets: inherit
+
+  publish:
+    needs: [draft, ios, android, termux]
+    # by hand (workflow_dispatch) the builds are skipped: publish what's attached
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.draft.outputs.tag }}
+          VERSION: ${{ needs.draft.outputs.version }}
+          PRERELEASE: ${{ needs.draft.outputs.prerelease }}
+        run: |
+          assets=$(gh release view "$TAG" --json assets --jq '.assets[].name')
+          echo "$assets"
+          for file in "Kioku-iOS-$VERSION-unsigned.ipa" altstore.json \
+                      "Kioku-Android-$VERSION-arm64.apk" "Kioku-Termux-$VERSION-arm64.apk"; do
+            grep -qxF "$file" <<< "$assets" || { echo "::error::$file is missing"; exit 1; }
+          done
+          if [ "$PRERELEASE" = true ]; then
+            gh release edit "$TAG" --draft=false --prerelease
+            exit 0
+          fi
+          previous=$(git describe --tags --abbrev=0 --match 'v*' --exclude '*-*' "$TAG^" 2>/dev/null || true)
+          python3 shared/tools/release_notes.py --version "$VERSION" --repo "$GITHUB_REPOSITORY" \
+            ${previous:+--previous "$previous"} > notes.md
+          gh release edit "$TAG" --draft=false --latest --notes-file notes.md
+
+  # a release published with the workflow's token starts no other workflow
+  desktop:
+    needs: [draft, publish]
+    if: needs.draft.outputs.prerelease == 'false'
+    uses: ./.github/workflows/desktop-docker.yml

@@ -5,8 +5,11 @@
 name: Desktop image
 
 on:
+  # release.yml calls it after publishing (a release its token publishes
+  # starts no workflow); this catches releases published by hand
   release:
     types: [published]
+  workflow_call:
   workflow_dispatch:
     inputs:
       tag:

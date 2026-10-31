@@ -1,12 +1,13 @@
 # Builds the native Android variant (android/) and publishes the APK to a
 # GitHub release.
 #
-# - Push a tag like v0.2.0: builds and attaches Kioku-Android-0.2.0-arm64.apk
-#   to the release of that tag (created if needed).
+# - Push a tag like v0.2.0: release.yml runs this and attaches
+#   Kioku-Android-0.2.0-arm64.apk to the draft release of that tag.
 # - Push to main with changes in android/ or shared/: builds only, the result is
 #   a workflow artifact.
 # - Run it by hand (Actions → Android APK → Run workflow): builds and keeps the
-#   APK as a workflow artifact; give a tag to publish it to that release too.
+#   APK as a workflow artifact; give a tag to attach it to that
+#   release too (the release must exist).
 #
 # Signing: add these repository secrets to sign with your own key. Keep the same
 # key for every release, or Android refuses to update an installed Kioku.
@@ -19,7 +20,6 @@ name: Android APK
 
 on:
   push:
-    tags: ["v*"]
     # build only (no release) when the android code changes on main
     branches: [main]
     paths: ["android/**", "shared/**", ".github/workflows/android.yml"]
@@ -29,6 +29,12 @@ on:
         description: "Release tag to publish to (empty: build only)"
         required: false
         default: ""
+  # release.yml: builds for the draft release of a tag
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
 
 permissions:
   contents: write
@@ -110,9 +116,8 @@ jobs:
       - name: Version
         id: version
         env:
-          INPUT_TAG: ${{ github.event.inputs.tag }}
+          tag: ${{ inputs.tag }}
         run: |
-          if [ "$GITHUB_REF_TYPE" = tag ]; then tag="$GITHUB_REF_NAME"; else tag="$INPUT_TAG"; fi
           if [ -n "$tag" ]; then version="${tag#v}"; else version="0.0.0-${GITHUB_SHA::7}"; fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -156,17 +161,9 @@ jobs:
           path: android/dist/
           compression-level: 0
 
-      - name: Publish the release
+      - name: Attach to the release
         if: steps.version.outputs.tag != ''
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: Kioku ${{ steps.version.outputs.version }}
-          files: |
-            android/dist/*.apk
-            android/dist/SHA256SUMS-android.txt
-          append_body: true
-          body: |
-            **Android (native) variant:** download `Kioku-Android-${{ steps.version.outputs.version }}-arm64.apk` on your phone and open it
-            (allow installing from your browser or file manager when Android asks).
-            Needs a 64-bit ARM phone (arm64-v8a) with Android 9 or newer. It installs next to the Termux variant.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: gh release upload "$TAG" dist/*.apk dist/SHA256SUMS-android.txt --clobber -R "$GITHUB_REPOSITORY"

@@ -1,12 +1,13 @@
 # Builds the iOS variant (ios/) as an unsigned .ipa and publishes it to a
 # GitHub release.
 #
-# - Push a tag like v0.2.0: builds and attaches Kioku-iOS-0.2.0-unsigned.ipa
-#   to the release of that tag (created if needed).
+# - Push a tag like v0.2.0: release.yml runs this and attaches
+#   Kioku-iOS-0.2.0-unsigned.ipa to the draft release of that tag.
 # - Push to main with changes in ios/ or shared/: builds only, the result is
 #   a workflow artifact.
 # - Run it by hand (Actions → iOS IPA → Run workflow): builds and keeps the
-#   .ipa as a workflow artifact; give a tag to publish it to that release too.
+#   .ipa as a workflow artifact; give a tag to attach it to that
+#   release too (the release must exist).
 #
 # The .ipa is unsigned: install it with a tool that signs apps with your own
 # Apple ID (AltStore, Sideloadly, …). Releases also carry altstore.json, an
@@ -17,7 +18,6 @@ name: iOS IPA
 
 on:
   push:
-    tags: ["v*"]
     # build only (no release) when the ios code changes on main
     branches: [main]
     paths: ["ios/**", "shared/**", ".github/workflows/ios.yml"]
@@ -27,6 +27,12 @@ on:
         description: "Release tag to publish to (empty: build only)"
         required: false
         default: ""
+  # release.yml: builds for the draft release of a tag
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
 
 permissions:
   contents: write
@@ -84,9 +90,8 @@ jobs:
       - name: Version
         id: version
         env:
-          INPUT_TAG: ${{ github.event.inputs.tag }}
+          tag: ${{ inputs.tag }}
         run: |
-          if [ "$GITHUB_REF_TYPE" = tag ]; then tag="$GITHUB_REF_NAME"; else tag="$INPUT_TAG"; fi
           if [ -n "$tag" ]; then version="${tag#v}"; else version="0.0.0-${GITHUB_SHA::7}"; fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -128,20 +133,9 @@ jobs:
           path: ios/dist/
           compression-level: 0
 
-      - name: Publish the release
+      - name: Attach to the release
         if: steps.version.outputs.tag != ''
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: Kioku ${{ steps.version.outputs.version }}
-          files: |
-            ios/dist/*.ipa
-            ios/dist/SHA256SUMS-ios.txt
-            ios/dist/altstore.json
-          append_body: true
-          body: |
-            **iOS variant:** in AltStore, add the source
-            `https://github.com/${{ github.repository }}/releases/latest/download/altstore.json` (Sources → +)
-            and install Kioku from it; updates then show up in AltStore. Or install
-            `Kioku-iOS-${{ steps.version.outputs.version }}-unsigned.ipa` with any tool that signs apps with your Apple ID.
-            Needs iOS 17 or newer.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: gh release upload "$TAG" dist/*.ipa dist/SHA256SUMS-ios.txt dist/altstore.json --clobber -R "$GITHUB_REPOSITORY"
