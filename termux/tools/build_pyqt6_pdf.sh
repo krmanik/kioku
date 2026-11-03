@@ -21,8 +21,13 @@ BINDINGS="$SITE_TREE/PyQt6/bindings"
 # Build the version of the prefix's PyQt6, against the sip ABI it was built with.
 PYQT_VERSION="$(sed -n 's/^Version: //p' "$SITE_TREE"/[Pp]y[Qq]t6-*.dist-info/METADATA | head -1)"
 SIP_ABI="$(sed -n 's/^sip-abi-version = "\(.*\)"/\1/p' "$BINDINGS/QtCore/QtCore.toml")"
-# QtPdf comes with qt6-qtwebengine, which may be older than qt6-qtbase.
-QT_VERSION="$(sed -n 's/^#define QTPDF_VERSION_STR "\(.*\)"/\1/p' "$PREFIX_TREE/include/qt6/QtPdf/qtpdfversion.h")"
+# The Qt version PyQt6.QtCore was built for (its module tag, e.g. Qt_6_12_0):
+# sip selects one tag per %Timeline, so another one (QtPdf's: it comes with
+# qt6-qtwebengine, which may be older than qt6-qtbase) fails with "only one
+# of 'Qt_6_11_0','Qt_6_12_0' can be selected". QtPdf's .sip files use no API
+# newer than Qt 6.7.
+QT_VERSION="$(sed -n 's/^module-tags = \[.*"Qt_\([0-9]*\)_\([0-9]*\)_\([0-9]*\)".*/\1.\2.\3/p' "$BINDINGS/QtCore/QtCore.toml")"
+[ -n "$QT_VERSION" ] || { echo "no Qt tag in $BINDINGS/QtCore/QtCore.toml" >&2; exit 1; }
 
 BIN="$(ls -d "$NDK"/toolchains/llvm/prebuilt/*/bin | head -1)"
 CXX="$BIN/clang++ --target=aarch64-linux-android$API"
