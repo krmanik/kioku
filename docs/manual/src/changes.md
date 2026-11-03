@@ -2,7 +2,7 @@
 
 All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
 
-## Next release
+## 0.2.7
 
 - Pictures and sounds attached with the paperclip or recorded with the
   microphone show in the field right away. They used to show only after
