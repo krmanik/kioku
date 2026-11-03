@@ -109,6 +109,13 @@ PRELUDE = r"""
 VIEWPORT_META = '<meta name="viewport" content="width=device-width, initial-scale=1">'
 
 PHONE_CSS_ID = "kioku-phone"
+# add-on tables under the deck list (Anki Leaderboard: 7 columns that don't
+# wrap) widened the page, which then zoomed out to show them all: they scroll
+# sideways in their own box, like the deck list
+WIDE_TABLE = "display: block; width: fit-content; max-width: 100%; box-sizing: border-box; overflow-x: auto;"
+# the same in add-ons' shadow roots on the deck list page (Anki Leaderboard
+# draws its table in one), which PHONE_CSS doesn't reach
+SHADOW_CSS = "@media (max-width: 600px) { :host table:not(table table) { %s } }" % WIDE_TABLE
 PHONE_CSS = (
     "html { -webkit-text-size-adjust: 100%; }"
     # add-on columns (Mature/Young, progress bars) made the deck list wider
@@ -125,6 +132,7 @@ PHONE_CSS = (
     "  table:has(.decktd) .count { min-width: 2em; }"
     "  table:has(.decktd) td, table:has(.decktd) th { padding-left: 4px !important; padding-right: 4px !important; }"
     "  body:has(.decktd) { margin-left: 0.5em; margin-right: 0.5em; }"
+    f"  body:has(.decktd) table:not(:has(.decktd)):not(table:has(.decktd) table) {{ {WIDE_TABLE} }}"
     # add-on buttons in the top bar (right-tray) covered Sync: share one row
     # with the links, or wrap to a second one
     "  .header:has(.tray-item) { display: flex; flex-wrap: wrap; justify-content: center; align-items: start; }"
@@ -213,10 +221,31 @@ VIEWPORT = r"""
             svg.style.height = "auto";
         });
     }
-    function later() {
-        if (!pending) { pending = true; requestAnimationFrame(fitCharts); }
+    // Shadow roots keep an adopted sheet when an add-on replaces their
+    // content (Anki Leaderboard's refresh), unlike a <style> put in them.
+    var shadowSheet = null;
+    function fitShadowTables() {
+        if (!document.adoptedStyleSheets || !document.querySelector(".decktd")) return;
+        document.querySelectorAll("*").forEach(function (el) {
+            var root = el.shadowRoot;
+            if (!root) return;
+            if (!shadowSheet) {
+                shadowSheet = new CSSStyleSheet();
+                shadowSheet.replaceSync(__SHADOW_CSS__);
+            }
+            if (root.adoptedStyleSheets.indexOf(shadowSheet) < 0) {
+                root.adoptedStyleSheets = root.adoptedStyleSheets.concat([shadowSheet]);
+            }
+        });
     }
-    fitCharts();
+    function fit() {
+        fitCharts();
+        fitShadowTables();
+    }
+    function later() {
+        if (!pending) { pending = true; requestAnimationFrame(fit); }
+    }
+    fit();
     window.addEventListener("resize", later);
     if (document.body) {
         new MutationObserver(later).observe(document.body, {
@@ -227,7 +256,7 @@ VIEWPORT = r"""
 """
 VIEWPORT = VIEWPORT.replace("__PHONE_CSS_ID__", PHONE_CSS_ID).replace(
     "__PHONE_CSS__", json.dumps(PHONE_CSS)
-)
+).replace("__SHADOW_CSS__", json.dumps(SHADOW_CSS))
 
 # Injection times understood by every backend
 AT_DOCUMENT_START = 0

@@ -2,6 +2,12 @@
 
 All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
 
+## Next release
+
+- Anki Leaderboard's table on the home screen scrolls sideways in its own
+  box on phones, like the deck list. It used to make the whole home screen
+  wider than the screen and zoom it out.
+
 ## 0.2.6
 
 Add-ons that start programs, read PDFs or import native packages now work on
