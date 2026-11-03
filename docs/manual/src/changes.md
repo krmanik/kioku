@@ -4,6 +4,11 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
 
 ## Next release
 
+- Pictures and sounds attached with the paperclip or recorded with the
+  microphone show in the field right away. They used to show only after
+  opening the field's HTML editor (`<>`).
+- Pictures copied in another app can be pasted into a field on Android, and
+  pictures, sounds and videos can be dropped onto a field.
 - Anki Leaderboard's table on the home screen scrolls sideways in its own
   box on phones, like the deck list. It used to make the whole home screen
   wider than the screen and zoom it out.

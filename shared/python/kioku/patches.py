@@ -68,6 +68,7 @@ def apply() -> None:
     _patch_docks()
     _patch_update_check()
     _patch_page_html()
+    _patch_editor_media()
     _python_313_compat()
     _addon_platform()
 
@@ -411,6 +412,154 @@ def _patch_screen_edges() -> None:
     from . import screenedges
 
     screenedges.apply()
+
+
+_INSERT_MEDIA_JS = """(function(html,index){
+function active(){var e=document.activeElement;
+while(e&&e.shadowRoot&&e.shadowRoot.activeElement){e=e.shadowRoot.activeElement;}
+return e&&e.isContentEditable?e:null;}
+var done=false;
+function insert(){
+var e=active();if(done||!e){return;}done=true;
+var root=e.getRootNode(),sel=root.getSelection?root.getSelection():document.getSelection();
+var a=sel.rangeCount?sel.anchorNode:null;
+if(!a||!(e.contains(a)||a===root.host)){
+var n=e.childNodes.length,last=e.lastChild;
+sel.collapse(e,last&&last.nodeName==="BR"?n-1:n);}
+setFormat("inserthtml",html);}
+if(active()&&document.hasFocus()){insert();return;}
+document.addEventListener("focusin",insert,{once:true});
+setTimeout(insert,500);
+var e=active();
+if(e){e.blur();e.focus();}
+else if(index!==null&&typeof focusField==="function"){focusField(index);}
+})(%s,%s);"""
+
+
+def _patch_editor_media() -> None:
+    """The editor's attach and record buttons insert the file once the field
+    gets focus again (TemplateButtons.svelte), which on the desktop happens
+    when the file dialog closes and Qt gives the page its focus back. The
+    platform pickers and the recorder leave the page focused (Android), or
+    give it focus back without a caret (iOS: restoring the caret then fails),
+    so the image or [sound:] wasn't inserted until the field was focused
+    another way, e.g. by the HTML editor's toggle. Insert it directly, at the
+    caret or the end of the field (in WebKit, a selection can be put into a
+    field's shadow root only with collapse()). The handler waiting for the
+    field's focus is never resolved: resolving it with "" made Chromium's
+    insertHTML delete what was just inserted."""
+    import json
+
+    import aqt.editor_legacy
+    from aqt.qt import QTimer
+
+    editor = aqt.editor_legacy.Editor
+
+    def resolve_media(self, path: str) -> None:  # type: ignore[no-untyped-def]
+        try:
+            html = self._addMedia(path)
+        except Exception as e:
+            aqt.editor_legacy.showWarning(str(e))
+            return
+        index = getattr(self, "last_field_index", None)
+        js = _INSERT_MEDIA_JS % (json.dumps(html), json.dumps(index))
+        # after onAddMedia's activateWindow(): on the web it takes the focus
+        # from the page, and the field then dropped an image inserted before
+        QTimer.singleShot(0, lambda: self.web.eval(js))
+
+    editor.resolve_media = resolve_media
+
+    # Pasting or dropping a picture: the editor page hands the paste to
+    # Python, which reads Qt's clipboard, but Qt for Android's clipboard
+    # carries only text, HTML and URLs, so a picture copied in another app
+    # pasted nothing; drops go to the native web view, never to Qt. The
+    # page's own clipboard/drop data has the files: send those instead.
+    setup_web = editor.setupWeb
+    on_bridge_cmd = editor.onBridgeCmd
+
+    def setup_web_with_media(self) -> None:  # type: ignore[no-untyped-def]
+        setup_web(self)
+        self.web.eval(_PASTE_MEDIA_JS)
+
+    def bridge_cmd(self, cmd: str):  # type: ignore[no-untyped-def]
+        if cmd.startswith(_PASTE_MEDIA_CMD):
+            if self.note:
+                _paste_media(self, json.loads(cmd[len(_PASTE_MEDIA_CMD) :]))
+            return None
+        return on_bridge_cmd(self, cmd)
+
+    editor.setupWeb = setup_web_with_media
+    editor.onBridgeCmd = bridge_cmd
+
+
+_PASTE_MEDIA_CMD = "kiokuMedia:"
+_PASTE_MEDIA_JS = """(function(){
+if(window.__kiokuMedia){return;}window.__kiokuMedia=true;
+var MEDIA=/^(image|audio|video)\\//;
+function files(dt){
+if(!dt){return [];}
+var t=Array.from(dt.types||[]);
+if(t.indexOf("text/html")>=0||t.indexOf("text/uri-list")>=0){return [];}
+return Array.from(dt.files||[]).filter(function(f){return MEDIA.test(f.type);});}
+function send(kind,list){
+Promise.all(list.map(function(f){return new Promise(function(done){
+var r=new FileReader();
+r.onload=function(){done({name:f.name||"",type:f.type,data:String(r.result).split(",")[1]||""});};
+r.onerror=function(){done(null);};
+r.readAsDataURL(f);});})).then(function(out){
+pycmd("kiokuMedia:"+JSON.stringify({kind:kind,files:out.filter(Boolean)}));});}
+document.addEventListener("paste",function(e){
+var f=files(e.clipboardData);if(!f.length){return;}
+e.preventDefault();e.stopImmediatePropagation();send("paste",f);},true);
+document.addEventListener("dragover",function(e){
+if(e.dataTransfer&&Array.from(e.dataTransfer.types||[]).indexOf("Files")>=0){e.preventDefault();}},true);
+document.addEventListener("drop",function(e){
+var f=files(e.dataTransfer);if(!f.length){return;}
+e.preventDefault();e.stopImmediatePropagation();
+if(typeof focusIfField==="function"){focusIfField(e.clientX,e.clientY);}
+send("drop",f);},true);
+})();"""
+
+
+def _paste_media(editor, payload: dict) -> None:  # type: ignore[no-untyped-def]
+    """Add the files a paste or drop on the editor page carried, like the
+    desktop editor does with Qt's clipboard: a pasted picture is saved as
+    paste-<checksum>.png/.jpg (the "Paste images as PNG" preference), a
+    dropped file keeps its name."""
+    import base64
+    import mimetypes
+
+    from anki.collection import Config
+    from aqt.qt import QBuffer, QImage
+
+    links = []
+    for item in payload.get("files", []):
+        data = base64.b64decode(item.get("data", ""))
+        if not data:
+            continue
+        mime = item.get("type", "")
+        name = os.path.basename(item.get("name", "")).strip()
+        fname = None
+        if payload.get("kind") == "paste" and mime.startswith("image/") and mime not in (
+            "image/gif",
+            "image/svg+xml",
+        ):
+            image = QImage.fromData(data)
+            if not image.isNull():
+                as_png = editor.mw.col.get_config_bool(Config.Bool.PASTE_IMAGES_AS_PNG)
+                ext, quality = ("png", 50) if as_png else ("jpg", 80)
+                buffer = QBuffer()
+                buffer.open(QBuffer.OpenModeFlag.ReadWrite)
+                image.save(buffer, ext, quality)
+                fname = editor._addPastedImage(bytes(buffer.data()), ext)
+        if fname is None:
+            ext = os.path.splitext(name)[1] or mimetypes.guess_extension(mime) or ""
+            if payload.get("kind") == "paste" or not os.path.splitext(name)[0]:
+                name = editor._pasted_image_filename(data, ext.lstrip("."))
+            fname = editor._addMediaFromData(name, data)
+        links.append(editor.fnameToLink(fname))
+    if links:
+        editor.doPaste("".join(links), internal=True)
 
 
 def _patch_splitters() -> None:
