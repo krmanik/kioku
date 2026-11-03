@@ -183,6 +183,11 @@ def _fit_children(w: QWidget, avail: QRect) -> None:
         ):
             # a row of long labels ("Download from AnkiWeb") would be clipped
             child.setOrientation(Qt.Orientation.Vertical)
+            # Qt makes a vertical box expand vertically: in the card preview
+            # it took the space under the web view, which kept its 300 px
+            # size hint and cut off the answer (an image occlusion card's
+            # Back Extra and Toggle Masks under the picture)
+            child.setSizePolicy(child.sizePolicy().horizontalPolicy(), QSizePolicy.Policy.Fixed)
         elif (
             isinstance(child, QLabel)
             and not child.wordWrap()

@@ -23,7 +23,7 @@ import base64
 import json
 import logging
 import re
-from urllib.parse import unquote, urlsplit
+from urllib.parse import urlsplit
 
 import _kioku_web
 
@@ -118,7 +118,11 @@ def _serve(event: dict) -> tuple[int, list[tuple[str, str]], bytes]:
     }
     client = aqt.mediasrv.app.test_client()
     resp = client.open(
-        unquote(url.path),
+        # still percent-encoded: werkzeug decodes the path itself, as Anki's
+        # server (waitress) does on the desktop. Decoded here first, a media
+        # file whose name has "#" or "%xx" in it (the editor's src="a%23b.png")
+        # was cut at the "#" or decoded twice, and didn't show
+        url.path,
         base_url=f"http://127.0.0.1:{_port}",
         query_string=url.query,
         method=event["method"],

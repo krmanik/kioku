@@ -12,6 +12,10 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
 - Anki Leaderboard's table on the home screen scrolls sideways in its own
   box on phones, like the deck list. It used to make the whole home screen
   wider than the screen and zoom it out.
+- Card preview on phones shows the whole answer: an image occlusion card's
+  Toggle Masks button and Back Extra were cut off under the picture.
+- Kioku Web shows pictures whose file name contains `#` or `%` (they were
+  missing, e.g. on image occlusion cards).
 
 ## 0.2.6
 
