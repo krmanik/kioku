@@ -21,6 +21,8 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
 - Tapping next to a field (just above or below it, or between two fields)
   moves to that field instead of closing the keyboard: on iPhone the keyboard
   used to pop up and go down again.
+- iPhone and iPad in dark mode: pages no longer flash white when they open
+  (the deck list at start, Add, Browse).
 
 ## 0.2.6
 

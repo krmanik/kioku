@@ -493,7 +493,9 @@ class WebView:
 
     def set_background(self, r: float, g: float, b: float, a: float) -> None:
         color = UIColor.colorWithRed_green_blue_alpha_(r, g, b, a)
-        self.webview.setOpaque_(a >= 1.0)
+        # an opaque WKWebView shows white until its first frame, whatever its
+        # background colour: a white flash on every new page in dark mode
+        self.webview.setOpaque_(False)
         self.webview.setBackgroundColor_(color)
         prop(self.webview, "scrollView").setBackgroundColor_(color)
         if self.webview.respondsToSelector_(SEL("setUnderPageBackgroundColor:")):
