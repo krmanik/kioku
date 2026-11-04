@@ -360,9 +360,44 @@ def _card_size(w: QWidget, avail: QRect) -> QSize:
     return QSize(width, min(height, avail.height() - 2 * CARD_MARGIN))
 
 
-def _available() -> QRect:
+# Android before 15: the activity's adjustResize shrinks Qt's available
+# geometry to the part above the on-screen keyboard while it is open (Android
+# 15 draws edge to edge and leaves it alone). Following it resized the
+# windows, and a window's Android surface shows black until Qt draws its next
+# frame: the Add and Edit windows flashed black beside their editor (whose
+# web view Android draws itself) each time the keyboard opened or closed
+# (GitHub issue #4). Windows keep the size they have without the keyboard
+# (_rest); keyboard_overlap keeps their contents above it, as on Android 15.
+_rest: QRect | None = None
+
+
+def _screen_available() -> QRect:
     screen = QGuiApplication.primaryScreen()
     return screen.availableGeometry() if screen is not None else QRect(0, 0, 400, 800)
+
+
+def _keyboard_shrunk(avail: QRect) -> bool:
+    """Whether avail is _rest with its bottom cut off, as the keyboard does."""
+    rest = _rest
+    return (
+        sys.platform == "android"
+        and rest is not None
+        and avail.topLeft() == rest.topLeft()
+        and avail.width() == rest.width()
+        and avail.height() < rest.height()
+    )
+
+
+def _keyboard_visible() -> bool:
+    im = QGuiApplication.inputMethod()
+    return im is not None and im.isVisible()
+
+
+def _available() -> QRect:
+    avail = _screen_available()
+    if _rest is not None and _keyboard_shrunk(avail):
+        return QRect(_rest)
+    return avail
 
 
 def _above_keyboard(avail: QRect) -> QRect:
@@ -395,7 +430,31 @@ def keyboard_overlap(w: QWidget) -> int:
     free = _above_keyboard(avail)
     if free == avail:
         return 0
-    return max(0, w.geometry().bottom() - free.bottom())
+    return max(0, min(w.geometry().bottom(), avail.bottom()) - free.bottom())
+
+
+def _overhang(w: QWidget) -> int:
+    """The part of w below the available geometry (_fill's extra pixel)."""
+    if sys.platform != "android":
+        return 0
+    return max(0, w.geometry().bottom() - _available().bottom())
+
+
+def _fill(w: QWidget, avail: QRect) -> None:
+    """Make w fill avail. On Android, Qt resizes a window along with the
+    available geometry when it is maximized (Qt for Android maximizes every
+    top-level window that isn't a dialog) or exactly as large
+    (QPlatformScreen::resizeMaximizedWindows), so the keyboard's adjustResize
+    still resized it (see _rest): the window is made normal and one pixel
+    taller, which is under the navigation bar or off the screen (_overhang
+    keeps the contents above it)."""
+    if sys.platform != "android":
+        w.setGeometry(avail)
+        return
+    handle = w.windowHandle()
+    if handle is not None and handle.windowStates() & Qt.WindowState.WindowMaximized:
+        handle.setWindowStates(Qt.WindowState.WindowNoState)
+    w.setGeometry(avail.adjusted(0, 0, 0, 1))
 
 
 def _center(w: QWidget, size: QSize, avail: QRect) -> None:
@@ -413,9 +472,17 @@ class WindowManager(QObject):
     def __init__(self, app: QApplication) -> None:
         super().__init__(app)
         app.installEventFilter(self)
+        global _rest
         screen = QGuiApplication.primaryScreen()
         if screen is not None:
-            screen.availableGeometryChanged.connect(self._refit_all)
+            _rest = screen.availableGeometry()
+            screen.availableGeometryChanged.connect(self._available_changed)
+        # a shrink that no keyboard explains (split screen) is followed
+        # after this long; the keyboard reports itself well before
+        self._confirm = QTimer(self)
+        self._confirm.setSingleShot(True)
+        self._confirm.setInterval(1000)
+        self._confirm.timeout.connect(self._confirm_shrink)
         im = QGuiApplication.inputMethod()
         if im is not None:
             # keep cards with a text field (the AnkiWeb login) above it, and
@@ -504,7 +571,7 @@ class WindowManager(QObject):
             if adapt is not None:
                 adapt(w, bar)
         w.setMinimumSize(0, 0)
-        w.setGeometry(avail)
+        _fill(w, avail)
         self._layout(w)
 
     def _layout(self, w: QWidget) -> None:
@@ -520,7 +587,7 @@ class WindowManager(QObject):
             safe.left() + own[0],
             safe.top() + own[1] + BAR_HEIGHT,
             safe.right() + own[2],
-            max(safe.bottom(), keyboard_overlap(w)) + own[3],
+            max(safe.bottom(), keyboard_overlap(w)) + own[3] + _overhang(w),
         )
         current = w.contentsMargins()
         if (current.left(), current.top(), current.right(), current.bottom()) != margins:
@@ -555,6 +622,25 @@ class WindowManager(QObject):
         for w in QApplication.topLevelWidgets():
             if w.isVisible() and self._border(w) is not None:
                 _center(w, w.size(), avail)
+
+    def _available_changed(self, avail: QRect) -> None:
+        global _rest
+        if _keyboard_shrunk(avail):
+            # the keyboard opening (Android before 15): windows keep their
+            # size; check later in case it was something else
+            if not _keyboard_visible():
+                self._confirm.start()
+            return
+        self._confirm.stop()
+        _rest = QRect(avail)
+        self._refit_all()
+
+    def _confirm_shrink(self) -> None:
+        global _rest
+        avail = _screen_available()
+        if _keyboard_shrunk(avail) and not _keyboard_visible():
+            _rest = avail
+            self._refit_all()
 
     def _refit_all(self) -> None:
         for w in QApplication.topLevelWidgets():

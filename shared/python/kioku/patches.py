@@ -480,6 +480,7 @@ def _patch_editor_media() -> None:
     def setup_web_with_media(self) -> None:  # type: ignore[no-untyped-def]
         setup_web(self)
         self.web.eval(_PASTE_MEDIA_JS)
+        self.web.eval(_FIELD_TAP_JS)
 
     def bridge_cmd(self, cmd: str):  # type: ignore[no-untyped-def]
         if cmd.startswith(_PASTE_MEDIA_CMD):
@@ -491,6 +492,34 @@ def _patch_editor_media() -> None:
     editor.setupWeb = setup_web_with_media
     editor.onBridgeCmd = bridge_cmd
 
+
+# A field's text area is 30 px tall in a 44 px box, with gaps between the
+# fields: a finger landing a little off it hit the editor's background, the
+# field lost focus and the keyboard went down (issue #4, "keyboard pops up and
+# goes down", seen on an iPhone when moving to the next field). On touch, a
+# tap on the background goes to the nearest field (within 24 px) and never
+# takes the focus away from the field being edited. Mouse clicks are left
+# alone.
+_FIELD_TAP_JS = """(function(){
+if(window.__kiokuFieldTap){return;}window.__kiokuFieldTap=true;
+var touch=false;
+document.addEventListener('pointerdown',function(e){touch=e.pointerType==='touch';},true);
+document.addEventListener('mousedown',function(e){
+if(!touch||typeof focusField!=='function'){return;}
+var path=e.composedPath();
+for(var i=0;i<path.length;i++){var n=path[i];
+if(n.nodeType!==1){continue;}
+if(n.isContentEditable||n.matches('.editor-field,.label-container,button,input,select,textarea,a,label,[role=button],[tabindex]')){return;}}
+var fields=document.querySelectorAll('.editor-field'),y=e.clientY,best=-1,dist=1e9;
+for(var j=0;j<fields.length;j++){var r=fields[j].getBoundingClientRect();
+if(!r.height){continue;}
+var d=y<r.top?r.top-y:(y>r.bottom?y-r.bottom:0);
+if(d<dist){dist=d;best=j;}}
+if(best<0){return;}
+e.preventDefault();
+if(dist<=24){focusField(best);}
+},true);
+})();"""
 
 _PASTE_MEDIA_CMD = "kiokuMedia:"
 _PASTE_MEDIA_JS = """(function(){

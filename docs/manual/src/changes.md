@@ -16,6 +16,11 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
   Toggle Masks button and Back Extra were cut off under the picture.
 - Kioku Web shows pictures whose file name contains `#` or `%` (they were
   missing, e.g. on image occlusion cards).
+- Android 14 and older: the edges of the Add, Edit and Browse windows no
+  longer flash black when the keyboard opens or closes.
+- Tapping next to a field (just above or below it, or between two fields)
+  moves to that field instead of closing the keyboard: on iPhone the keyboard
+  used to pop up and go down again.
 
 ## 0.2.6
 
