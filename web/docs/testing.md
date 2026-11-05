@@ -320,3 +320,22 @@ took 299 ms, stats 43 ms, export 172 ms).
 
 Start on the phone over the LAN: Python up after 15–27 s, Anki's main loop
 after 20–41 s (no HTTP cache: `serve.py` sends `no-store`).
+
+### 2026-11-05: interrupted saves and media sync (issue #10, Chrome, headless)
+
+Local `anki-sync-server`, Anki desktop 25.09.4 (own base folder), Kioku
+Android on the emulator, all on one account. Kioku Web was killed with
+SIGKILL at chosen IndexedDB transactions (a hook on
+`IDBDatabase.prototype.transaction`), then opened again normally so it
+synced on its own. Test pictures were uncompressed PNGs (3 MB on disk, small
+in a sync zip): the local relay downloads ~1 MB/s, and slower downloads
+never put more than 8 MB into one save.
+
+| Test | Result |
+| --- | --- |
+| Before the fix: killed right after the transaction with `collection.media.db2` and 4 of 14 new pictures | ❌ on the next start Kioku Web's sync sent `removed` for the 7 pictures it listed but had not saved (one an image occlusion picture); Anki desktop moved them to `media.trash`, a fresh Android profile downloaded the notes without them |
+| Before the fix: storage quota full during the save (`Storage.overrideQuotaForOrigin`) | ⚠️ "saving files failed" every 10 s only in the console; no loss when the failed save fit in one transaction |
+| Recovery: Tools › Check Media › Restore Deleted on Anki desktop, sync, then sync Android | ✅ all 74 pictures back on the server and the phone |
+| After the fix: killed right after the first media transaction (media database not saved) | ✅ next start: nothing missing, no `removed` on the server |
+| After the fix: killed right after the media database's transaction | ✅ same |
+| After the fix: IndexedDB reads fail during loading | ✅ "Kioku couldn't load your saved collection…" note, Anki not started, all 117 saved entries kept; a normal reload starts with everything |
