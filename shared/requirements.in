@@ -1,4 +1,4 @@
-# Anki's Python dependencies for the iOS and native Android builds (aqt/anki 26.9.3).
+# Anki's Python dependencies for the iOS and native Android builds (aqt/anki 26.9.4).
 # Pin with: uv pip compile -p 3.14 shared/requirements.in -o shared/requirements.txt
 decorator
 markdown
