@@ -14,7 +14,7 @@ android {
         targetSdk 36
         // CI passes the release tag's version (v0.2.0 -> 0.2.0) and run number.
         versionCode((project.findProperty('kiokuVersionCode') ?: '1') as int)
-        versionName project.findProperty('kiokuVersionName') ?: '0.1.0-anki26.09.3'
+        versionName project.findProperty('kiokuVersionName') ?: '0.1.0-anki26.09.4'
         ndk { abiFilters 'arm64-v8a' }
     }
 
