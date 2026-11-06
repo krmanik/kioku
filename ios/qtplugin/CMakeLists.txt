@@ -9,7 +9,7 @@ set(QTBASE_SRC "" CACHE PATH "qtbase source tree")
 find_package(Qt6 REQUIRED COMPONENTS Core Gui CorePrivate GuiPrivate)
 
 set(SRC ${QTBASE_SRC}/src/plugins/platforms/ios)
-set(SOURCES qiosplatformaccessibility.mm qiostextinputoverlay.mm qiostextresponder.mm)
+set(SOURCES qiosplatformaccessibility.mm qiostextinputoverlay.mm qiostextresponder.mm quiview.mm)
 list(TRANSFORM SOURCES PREPEND ${SRC}/)
 
 add_library(qios OBJECT ${SOURCES})

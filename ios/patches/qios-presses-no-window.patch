@@ -1,0 +1,24 @@
+diff --git a/src/plugins/platforms/ios/quiview.mm b/src/plugins/platforms/ios/quiview.mm
+index 3bec044..91173de 100644
+--- a/src/plugins/platforms/ios/quiview.mm
++++ b/src/plugins/platforms/ios/quiview.mm
+@@ -643,6 +643,10 @@ inline ulong getTimeStamp(UIEvent *event)
+     if (!qApp->focusWindow())
+         return false;
+ 
++    // The view outlives its platform window and can still be the first
++    // responder, getting hardware key presses, once that is gone
++    QWindow *window = self.platformWindow ? self.platformWindow->window() : qApp->focusWindow();
++
+     bool eventHandled = false;
+     const bool imEnabled = QIOSInputContext::instance()->inputMethodAccepted();
+ 
+@@ -658,7 +662,7 @@ inline ulong getTimeStamp(UIEvent *event)
+             continue;
+ 
+         bool keyHandled = QWindowSystemInterface::handleKeyEvent(
+-                    self.platformWindow->window(), type, key, qtModifiers, text);
++                    window, type, key, qtModifiers, text);
+         eventHandled = eventHandled || keyHandled;
+     }
+ 
