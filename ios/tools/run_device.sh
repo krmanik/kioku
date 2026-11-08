@@ -11,7 +11,7 @@ DEV=${KIOKU_DEVICE:-$(xcrun devicectl list devices 2>/dev/null | grep physical \
     | grep -oE '[0-9A-F]{8}-[0-9A-F]{16}' | head -1)}
 LOGDIR=$ROOT/build/device-logs
 mkdir -p "$LOGDIR"
-"$ROOT/tools/build.sh" > /dev/null || exit 1
+KIOKU_DEV_BUILD=1 "$ROOT/tools/build.sh" > /dev/null || exit 1
 xcrun devicectl device install app --device "$DEV" \
     "$ROOT/build/xcode-dev/Release-iphoneos/Kioku.app" > /dev/null || exit 1
 xcrun devicectl device process launch --device "$DEV" --terminate-existing \

@@ -165,13 +165,19 @@ def _url_string(request: Any) -> str:
     return str(prop(url, "absoluteString")) if url is not None else ""
 
 
+def _from_main_frame(message: Any) -> bool:
+    """WebKit gives messageHandlers to every frame of a page, a card's iframe
+    from another site included; Qt WebEngine's bridge is for the main frame."""
+    return bool(prop(prop(message, "frameInfo"), "isMainFrame"))
+
+
 class KiokuScriptHandler(NSObject):
     @objc_method
     def userContentController_didReceiveScriptMessage_(
         self, controller, message
     ) -> None:
         view = _view_for_controller(controller)
-        if view is None:
+        if view is None or not _from_main_frame(message):
             return
         name = str(prop(message, "name"))
         body = prop(message, "body")
@@ -197,10 +203,10 @@ class KiokuScriptHandler(NSObject):
         try:
             if view is None:
                 raise RuntimeError("no view for message")
+            if not _from_main_frame(message):
+                raise RuntimeError("the web channel is for the main frame")
             call = json.loads(str(prop(message, "body")))
-            result = view.on_channel_call(
-                call["obj"], call["method"], call.get("args", [])
-            )
+            result = view.on_channel_call(call["obj"], call["method"], call.get("args", []))
             reply_block(at(json.dumps(result)), None)
         except Exception as e:
             logger.exception("channel call failed")

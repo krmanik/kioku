@@ -20,6 +20,7 @@ __all__ = [
     "config_dir",
     "dark_mode",
     "delete_cookies",
+    "dev_allowed",
     "documents_dir",
     "keep_awake",
     "key_window",
@@ -53,6 +54,18 @@ def prepare() -> None:
         import truststore._api  # noqa: F401
     finally:
         platform.system, platform.mac_ver = system, mac_ver
+
+
+def dev_allowed() -> bool:
+    """The dev command channel runs code from Documents, which the Files app
+    shows; only a development build (tools/run_device.sh, run_sim.sh) accepts
+    the Documents/.kioku-dev file. KIOKU_DEV in the environment is set only by
+    whoever launches the app, so it needs no marker."""
+    if os.environ.get("KIOKU_DEV"):
+        return True
+    # <app>/app/kioku_platform/__init__.py, tools/bundle_python.sh
+    app = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    return os.path.exists(os.path.join(app, "dev-build"))
 
 
 def documents_dir() -> str:

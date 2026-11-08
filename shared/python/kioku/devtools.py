@@ -1,5 +1,6 @@
 """Development helpers, active only when the app is launched with KIOKU_DEV=1
-or Documents/.kioku-dev exists (see the run scripts in each variant's tools/):
+or Documents/.kioku-dev exists in a development build (platform.dev_allowed();
+see the run scripts in each variant's tools/):
 
 - Qt messages go to the log file, never to Anki's error dialog;
 - Documents/.kioku-cmd.py is executed on the main thread when it appears,
@@ -46,7 +47,10 @@ def install() -> None:
     # install, so tools/run_device.sh also leaves Documents/.kioku-dev
     if not os.environ.get("KIOKU_DEV") and not os.path.exists(os.path.join(DOCUMENTS, ".kioku-dev")):
         return
-    if not getattr(platform, "dev_allowed", lambda: True)():
+    # a platform without dev_allowed() has no development build to tell apart:
+    # only the environment variable, which an app cannot be sent, counts
+    allowed = getattr(platform, "dev_allowed", None)
+    if not (allowed() if allowed else os.environ.get("KIOKU_DEV")):
         return
     global _timer
     _timer = QTimer()

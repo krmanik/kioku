@@ -14,6 +14,8 @@
 # Env: KIOKU_VERSION (default: the latest v* tag), KIOKU_BUILD (default: the
 # number of commits; must grow with every upload of the same version)
 set -euo pipefail
+# never ship the dev-build marker (bundle_python.sh) because of an exported variable
+unset KIOKU_DEV_BUILD
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 source "$ROOT/../shared/versions.env"
 TEAM=${KIOKU_TEAM:?set KIOKU_TEAM to your Apple team id}
