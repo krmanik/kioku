@@ -211,7 +211,10 @@ perl, mesa + LLVM (Qt and Chromium run without OpenGL), gstreamer.
 ## Known gaps in the Termux packages
 
 * `pyqt6` installs `PyQt6-sip` with pip in its postinst (compiling it on the phone);
-  `tools/build_pyqt6_sip.sh` cross-compiles it instead. `python-pyqt6-sip` from
+  `tools/build_pyqt6_sip.sh` cross-compiles it instead. It reads the sip ABI the prefix's
+  PyQt6 bindings need, builds the newest PyQt6-sip of that ABI's major version from PyPI and
+  stops if its `sip.h` doesn't cover the ABI, so a Termux pyqt6 upgrade can't ship a sip
+  module PyQt6 refuses to import (`PYQT6_SIP_VERSION=` pins one). `python-pyqt6-sip` from
   krmanik/termux-packages would replace this once it is in the repositories.
 * `pyqt6` is built without the QtQuick bindings and Qt's OpenGL classes. Anki imports both but
   only uses them for GPU selection; `launch_anki.py` provides stand-ins.
