@@ -80,15 +80,23 @@ esac
 CFLAGS="-O2 -fPIC"
 export PKG_CONFIG_LIBDIR=$PREFIX/lib/pkgconfig PKG_CONFIG_PATH=
 
-fetch() {  # fetch <url> <directory it unpacks to>
+fetch() {  # fetch <url> <directory it unpacks to> [mirror url...]
     [ -d "$SRC/$2" ] && return
     echo "fetching $2"
-    local tmp=$SRC/.tmp-$2
+    local tmp=$SRC/.tmp-$2 dir=$2 url ok=
     rm -rf "$tmp" && mkdir -p "$tmp"
-    # from a file: GNU tar only detects the compression of a file, not of a pipe
-    curl -fsSL --retry 3 -o "$tmp.tar" "$1"
+    # --retry alone skips connection resets and TLS errors, which is what
+    # downloads.xiph.org does on CI; then the mirrors
+    for url in "$1" "${@:3}"; do
+        # from a file: GNU tar only detects the compression of a file, not of a pipe
+        if curl -fsSL --retry 4 --retry-all-errors --retry-delay 5 -o "$tmp.tar" "$url"; then
+            ok=1; break
+        fi
+        echo "fetching $dir from $url failed" >&2
+    done
+    [ -n "$ok" ] || exit 1
     tar xf "$tmp.tar" -C "$tmp" && rm "$tmp.tar"
-    mv "$tmp"/* "$SRC/$2" && rmdir "$tmp"
+    mv "$tmp"/* "$SRC/$dir" && rmdir "$tmp"
 }
 
 step() {  # step <name>: true if <name> still has to be built
@@ -132,9 +140,12 @@ autotools_build() {  # autotools_build <name> <source dir> [configure args]
 # Sources ----------------------------------------------------------------------
 fetch "https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.xz" ffmpeg-$FFMPEG_VERSION
 fetch "https://downloads.sourceforge.net/project/lame/lame/$LAME_VERSION/lame-$LAME_VERSION.tar.gz" lame-$LAME_VERSION
-fetch "https://downloads.xiph.org/releases/ogg/libogg-$OGG_VERSION.tar.xz" libogg-$OGG_VERSION
-fetch "https://downloads.xiph.org/releases/vorbis/libvorbis-$VORBIS_VERSION.tar.xz" libvorbis-$VORBIS_VERSION
-fetch "https://downloads.xiph.org/releases/opus/opus-$OPUS_VERSION.tar.gz" opus-$OPUS_VERSION
+fetch "https://downloads.xiph.org/releases/ogg/libogg-$OGG_VERSION.tar.xz" libogg-$OGG_VERSION \
+    "https://ftp.osuosl.org/pub/xiph/releases/ogg/libogg-$OGG_VERSION.tar.xz"
+fetch "https://downloads.xiph.org/releases/vorbis/libvorbis-$VORBIS_VERSION.tar.xz" libvorbis-$VORBIS_VERSION \
+    "https://ftp.osuosl.org/pub/xiph/releases/vorbis/libvorbis-$VORBIS_VERSION.tar.xz"
+fetch "https://downloads.xiph.org/releases/opus/opus-$OPUS_VERSION.tar.gz" opus-$OPUS_VERSION \
+    "https://ftp.osuosl.org/pub/xiph/releases/opus/opus-$OPUS_VERSION.tar.gz"
 fetch "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-$WEBP_VERSION.tar.gz" libwebp-$WEBP_VERSION
 fetch "https://github.com/webmproject/libvpx/archive/refs/tags/v$VPX_VERSION.tar.gz" libvpx-$VPX_VERSION
 fetch "https://storage.googleapis.com/aom-releases/libaom-$AOM_VERSION.tar.gz" libaom-$AOM_VERSION
