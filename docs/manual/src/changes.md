@@ -2,6 +2,16 @@
 
 All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
 
+## 0.2.8
+
+Anki 26.09.4.
+
+- Termux: Kioku 0.2.7 didn't start ("the sip module implements ABI v13.0
+  to v13.12"): a Termux update of PyQt6 needed a newer sip module than the
+  one in the app. The build now picks the sip module PyQt6 needs.
+- Android: turning the sync server on and off again quickly no longer
+  closes the app.
+
 ## 0.2.7
 
 - Pictures and sounds attached with the paperclip or recorded with the
