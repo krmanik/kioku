@@ -25,21 +25,41 @@ public class KiokuSyncService extends Service {
     private static final int NOTIFICATION = 0x6b73;
     private static final String STOP = "io.ankidesk.kioku.STOP_SYNC_SERVER";
 
+    // A service started with startForegroundService() must call
+    // startForeground() even when it is stopped right away: stopping it
+    // before onStartCommand ran crashes the app
+    // (ForegroundServiceDidNotStartInTimeException; the server switched on
+    // and off quickly). Until then a stop is only remembered.
+    private static boolean starting;
+    private static boolean stopWhenStarted;
+
     /** From KiokuBridge: show (running) or remove the service. */
-    static void update(Context context, boolean running, String text) {
+    static synchronized void update(Context context, boolean running, String text) {
         Intent intent = new Intent(context, KiokuSyncService.class);
         if (running) {
             intent.putExtra("text", text);
             try {
                 context.startForegroundService(intent);
+                starting = true;
+                stopWhenStarted = false;
             } catch (RuntimeException e) {
                 // Android 12+ refuses while the app is in the background; the
                 // server still runs, but only as long as the process does
                 Log.w(TAG, "cannot start the sync server's service", e);
             }
+        } else if (starting) {
+            stopWhenStarted = true;
         } else {
             context.stopService(intent);
         }
+    }
+
+    /** Called once startForeground() ran: whether to stop again at once. */
+    private static synchronized boolean started() {
+        starting = false;
+        boolean stop = stopWhenStarted;
+        stopWhenStarted = false;
+        return stop;
     }
 
     @Override
@@ -54,6 +74,10 @@ public class KiokuSyncService extends Service {
             startForeground(NOTIFICATION, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
         } else {
             startForeground(NOTIFICATION, notification);
+        }
+        if (started()) {
+            stopForeground(STOP_FOREGROUND_REMOVE);
+            stopSelf();
         }
         // after the process dies the server is gone too: don't restart empty
         return START_NOT_STICKY;

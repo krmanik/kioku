@@ -181,6 +181,7 @@ User guide: [sync-server.md](manual/src/features/sync-server.md). Code: `shared/
 
 | Problem | Cause | Fix |
 | --- | --- | --- |
+| Android: the app closed when the sync server was stopped right after starting it (`ForegroundServiceDidNotStartInTimeException`, found by the in-app tests) | `stopService()` arrived before the service's `onStartCommand()`; Android requires a service started with `startForegroundService()` to call `startForeground()` even when it is stopped at once | `KiokuSyncService` remembers a stop while a start is pending; `onStartCommand()` calls `startForeground()`, then removes the notification and stops itself |
 | Anki's sync server can't be stopped or restarted inside the app | `syncserver()` in rsbridge runs until Ctrl+C, and only reads its settings once | `shared/patches/anki-syncserver.patch`: `BackgroundServer` (own thread and Tokio runtime, graceful stop with a 5 s limit for stalled clients, then the users' collections close) and `syncserver_start()`/`syncserver_stop()` in rsbridge; applied by both `fetch_deps.sh` |
 | Android stops the process soon after Kioku leaves the screen | – | `KiokuSyncService`, a foreground service of type `specialUse` (no daily time limit, unlike `dataSync` on Android 15) while the server runs; its notification's Stop action stops the server |
 | The service's notification never appeared after allowing notifications | the service posted it before Android 13's notification prompt was answered | `KiokuBridge.onRequestPermissionsResult` posts it again once allowed |
