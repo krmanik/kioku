@@ -6,7 +6,8 @@
 #   tools/build.sh                              unsigned; also writes
 #                                               build/Kioku-<version>-unsigned.ipa
 #                                               for sideloading tools to re-sign
-# Env: KIOKU_VERSION, KIOKU_BUILD (default: Anki's version, 1)
+# Env: KIOKU_VERSION, KIOKU_BUILD (default: Anki's version, 1),
+#      KIOKU_DEV_BUILD=1 (allow the dev command channel; run_device.sh sets it)
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 source "$ROOT/../shared/versions.env"

@@ -30,7 +30,7 @@ rsync -a "$ROOT/../build/wheels/ios-sim/site/" "$ROOT/build/site/"
     -DQT_HOST_PATH="$QT/macos" -DCMAKE_OSX_SYSROOT=iphonesimulator \
     -DCMAKE_OSX_ARCHITECTURES=arm64 > /dev/null
 cd "$ROOT/build/xcode-sim"
-xcodebuild -project Kioku.xcodeproj -target Kioku -configuration Release \
+KIOKU_DEV_BUILD=1 xcodebuild -project Kioku.xcodeproj -target Kioku -configuration Release \
     -sdk iphonesimulator -arch arm64 CODE_SIGN_IDENTITY=- \
     > "$ROOT/build/xcode-sim.log" 2>&1 || {
     grep -E 'error:|^ld: |Undefined' "$ROOT/build/xcode-sim.log" | sort -u | head -40

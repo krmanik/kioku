@@ -94,12 +94,7 @@ class WebView:
     # Scripts (served by http.py) -------------------------------------------
 
     def set_user_scripts(self, scripts: list[tuple[str, int, bool]]) -> None:
-        # kioku.webengine's auth script adds Anki's headers to requests for
-        # host 127.0.0.1; here Anki's server is the page's origin
-        self._scripts = [
-            (js.replace("hostname==='127.0.0.1'", f"origin==={json.dumps(http.origin)}"), when, main)
-            for js, when, main in scripts
-        ]
+        self._scripts = list(scripts)
 
     def page_script(self, gen: int) -> str:
         """Loads the scripts as separate files, so each runs at global scope

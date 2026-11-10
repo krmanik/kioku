@@ -5,6 +5,8 @@
 # moved into Frameworks/<module>.framework and replaced by a .fwork pointer,
 # the layout CPython's iOS import machinery expects.
 #
+# Env: KIOKU_DEV_BUILD=1 marks a development build (run_device.sh, run_sim.sh):
+# only it accepts the Documents/.kioku-dev file (kioku_platform.dev_allowed)
 # Usage: bundle_python.sh <Python.xcframework slice> <ios folder>
 set -euo pipefail
 
@@ -21,6 +23,7 @@ trap 'rm -f "$PACK_EXCLUDES"' EXIT
 python3 "$ROOT/../shared/tools/packs.py" excludes > "$PACK_EXCLUDES"
 
 mkdir -p "$APP/python/lib" "$APP/Frameworks"
+if [ "${KIOKU_DEV_BUILD:-}" = 1 ]; then touch "$APP/dev-build"; else rm -f "$APP/dev-build"; fi
 rsync -a --delete --delete-excluded --exclude-from="$EXCLUDES" \
     --exclude 'libpython*.dylib' --exclude '__pycache__' \
     --exclude 'test/' --exclude 'idlelib/' --exclude 'tkinter/' \

@@ -11,6 +11,7 @@ crashing.
 from __future__ import annotations
 
 import enum
+import inspect
 import json
 import logging
 from typing import Any, Callable
@@ -18,6 +19,7 @@ from typing import Any, Callable
 from PyQt6.QtCore import (
     QByteArray,
     QEvent,
+    QMetaMethod,
     QObject,
     QPoint,
     QSize,
@@ -573,13 +575,16 @@ class QWebEnginePage(QObject, _Lenient):
         scripts = self._profile.scripts().toList() + self._scripts.toList()
         start, end = webscripts.AT_DOCUMENT_START, webscripts.AT_DOCUMENT_END
         converted = [
-            (platform.WebView.BRIDGE, start, False),
-            (webscripts.PRELUDE, start, False),
+            # main frame only, as Qt WebEngine's bridge: a card can embed pages
+            # from other sites, which must reach neither the channel nor the
+            # token (WKWebView; on Android the bridge and the token script still run in every frame)
+            (platform.WebView.BRIDGE, start, True),
+            (webscripts.PRELUDE, start, True),
             (webscripts.VIEWPORT, end, True),
         ]
         headers = self._profile._headers_for(_media_server_url())
         if headers:
-            converted.append((_auth_script(headers), start, False))
+            converted.append((_auth_script(headers, _origin(_media_server_url())), start, True))
         converted += [s._for_webkit() for s in scripts if s.sourceCode()]
         self._web.set_user_scripts(converted)
 
@@ -762,13 +767,20 @@ class QWebEnginePage(QObject, _Lenient):
             at = QPoint(round(x * view.width()), round(y * view.height()))
             _tap = (view.mapToGlobal(at), _qt_cursor_pos())
 
-    def _on_channel_call(self, obj: str, method: str, args: list) -> Any:
+    def _on_channel_call(
+        self, obj: str, method: str, args: list, main_frame: bool = True
+    ) -> Any:
+        if not main_frame:
+            raise RuntimeError("the web channel is for the main frame")
         if self._channel is None:
             raise RuntimeError("no web channel")
         target = self._channel._objects.get(obj)
         if target is None:
             raise RuntimeError(f"no object {obj!r} registered")
-        return getattr(target, method)(*args)
+        slot = _channel_slot(target, method)
+        if slot is None:
+            raise RuntimeError(f"{obj!r} has no slot {method!r}")
+        return slot(*args)
 
     def _on_navigation(self, url: str, nav_type: int, main_frame: bool) -> bool:
         if url.startswith("about:"):
@@ -816,6 +828,38 @@ class QWebEnginePage(QObject, _Lenient):
         return bool(self.javaScriptConfirm(self.url(), text))
 
 
+def _channel_slot(target: QObject, method: str) -> Callable[..., Any] | None:
+    """What QWebChannel gives a page: the slots and invokable methods the
+    object declares (pyqtSlot), not QObject's own and not other attributes;
+    a name with a leading underscore stays private. Like Qt's own invocation,
+    an override that is not decorated again calls the decorated method it
+    overrides, and a pyqtSlot(name=...) slot is not found by its Qt name
+    (PyQt keeps that name in an opaque capsule)."""
+    if method.startswith("_"):
+        return None
+    meta = target.metaObject()
+    kinds = (QMetaMethod.MethodType.Slot, QMetaMethod.MethodType.Method)
+    for i in range(QObject.staticMetaObject.methodCount(), meta.methodCount()):
+        m = meta.method(i)
+        if (
+            m.methodType() in kinds
+            and m.access() == QMetaMethod.Access.Public
+            and bytes(m.name()).decode() == method
+        ):
+            break
+    else:
+        return None
+    for cls in type(target).__mro__:
+        attr = cls.__dict__.get(method)
+        if attr is None:
+            continue
+        if not inspect.isfunction(attr):
+            return attr.__get__(target, type(target))  # a slot of a Qt class
+        if hasattr(attr, "__pyqtSignature__"):
+            return attr.__get__(target)
+    return None
+
+
 def _qt_value(value: Any) -> Any:
     """Qt WebEngine returns whole JavaScript numbers as ints (Anki passes
     them to setFixedHeight() and the like); WebKit returns every number as a
@@ -839,12 +883,22 @@ def _media_server_url() -> QUrl:
     return QUrl(aqt.mw.serverURL())
 
 
-def _auth_script(headers: dict[str, str]) -> str:
-    """Add the interceptor's headers to fetch/XHR requests to 127.0.0.1,
-    which WebKit has no request interceptor for."""
+def _origin(url: QUrl) -> str:
+    """The origin as JavaScript's URL.origin spells it."""
+    default = {"http": 80, "https": 443}.get(url.scheme())
+    port = f":{url.port()}" if url.port() not in (-1, default) else ""
+    host = url.host(QUrl.ComponentFormattingOption.EncodeUnicode)
+    return f"{url.scheme()}://{f'[{host}]' if ':' in host else host}{port}"
+
+
+def _auth_script(headers: dict[str, str], origin: str) -> str:
+    """Add the interceptor's headers to fetch/XHR requests to Anki's server
+    (origin), which WebKit has no request interceptor for. Anki 26.09's
+    interceptor matches the server's host and port, so other ports on 127.0.0.1
+    get nothing. Installed in the main frame only."""
     return (
-        "(function(h){"
-        "function local(u){try{return new URL(u,location.href).hostname==='127.0.0.1';}"
+        "(function(h,o){"
+        "function local(u){try{return new URL(u,location.href).origin===o;}"
         "catch(e){return false;}}"
         "var of=window.fetch;"
         "window.fetch=function(input,init){"
@@ -859,7 +913,7 @@ def _auth_script(headers: dict[str, str]) -> str:
         "XMLHttpRequest.prototype.send=function(){"
         "if(local(this.__kiokuUrl)){for(var k in h){this.setRequestHeader(k,h[k]);}}"
         "return os.apply(this,arguments);};"
-        f"}})({json.dumps(headers)});"
+        f"}})({json.dumps(headers)},{json.dumps(origin)});"
     )
 
 
