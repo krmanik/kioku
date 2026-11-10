@@ -212,7 +212,7 @@ def test_bridge_and_token_scripts_run_in_the_main_frame_only(platform, monkeypat
     page = webengine.QWebEnginePage()
     installed: list[tuple] = []
     page._web.set_user_scripts = installed.extend
-    monkeypatch.setattr(page._profile, "_headers_for", lambda url: {"Authorization": "Bearer secret"})
+    monkeypatch.setattr(page._profile, "_headers_for", lambda url, api=False: {"Authorization": "Bearer secret"})
     page.setHtml("<p>x</p>")
     by_source = {source: main_only for source, _when, main_only in installed}
     assert any("Bearer secret" in s for s in by_source)
@@ -305,3 +305,76 @@ def test_channel_does_not_call_a_python_override_of_a_qt_slot(platform) -> None:
     page._web.on_channel_call("t", "stop", [])
     assert called == []
     assert not timer.isActive()
+
+
+def _anki_auth_interceptor(server: str):  # type: ignore[no-untyped-def]
+    """The installed Anki's AuthInterceptor and _is_internal_url, run against
+    this stand-in's classes (aqt.webview itself needs Qt WebEngine)."""
+    import ast
+    import importlib.util
+    import types
+
+    path = os.path.join(os.path.dirname(importlib.util.find_spec("aqt").origin), "webview.py")
+    with open(path, encoding="utf8") as f:
+        tree = ast.parse(f.read())
+    wanted = {"AuthInterceptor", "_is_internal_url"}
+    nodes = [n for n in tree.body if getattr(n, "name", None) in wanted]
+    assert {n.name for n in nodes} == wanted, "aqt.webview changed: check kioku.webengine's interceptor support"
+    import aqt
+
+    namespace = {
+        "QObject": QObject,
+        "QUrl": QUrl,
+        "QWebEngineUrlRequestInterceptor": webengine.QWebEngineUrlRequestInterceptor,
+        "QWebEngineUrlRequestInfo": webengine.QWebEngineUrlRequestInfo,
+        "hmr_mode": False,
+        "__name__": "aqt_webview_extract",
+    }
+    exec(compile(ast.Module(body=nodes, type_ignores=[]), path, "exec"), namespace)
+    fake_mw = types.SimpleNamespace(serverURL=lambda: server)
+    return namespace["AuthInterceptor"], fake_mw
+
+
+def test_anki_interceptor_authorizes_api_calls(monkeypatch) -> None:
+    # Anki 26.09.4 only authorizes XHR POSTs to its own server, comparing the
+    # request's resourceType with QWebEngineUrlRequestInfo's enum: the token
+    # must still reach the pages' API calls (issue: Statistics, Deck Options,
+    # the editor and the import screen answered 403 on iOS and Android)
+    import aqt
+    import aqt.mediasrv
+
+    interceptor_class, fake_mw = _anki_auth_interceptor("http://127.0.0.1:40000/")
+    monkeypatch.setattr(aqt, "mw", fake_mw, raising=False)
+    monkeypatch.setattr(aqt.mediasrv, "_APIKEY", "secret", raising=False)
+    profile = webengine.QWebEngineProfile()
+    profile.setUrlRequestInterceptor(interceptor_class(api_enabled=True))
+    server = QUrl("http://127.0.0.1:40000/")
+    assert profile._headers_for(server, api=True) == {"Authorization": "Bearer secret"}
+    assert profile._headers_for(QUrl("http://127.0.0.1:9999/"), api=True) == {}
+    profile.setUrlRequestInterceptor(interceptor_class(api_enabled=False))
+    assert profile._headers_for(server, api=True) == {}
+
+
+def test_stand_ins_have_every_web_engine_name_anki_uses() -> None:
+    # aqt imports Qt WebEngine with `from aqt.qt import *`, so a name the
+    # stand-in lacks only fails when that code runs on a phone (Anki 26.09.4:
+    # QWebEngineUrlRequestInfo in the request interceptor)
+    import glob
+    import importlib.util
+    import re
+
+    here = os.path.join(os.path.dirname(__file__), "..", "python", "PyQt6")
+    provided: set[str] = set()
+    for module in ("QtWebEngineCore", "QtWebEngineWidgets"):
+        spec = importlib.util.spec_from_file_location(f"standin_{module}", os.path.join(here, f"{module}.py"))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        provided |= {n for n in vars(mod) if not n.startswith("_")}
+    aqt_dir = os.path.dirname(importlib.util.find_spec("aqt").origin)
+    used: dict[str, str] = {}
+    for path in glob.glob(os.path.join(aqt_dir, "**", "*.py"), recursive=True):
+        with open(path, encoding="utf8") as f:
+            for name in re.findall(r"\b(QWebEngine\w+|qWebEngine\w+)\b", f.read()):
+                used.setdefault(name, os.path.relpath(path, aqt_dir))
+    missing = {n: where for n, where in used.items() if n not in provided}
+    assert not missing, f"used by aqt but not in kioku.webengine: {missing}"

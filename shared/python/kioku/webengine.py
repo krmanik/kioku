@@ -276,11 +276,61 @@ class QWebEngineUrlRequestInterceptor(QObject):
         pass
 
 
-class _RequestInfo:
-    """Just enough of QWebEngineUrlRequestInfo to collect extra headers."""
+class QWebEngineUrlRequestInfo:
+    """Qt's enums, for interceptors that compare against them (Anki 26.09.4's
+    AuthInterceptor only authorizes XHR POSTs)."""
 
-    def __init__(self, url: QUrl) -> None:
+    class ResourceType(enum.Enum):
+        ResourceTypeMainFrame = 0
+        ResourceTypeSubFrame = 1
+        ResourceTypeStylesheet = 2
+        ResourceTypeScript = 3
+        ResourceTypeImage = 4
+        ResourceTypeFontResource = 5
+        ResourceTypeSubResource = 6
+        ResourceTypeObject = 7
+        ResourceTypeMedia = 8
+        ResourceTypeWorker = 9
+        ResourceTypeSharedWorker = 10
+        ResourceTypePrefetch = 11
+        ResourceTypeFavicon = 12
+        ResourceTypeXhr = 13
+        ResourceTypePing = 14
+        ResourceTypeServiceWorker = 15
+        ResourceTypeCspReport = 16
+        ResourceTypePluginResource = 17
+        ResourceTypeNavigationPreloadMainFrame = 19
+        ResourceTypeNavigationPreloadSubFrame = 20
+        ResourceTypeWebSocket = 254
+        ResourceTypeUnknown = 255
+
+    class NavigationType(enum.Enum):
+        NavigationTypeLink = 0
+        NavigationTypeTyped = 1
+        NavigationTypeFormSubmitted = 2
+        NavigationTypeBackForward = 3
+        NavigationTypeReload = 4
+        NavigationTypeOther = 5
+        NavigationTypeRedirect = 6
+
+
+class _RequestInfo(QWebEngineUrlRequestInfo):
+    """Just enough of a QWebEngineUrlRequestInfo to collect extra headers:
+    the platform web views can't intercept requests, so the interceptor is
+    asked once for a kind of request and the headers it sets are added to
+    every such request."""
+
+    def __init__(
+        self,
+        url: QUrl,
+        method: bytes = b"GET",
+        resource_type: QWebEngineUrlRequestInfo.ResourceType = (
+            QWebEngineUrlRequestInfo.ResourceType.ResourceTypeMainFrame
+        ),
+    ) -> None:
         self._url = url
+        self._method = method
+        self._resource_type = resource_type
         self.headers: dict[str, str] = {}
         self.blocked = False
 
@@ -291,7 +341,7 @@ class _RequestInfo:
         return self._url
 
     def requestMethod(self) -> QByteArray:
-        return QByteArray(b"GET")
+        return QByteArray(self._method)
 
     def setHttpHeader(self, name: bytes | QByteArray, value: bytes | QByteArray) -> None:
         self.headers[bytes(name).decode()] = bytes(value).decode()
@@ -302,11 +352,17 @@ class _RequestInfo:
     def redirect(self, url: QUrl) -> None:
         pass
 
-    def resourceType(self) -> int:
-        return 0
+    def resourceType(self) -> QWebEngineUrlRequestInfo.ResourceType:
+        return self._resource_type
 
-    def navigationType(self) -> int:
-        return 0
+    def navigationType(self) -> QWebEngineUrlRequestInfo.NavigationType:
+        return QWebEngineUrlRequestInfo.NavigationType.NavigationTypeLink
+
+    def isDownload(self) -> bool:
+        return False
+
+    def changed(self) -> bool:
+        return bool(self.headers) or self.blocked
 
 
 class QWebEngineProfile(QObject, _Lenient):
@@ -372,10 +428,16 @@ class QWebEngineProfile(QObject, _Lenient):
     def cookieStore(self) -> QWebEngineCookieStore:
         return self._cookies
 
-    def _headers_for(self, url: QUrl) -> dict[str, str]:
+    def _headers_for(self, url: QUrl, api: bool = False) -> dict[str, str]:
+        """The headers the interceptor sets on a page load of url or, with
+        api, on the pages' calls to Anki's API (XHR/fetch POSTs to url's
+        server)."""
         if self._interceptor is None:
             return {}
-        info = _RequestInfo(url)
+        if api:
+            info = _RequestInfo(url, b"POST", QWebEngineUrlRequestInfo.ResourceType.ResourceTypeXhr)
+        else:
+            info = _RequestInfo(url)
         try:
             self._interceptor.interceptRequest(info)
         except Exception:
@@ -582,7 +644,7 @@ class QWebEnginePage(QObject, _Lenient):
             (webscripts.PRELUDE, start, True),
             (webscripts.VIEWPORT, end, True),
         ]
-        headers = self._profile._headers_for(_media_server_url())
+        headers = self._profile._headers_for(_media_server_url(), api=True)
         if headers:
             converted.append((_auth_script(headers, _origin(_media_server_url())), start, True))
         converted += [s._for_webkit() for s in scripts if s.sourceCode()]
