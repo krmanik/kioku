@@ -51,7 +51,7 @@ jobs:
           if [ "$tag" = "$current" ]; then
             echo "Up to date."; echo "update=false" >> "$GITHUB_OUTPUT"; exit 0
           fi
-          if ! curl -fsS "https://pypi.org/pypi/aqt/$py/json" > aqt.json; then
+          if ! curl -fsS -o /dev/null "https://pypi.org/pypi/aqt/$py/json"; then
             echo "aqt $py is not on PyPI yet; trying again tomorrow."
             echo "update=false" >> "$GITHUB_OUTPUT"; exit 0
           fi
@@ -166,9 +166,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           BRANCH: ${{ steps.anki.outputs.branch }}
+          DEB: ${{ steps.termux.outputs.deb }}
         run: |
           # pull requests opened with GITHUB_TOKEN start no workflows by
-          # themselves; dispatching them explicitly is allowed
-          for workflow in android.yml ios.yml termux.yml; do
+          # themselves; dispatching them explicitly is allowed. The Termux
+          # build can only fail until krmanik/termux-packages has the deb.
+          workflows="android.yml ios.yml"
+          [ "$DEB" = found ] && workflows="$workflows termux.yml"
+          for workflow in $workflows; do
             gh workflow run "$workflow" --ref "$BRANCH"
           done
