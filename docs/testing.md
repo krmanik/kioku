@@ -29,6 +29,54 @@ profile folder, so the desktop data is never opened, pushed with
 `xcrun devicectl device copy to … Documents/Import/` and imported with
 `aqt.import_export.importing.ColpkgImporter._import(mw, path)`.
 
+## Automated tests
+
+One command runs everything that needs no hands, and can run unattended
+(cron, launchd, a CI machine with a simulator or emulator):
+
+```sh
+shared/tools/test_all.sh                  # host tests + every target found
+shared/tools/test_all.sh android ios-sim  # only these
+KIOKU_BUILD=1 shared/tools/test_all.sh    # build and install first
+```
+
+- `host`: `shared/tests/run.sh`, Kioku's Python code against desktop Anki
+  of `ANKI_TAG` with a patched rsbridge. It also runs the installed Anki's
+  request interceptor against the Qt WebEngine stand-in and checks that every
+  `QWebEngine*` name aqt uses exists there, so an Anki update that needs more
+  of Qt WebEngine fails here before it reaches a phone.
+- `android` (the emulator or phone adb sees, `ANDROID_SERIAL`), `ios-sim`
+  (a booted simulator with Kioku, `KIOKU_SIM`), `ios` (a connected iPhone,
+  `KIOKU_DEVICE`): `shared/tools/apptest.py` relaunches the development
+  build, answers a fresh install's language and profile questions, then runs
+  [shared/tests/app/suite.py](../shared/tests/app/suite.py) inside the app
+  and the crash sweep (`ios/tools/smoke.py`, every window once).
+
+The in-app suite works in a deck "Kioku Test" in the open profile and
+removes it at the end:
+
+| Test | What it does |
+| --- | --- |
+| version, profile | Anki is `ANKI_TAG`; a profile and collection are open |
+| add | adds Basic and Cloze notes, one with a picture |
+| add-window | Add window: the note's text reaches the editor page, Add saves it to the deck, the editor clears; `activeWindow()` is Add |
+| deck-list | the deck list shows the deck |
+| browse | search, row count, the editor page shows the selected note, Add over Browse is the active window |
+| study, review, undo | overview, the picture card's question with its picture drawn, the answer, Good (review logged, next card), undo |
+| media-server | the media server hands out the picture |
+| statistics, deck-options | the pages load through the API (graphs drawn, inputs present) |
+| export-apkg, export-csv, export-window | packages and notes exported; the Export window opens |
+| import-apkg, import-csv, import-window | the test notes removed and imported back with the picture; CSV import; the import screen loads |
+| check-database, check-media | both pass, the picture isn't missing |
+| sync-server | the local sync server starts on a free port, answers `/health`, stops |
+| python-packages, programs | numpy, Pillow, cryptography, PyMuPDF, QtPdf … import; the bundled programs run |
+| https | ankiweb.net answers with a verified certificate (`--no-network` skips) |
+
+`python3 -I shared/tools/apptest.py android --only browse,review` runs
+some tests (with what they need); `--list` names them. Reports:
+`build/test-reports/<target>-<time>.md` and `.xml` (JUnit). Exit status 1
+when something failed.
+
 ## Results: iOS (iPhone 15 Pro Max, iOS 26, Anki 26.8.1)
 
 Collections: 41, 602, 61,199 and 258,430 cards (27k media files) imported,
