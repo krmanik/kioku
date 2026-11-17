@@ -27,7 +27,9 @@ Upload / Files panel ◀───────────────▶ /config
   touch, hardening) work as documented by LinuxServer.
 - **Anki:** a venv in `/opt/anki` with `aqt[qt]==$ANKI_PY_VERSION`
   (`shared/versions.env`), the same wheels Anki's Linux launcher installs,
-  plus Debian's `mpv` for sound, Noto CJK/emoji fonts and `libminizip`
+  plus Debian's `mpv` for sound, `ffmpeg` (`ffmpeg`, `ffprobe`, `ffplay`
+  on the `PATH`, for add-ons that use them; mpv already needs its
+  libraries), Noto CJK/emoji fonts and `libminizip`
   (the arm64 Qt WebEngine wheel links it; amd64's bundles its own).
 - **`/usr/local/bin/anki-session`** (the autostart): runs
   `anki -b /config/Anki2` from `/config/Desktop` and opens it again if it's

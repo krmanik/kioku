@@ -115,6 +115,10 @@ check "Anki $ANKI_TAG" '[ "$(echo "$out" | field anki)" = "$ANKI_TAG" ]'
 check "collection on /config" '[[ "$(echo "$out" | field path)" == /config/Anki2/* ]]'
 check "main window shows the deck list" '[ "$(echo "$out" | field state)" = deckBrowser ]'
 check "mpv plays sound" '[[ "$(echo "$out" | field players)" == *Mpv* ]]'
+check "ffmpeg, ffprobe, ffplay on the PATH" \
+    'docker exec -u abc $NAME sh -c "ffmpeg -version && ffprobe -version && ffplay -version" >/dev/null'
+check "ffmpeg converts a sound" \
+    'docker exec -u abc $NAME ffmpeg -v error -f lavfi -i sine=d=1 -y /tmp/kioku-sine.mp3 && docker exec -u abc $NAME ffprobe -v error -show_entries format=duration -of csv=p=0 /tmp/kioku-sine.mp3 | grep -q "^1\\."'
 check "Anki has Arial and Webdings" '[ "$(echo "$out" | field arial)$(echo "$out" | field webdings)" = TrueTrue ]'
 check "Arial Greek falls back to Arial" \
     '[ "$(docker exec -u abc -e HOME=/config $NAME fc-match -f "%{family}" "Arial Greek")" = Arial ]'
@@ -144,6 +148,13 @@ av_player.play_tags([SoundOrVideoTag("kioku-tone.wav")])' >/dev/null
 sleep 0.7
 check "sound plays into PulseAudio" \
     '[ -n "$(docker exec -u abc -e XDG_RUNTIME_DIR=/config/.XDG $NAME pactl list short sink-inputs 2>/dev/null)" ]'
+
+# ffplay (add-ons that play sound with it) reaches PulseAudio too
+docker exec -d -u abc -e HOME=/config -e XDG_RUNTIME_DIR=/config/.XDG $NAME \
+    ffplay -v error -nodisp -autoexit -f lavfi sine=d=4
+sleep 1.5
+check "ffplay plays into PulseAudio" \
+    'docker exec -u abc -e XDG_RUNTIME_DIR=/config/.XDG $NAME pactl list sink-inputs 2>/dev/null | grep -qi ffplay'
 
 # mouse and keyboard from the browser: a full-screen dialog with a text box
 # at the top and a button filling the rest

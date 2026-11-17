@@ -2,6 +2,12 @@
 
 All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
 
+## 0.2.9
+
+- Self-hosted server (Docker): FFmpeg is in the image, so add-ons that
+  use `ffmpeg`, `ffprobe` or `ffplay` work without installing it
+  ([issue #15](https://github.com/krmanik/kioku/issues/15)).
+
 ## 0.2.8
 
 Anki 26.09.4.

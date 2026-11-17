@@ -23,6 +23,7 @@ RUN \
   apt-get update && \
   apt-get install -y --no-install-recommends \
     cabextract \
+    ffmpeg \
     fonts-noto-cjk \
     fonts-noto-color-emoji \
     libasound2t64 \

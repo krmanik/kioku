@@ -195,9 +195,10 @@ for example to also use AnkiDroid or the Kioku apps.
 
 Add-ons run in Anki on the server, as on a Linux computer: install them from
 **Tools › Add-ons** as usual. Add-ons that only ship code for Windows or
-macOS don't work. To reach an add-on's web server (such as AnkiConnect)
-from outside, make it listen on `0.0.0.0` in its settings and publish its
-port in `compose.yaml`.
+macOS don't work. `ffmpeg`, `ffprobe` and `ffplay` are installed, for
+add-ons that record, convert or play sound and video with them. To reach
+an add-on's web server (such as AnkiConnect) from outside, make it listen
+on `0.0.0.0` in its settings and publish its port in `compose.yaml`.
 
 ## Updating and stopping
 
