@@ -64,6 +64,7 @@ def apply() -> None:
     _patch_review_menu()
     _patch_full_screen()
     _patch_screen_edges()
+    _patch_main_view_width()
     _patch_splitters()
     _patch_docks()
     _patch_update_check()
@@ -589,6 +590,26 @@ def _paste_media(editor, payload: dict) -> None:  # type: ignore[no-untyped-def]
         links.append(editor.fnameToLink(fname))
     if links:
         editor.doPaste("".join(links), internal=True)
+
+
+def _patch_main_view_width() -> None:
+    """Anki gives the main window (its form) and its main view (deck list,
+    overview, reviewer) a minimum width of 400 px. On screens narrower
+    than that (720 px phones at 2x are 360 px wide, a larger interface
+    size makes any phone narrower) the main window was wider than the
+    screen: the top bar, the deck list and the bottom bar were centred off
+    to the right and cut off (GitHub issue #14). Without the minimums the
+    window fits the screen."""
+    from aqt.main import AnkiQt
+
+    setup = AnkiQt.setupMainWindow
+
+    def setup_without_minimum(self):  # type: ignore[no-untyped-def]
+        setup(self)
+        self.setMinimumSize(0, 0)
+        self.web.setMinimumWidth(0)
+
+    AnkiQt.setupMainWindow = setup_without_minimum
 
 
 def _patch_splitters() -> None:
