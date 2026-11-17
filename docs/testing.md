@@ -1023,3 +1023,19 @@ folder, and the image built from `desktop/`.
 
 Not run: the full `desktop/test/run.sh` (its two new checks were run by
 hand in the container above).
+
+## Hidden add-on pages: Contanki's white box (2026-11-17)
+
+TestFlight feedback (0.2.8 build 215, iPad16,6, iPadOS 27.2.1): Contanki
+left a white box over the top left. iOS Simulator (iPhone SE, Python
+synced from the repo), Contanki's steps run with devcmd: `AnkiWebView(mw)`,
+`setFixedSize(0, 0)`, `stdHtml(...)`.
+
+| Test | Before | After |
+| --- | --- | --- |
+| View's geometry after `stdHtml` | 160×160 (native window 160×160, shown) | empty, native window hidden |
+| Screen | white 160×160 pt box over the menu bar and deck list | no box |
+| `runJavaScript` on the hidden page | — | runs (`1+window.ok` → 2) |
+| `document.visibilityState`, `navigator.getGamepads` | — | `visible`, function |
+
+Not run: Contanki itself with a real game controller (none here), Android.

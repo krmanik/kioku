@@ -1093,7 +1093,23 @@ class QWebEngineView(QWidget, _Lenient):
             QEvent.Type.ParentChange,
         ):
             QTimer.singleShot(0, self._attach)
+        elif evt is not None and evt.type() == QEvent.Type.Resize:
+            QTimer.singleShot(0, self._keep_size_limits)
         return super().event(evt)
+
+    def _keep_size_limits(self) -> None:
+        """Qt's platform window replaces an empty size with its 160x160
+        default and the widget takes that size, past its maximum: Contanki's
+        hidden controller page (setFixedSize(0, 0)) showed as a white box at
+        the top left. Back within its limits, an empty widget hides its
+        native window again."""
+        try:
+            size = self.size()
+        except RuntimeError:  # deleted
+            return
+        bounded = size.boundedTo(self.maximumSize()).expandedTo(self.minimumSize())
+        if bounded != size:
+            self.resize(bounded)
 
     def sizeHint(self) -> QSize:
         return QSize(400, 300)
