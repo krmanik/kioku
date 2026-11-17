@@ -133,5 +133,11 @@ Kioku stands on [Anki](https://apps.ankiweb.net), [Qt](https://www.qt.io) and
 Anki is AGPL-3.0; see [termux/docs/distribution.md](termux/docs/distribution.md)
 for the other licenses.
 
+## License
+
+Kioku is licensed under the [GNU Affero General Public License v3.0 or later](LICENSE),
+the same license as Anki. Forks and redistributed builds must keep that license
+and offer their source.
+
 "Anki" is a trademark of Ankitects. Kioku is an independent project, not
 affiliated with or endorsed by Ankitects.

@@ -14,7 +14,7 @@
 
 ## Licenses
 
-Anki is AGPL-3.0, termux-x11 and the Termux packages are GPL-3.0 and others. Distributing the APK
+Kioku itself is AGPL-3.0-or-later ([LICENSE](../../LICENSE)), as is Anki. termux-x11 and the Termux packages are GPL-3.0 and others. Distributing the APK
 means offering the corresponding source: this repository, termux-x11 (`third_party/`, the
 `kioku` branch of krmanik/termux-x11), and the Termux package recipes (termux/termux-packages
 and the `anki` branch of krmanik/termux-packages).
