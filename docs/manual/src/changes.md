@@ -13,6 +13,9 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
   ([issue #14](https://github.com/krmanik/kioku/issues/14)).
 - iOS, Android: add-ons with a hidden page, such as Contanki, no longer
   leave a white box over the top left of the main window.
+- iOS, Android: `kioku://` links let other apps and Shortcuts add notes,
+  sync and search, with AnkiMobile's actions and parameters
+  ([kioku:// links](features/links.md)).
 
 ## 0.2.8
 

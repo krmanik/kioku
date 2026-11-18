@@ -34,6 +34,19 @@
     <key>LSRequiresIPhoneOS</key>
     <true/>
 
+    <!-- kioku:// links (kioku/urlscheme.py): add notes, sync, search -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>${MACOSX_BUNDLE_GUI_IDENTIFIER}</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>kioku</string>
+            </array>
+        </dict>
+    </array>
+
     <key>UILaunchStoryboardName</key>
     <string>LaunchScreen</string>
 

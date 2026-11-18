@@ -87,6 +87,12 @@ def main() -> None:
             traceback.print_exc()
 
         patches.apply()
+        try:
+            from kioku import urlscheme
+
+            urlscheme.install()
+        except Exception:
+            traceback.print_exc()
         import aqt
 
         aqt.run()
