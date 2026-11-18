@@ -25,6 +25,8 @@ cp -r "$here/addon" "$cfg/Anki2/addons21/kioku_desktop_test"
 fails=0
 ok() { echo "ok   $1"; }
 bad() { echo "FAIL $1"; fails=$((fails + 1)); }
+# (with pipefail, "big output | grep -q" fails when grep stops reading early:
+# the writer gets SIGPIPE, so read it all with "grep >/dev/null")
 check() { if eval "$2"; then ok "$1"; else bad "$1"; fi; }
 
 # Python on Anki's main thread (addon/__init__.py); prints out.json
@@ -129,7 +131,7 @@ check "INSTALL_PACKAGES: jq and sqlite3 installed" \
     'docker exec $NAME dpkg-query -W jq sqlite3 >/dev/null'
 check "INSTALL_PACKAGES: Anki finds them on the PATH" \
     '[ "$(py "import shutil; out[\"w\"] = bool(shutil.which(\"jq\") and shutil.which(\"sqlite3\"))" | field w)" = True ]'
-check "INSTALL_PACKAGES: a bad name is skipped" 'docker logs $NAME 2>&1 | grep -qF "skipped: bad;name"'
+check "INSTALL_PACKAGES: a bad name is skipped" 'docker logs $NAME 2>&1 | grep -F "skipped: bad;name" >/dev/null'
 check "INSTALL_PACKAGES: nothing to install the next time" \
     'docker exec $NAME /usr/local/bin/anki-packages | grep -q "already installed" && docker exec $NAME test ! -e /mod-repo-packages-to-install.list'
 check "SELKIES_DESKTOP: taskbar running" 'docker exec $NAME pgrep -f selkies-desktop >/dev/null'
@@ -163,7 +165,7 @@ docker exec -d -u abc -e HOME=/config -e XDG_RUNTIME_DIR=/config/.XDG $NAME \
     ffplay -v error -nodisp -autoexit -f lavfi sine=d=4
 sleep 1.5
 check "ffplay plays into PulseAudio" \
-    'docker exec -u abc -e XDG_RUNTIME_DIR=/config/.XDG $NAME pactl list sink-inputs 2>/dev/null | grep -qi ffplay'
+    'docker exec -u abc -e XDG_RUNTIME_DIR=/config/.XDG $NAME pactl list sink-inputs 2>/dev/null | grep -i ffplay >/dev/null'
 
 # mouse and keyboard from the browser: a full-screen dialog with a text box
 # at the top and a button filling the rest
