@@ -65,6 +65,12 @@
         <true/>
     </dict>
 
+    <!-- add-ons that record (e.g. AVAudioRecorder through rubicon-objc):
+         without it iOS ends the app on the first microphone access
+         (issue #19). iOS asks once, when an add-on first records. -->
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Add-ons can record your voice, for example to compare your pronunciation or to add recordings to notes.</string>
+
     <key>UIFileSharingEnabled</key>
     <true/>
     <key>LSSupportsOpeningDocumentsInPlace</key>

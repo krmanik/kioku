@@ -74,6 +74,7 @@ removes it at the end:
 | check-database, check-media | both pass, the picture isn't missing |
 | sync-server | the local sync server starts on a free port, answers `/health`, stops |
 | python-packages, programs | numpy, Pillow, cryptography, PyMuPDF, QtPdf … import; the bundled programs run |
+| microphone | iOS: Info.plist has `NSMicrophoneUsageDescription` (issue #19); with the permission granted (`apptest.py ios-sim` grants it), one second recorded through `AVAudioRecorder` as an add-on does, then card audio's session restored. Never asks: on an iPhone that wasn't asked yet it checks the key only |
 | https | ankiweb.net answers with a verified certificate (`--no-network` skips) |
 
 `python3 -I shared/tools/apptest.py android --only browse,review` runs

@@ -16,6 +16,10 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
   italic, underline, superscript, subscript, text colour, highlight and
   remove formatting. MathJax and cloze keep the selected text
   ([issue #17](https://github.com/krmanik/kioku/issues/17)).
+- iOS: add-ons can record from the microphone, for example with
+  `AVAudioRecorder` through rubicon-objc. iOS asks for access the first
+  time; before, it closed Kioku
+  ([issue #19](https://github.com/krmanik/kioku/issues/19)).
 - iOS: a field keeps its caret when it gets the focus back without a tap
   (Tab with a keyboard, back from a dialog); the caret went to the end.
 - Self-hosted server (Docker): FFmpeg is in the image, so add-ons that

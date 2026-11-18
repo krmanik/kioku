@@ -1043,6 +1043,58 @@ def t_programs():
     return ", ".join(results)
 
 
+def t_microphone():
+    """Issue #19: an add-on recording through AVAudioRecorder (rubicon-objc)
+    needs NSMicrophoneUsageDescription, else iOS ends the app. Records a
+    second the way such an add-on does when the permission is granted
+    (apptest.py grants it on the Simulator); never asks for it."""
+    if sys.platform != "ios":
+        raise Skip(sys.platform)
+    from rubicon.objc import NSDictionary, ObjCClass, at
+    from rubicon.objc.runtime import load_library
+
+    from kioku_platform.audio import _activate_session
+    from kioku_platform.webview import prop
+
+    load_library("AVFoundation")
+    bundle = prop(ObjCClass("NSBundle"), "mainBundle")
+    text = bundle.objectForInfoDictionaryKey_(at("NSMicrophoneUsageDescription"))
+    check(text is not None and str(text).strip() != "",
+          "Info.plist has no NSMicrophoneUsageDescription")
+    session = prop(ObjCClass("AVAudioSession"), "sharedInstance")
+    permission = int(prop(session, "recordPermission"))
+    names = {0x67726E74: "granted", 0x64656E79: "denied", 0x756E6474: "not asked yet"}
+    if permission != 0x67726E74:
+        return f"usage description set; not recorded (permission {names.get(permission, permission)})"
+    path = os.path.join(WORK, "mic.wav")
+    if os.path.exists(path):
+        os.unlink(path)
+    url = ObjCClass("NSURL").fileURLWithPath_(at(path))
+    settings = NSDictionary.dictionaryWithDictionary_({
+        "AVFormatIDKey": 0x6C70636D,  # kAudioFormatLinearPCM
+        "AVSampleRateKey": 44100.0,
+        "AVNumberOfChannelsKey": 1,
+    })
+    try:
+        check(bool(session.setCategory_error_(at("AVAudioSessionCategoryPlayAndRecord"), None)),
+              "setCategory PlayAndRecord failed")
+        session.setActive_error_(True, None)
+        recorder = ObjCClass("AVAudioRecorder").alloc().initWithURL_settings_error_(url, settings, None)
+        check(recorder is not None, "AVAudioRecorder could not be created")
+        check(bool(recorder.record()), "AVAudioRecorder.record() returned NO")
+        yield 1.0
+        seconds = float(prop(recorder, "currentTime"))
+        recorder.stop()
+        yield 0.3
+    finally:
+        _activate_session()  # card audio plays as before
+    size = os.path.getsize(path) if os.path.exists(path) else 0
+    if size:
+        os.unlink(path)
+    check(size > 4096, f"recording has {size} bytes")
+    return f"recorded {seconds:.1f} s, {size} bytes"
+
+
 def t_https():
     if not NETWORK:
         raise Skip("network tests turned off")
@@ -1100,6 +1152,7 @@ TESTS = [
     ("sync-server", t_sync_server),
     ("python-packages", t_python_packages),
     ("programs", t_programs),
+    ("microphone", t_microphone),
     ("https", t_https),
     ("cleanup", t_cleanup),
 ]

@@ -126,6 +126,8 @@ class IosSim(Target):
         return os.path.join(p.stdout.strip(), "Documents")
 
     def launch(self) -> None:
+        # the "microphone" test records only with the permission: no prompt
+        run(["xcrun", "simctl", "privacy", self.dev, "grant", "microphone", APP_ID])
         env = dict(os.environ, SIMCTL_CHILD_KIOKU_DEV="1", SIMCTL_CHILD_USER="mobile")
         run(["xcrun", "simctl", "launch", "--terminate-running-process", self.dev, APP_ID], env=env)
 
