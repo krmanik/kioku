@@ -33,6 +33,7 @@ __all__ = [
     "set_cookie",
     "sync_server_running",
     "tts_player",
+    "watch_gamepads",
 ]
 
 HOME = os.path.expanduser("~")
@@ -134,6 +135,14 @@ def install_menu_bar(mw: Any) -> bool:
     from .menubar import install
 
     return install(mw)
+
+
+def watch_gamepads(listener: Any) -> None:
+    """Game controllers' buttons and sticks to kioku.gamepad's listener;
+    None stops."""
+    from .gamepad import watch
+
+    watch(listener)
 
 
 def keep_awake() -> None:

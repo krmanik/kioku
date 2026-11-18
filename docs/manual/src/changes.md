@@ -4,6 +4,14 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
 
 ## 0.2.9
 
+- iOS, Android: gamepads and game controllers (Bluetooth or USB: Xbox,
+  PlayStation, Switch Pro, 8BitDo…) study and move around Kioku. A shows
+  the answer, then answers Good; B, X and Y answer Again, Hard and Easy;
+  the d-pad moves through the deck list, dialogs and menus. Set each
+  action's buttons by pressing them, per card side, as in AnkiDroid, or
+  turn it off, in **Preferences › Advanced › Gamepad › Controls…**
+  ([Gamepads and Controllers](features/gamepad.md),
+  [issue #18](https://github.com/krmanik/kioku/issues/18)).
 - iOS: the editor's formatting buttons work on selected text: bold,
   italic, underline, superscript, subscript, text colour, highlight and
   remove formatting. MathJax and cloze keep the selected text

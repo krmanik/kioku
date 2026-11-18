@@ -34,6 +34,7 @@ __all__ = [
     "set_cookie",
     "sync_server_running",
     "tts_player",
+    "watch_gamepads",
 ]
 
 HOME = os.path.expanduser("~")
@@ -207,6 +208,42 @@ def watch_background(
 
 _foreground: list[Callable[[int], None]] = []
 _foreground_listening: list[bool] = []
+
+
+def watch_gamepads(listener: Any) -> None:
+    """Gamepads' buttons and sticks (KiokuGamepad.java) to kioku.gamepad's
+    listener instead of to Qt and the web views; None gives them back."""
+    from . import bridge
+
+    _gamepad[:] = [listener] if listener is not None else []
+    if not _gamepad_listening:
+        _gamepad_listening.append(True)
+        bridge.listen("gamepadButton", _on_gamepad_button)
+        bridge.listen("gamepadAxes", _on_gamepad_axes)
+        bridge.listen("gamepadDevice", _on_gamepad_device)
+    bridge.call("gamepad.watch", on=listener is not None)
+
+
+_gamepad: list[Any] = []
+_gamepad_listening: list[bool] = []
+
+
+def _on_gamepad_button(event: dict) -> None:
+    for listener in _gamepad:
+        listener.button(event["button"], bool(event["pressed"]), "key")
+
+
+def _on_gamepad_axes(event: dict) -> None:
+    for listener in _gamepad:
+        listener.axes("left", event["lx"], event["ly"])
+        listener.axes("right", event["rx"], event["ry"])
+        listener.axes("hat", event["hx"], event["hy"])
+        listener.axes("triggers", event["lt"], event["rt"])
+
+
+def _on_gamepad_device(event: dict) -> None:
+    for listener in _gamepad:
+        listener.connected(event["id"], event.get("name", ""), bool(event["connected"]))
 
 
 def sync_server_running(running: bool, text: str) -> None:

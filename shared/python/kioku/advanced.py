@@ -1,7 +1,7 @@
 """Preferences > Advanced: Kioku's own options for advanced users.
 
-Everything here is off by default and explains its risks before it is
-turned on. The tab is added to Anki's Preferences dialog after it is built.
+Everything here except gamepads is off by default and explains its risks
+before it is turned on. The tab is added to Anki's Preferences dialog after it is built.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ import os
 import sys
 from typing import Any
 
-from kioku import ankidroid, syncserver
+from kioku import ankidroid, gamepad, syncserver
 
 logger = logging.getLogger("kioku.advanced")
 
@@ -114,11 +114,56 @@ class AdvancedTab:
         self.scroll.setWidget(body)
         self.server = SyncServerGroup(self)
         self.layout.addWidget(self.server.box)
+        self.gamepad = GamepadGroup(self)
+        self.layout.addWidget(self.gamepad.box)
         self.ankidroid: AnkiDroidGroup | None = None
         if sys.platform == "android" and self.mw.col is not None:
             self.ankidroid = AnkiDroidGroup(self)
             self.layout.addWidget(self.ankidroid.box)
         self.layout.addStretch(1)
+
+
+class GamepadGroup:
+    """Gamepads and game controllers (kioku.gamepad): on or off, and the
+    buttons of each action."""
+
+    def __init__(self, tab: AdvancedTab) -> None:
+        from aqt.qt import QCheckBox, QGroupBox, QLabel, QPushButton, QVBoxLayout, qconnect
+
+        self.mw = tab.mw
+        self.box = QGroupBox("Gamepad")
+        layout = QVBoxLayout(self.box)
+        self.enabled = QCheckBox("Use gamepads and game controllers")
+        self.enabled.setChecked(gamepad.load_settings(self.mw.pm.meta).enabled)
+        qconnect(self.enabled.toggled, self._on_enabled)
+        layout.addWidget(self.enabled)
+        self.status = QLabel()
+        self.status.setWordWrap(True)
+        layout.addWidget(self.status)
+        self.buttons = QPushButton("Controls…")
+        qconnect(self.buttons.clicked, self._on_buttons)
+        layout.addWidget(self.buttons)
+        self._refresh()
+
+    def _refresh(self) -> None:
+        pads = gamepad.instance()
+        names = sorted(pads.controllers.values()) if pads else []
+        self.status.setText(
+            "Connected: " + ", ".join(names)
+            if names
+            else "None connected. Pair a Bluetooth controller in the system settings, or plug one in."
+        )
+        self.buttons.setEnabled(self.enabled.isChecked())
+
+    def _on_enabled(self, on: bool) -> None:
+        settings = gamepad.load_settings(self.mw.pm.meta)
+        settings.enabled = on
+        gamepad.save_settings(self.mw.pm, settings)
+        gamepad.settings_changed()
+        self._refresh()
+
+    def _on_buttons(self) -> None:
+        gamepad.ControlsDialog(self.box.window(), self.mw.pm).exec()
 
 
 class SyncServerGroup:

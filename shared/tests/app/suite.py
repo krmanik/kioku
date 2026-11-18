@@ -601,6 +601,198 @@ def t_undo():
     return "the review was undone, the card is shown again"
 
 
+class _PadRecorder:
+    """Records what the platform reports to kioku.gamepad, instead of
+    running actions."""
+
+    def __init__(self, pads) -> None:
+        self.pads = pads
+        self.events: list = []
+        for name in ("button", "axes", "connected"):
+            setattr(pads, name, self._record(name))
+
+    def _record(self, name):
+        return lambda *args: self.events.append((name, *args))
+
+    def restore(self) -> None:
+        for name in ("button", "axes", "connected"):
+            self.pads.__dict__.pop(name, None)
+
+
+def _gamepads():
+    from kioku import gamepad
+
+    pads = gamepad.instance()
+    if pads is None:
+        raise Skip("gamepad support didn't start")
+    return gamepad, pads
+
+
+def t_gamepad():
+    """Study with a controller's default buttons: presses go through
+    kioku.gamepad into Anki's own shortcuts."""
+    gamepad, pads = _gamepads()
+    saved = pads.settings
+    pads.settings = gamepad.Settings.from_dict({"version": gamepad.VERSION})
+
+    def tap(name: str) -> None:
+        pads.button(name, True, "test")
+        pads.button(name, False, "test")
+
+    try:
+        did = deck_id()
+        col().decks.select(did)
+        mw.moveToState("deckBrowser")
+        yield Until(lambda: mw.state == "deckBrowser", 10, "deck list")
+        yield 1
+        pads.actions.deck_id = None
+        tap("Down")  # the first press shows the highlight on the current deck
+        yield Until(lambda: pads.actions.deck_id == str(did), 10, "the test deck highlighted")
+        tap("A")
+        yield Until(lambda: mw.state == "overview", 10, "A: the deck's overview")
+        yield 1
+        tap("A")
+        yield Until(lambda: mw.state == "review" and mw.reviewer.card is not None, 15, "A: studying")
+        yield Until(lambda: mw.reviewer.state == "question", 10, "the question")
+        card = mw.reviewer.card
+        before = revlog_count(card.id)
+        tap("B")  # Again: only on the answer side
+        yield 1
+        check(mw.reviewer.state == "question" and revlog_count(card.id) == before,
+              "B on the question did something")
+        tap("A")
+        yield Until(lambda: mw.reviewer.state == "answer", 10, "A: the answer")
+        tap("B")
+        yield Until(lambda: revlog_count(card.id) == before + 1, 10, "B: answered Again")
+        tap("L1")
+        yield Until(lambda: revlog_count(card.id) == before, 10, "L1: undone")
+        yield Until(lambda: mw.reviewer.card is not None and mw.reviewer.card.id == card.id, 10,
+                    "the card back")
+        tap("View")
+        yield Until(lambda: mw.state == "overview", 10, "View: back to the overview")
+        tap("B")
+        yield Until(lambda: mw.state == "deckBrowser", 10, "B: back to the deck list")
+    finally:
+        pads.settings = saved
+    return "deck list → overview → study → answer → Again → undo → back"
+
+
+def t_gamepad_native():
+    """A controller's events through the platform layer: Android key and
+    joystick events through KiokuActivity, iOS Apple's virtual controller."""
+    gamepad, pads = _gamepads()
+    if not pads.settings.enabled:
+        raise Skip("gamepads are turned off (Preferences › Advanced)")
+    recorder = _PadRecorder(pads)
+    try:
+        if sys.platform == "android":
+            result = yield from _gamepad_android(recorder)
+        elif sys.platform == "ios":
+            result = yield from _gamepad_ios(recorder)
+        else:
+            raise Skip(sys.platform)
+    finally:
+        recorder.restore()
+    return result
+
+
+def _gamepad_android(recorder):
+    from kioku_platform import bridge
+
+    SOURCE_GAMEPAD, SOURCE_KEYBOARD = 0x401, 0x101
+    BUTTON_A, DPAD_DOWN, BUTTON_START = 96, 20, 108
+
+    def key(code: int, down: bool, source: int = SOURCE_GAMEPAD) -> bool:
+        return bridge.call("gamepad.test", kind="key", code=code, down=down, source=source)
+
+    check(key(BUTTON_A, True) and key(BUTTON_A, False), "button A not taken")
+    check(key(BUTTON_START, True) and key(BUTTON_START, False), "Start not taken")
+    check(key(DPAD_DOWN, True) and key(DPAD_DOWN, False), "the controller's d-pad not taken")
+    check(not key(DPAD_DOWN, True, SOURCE_KEYBOARD), "a keyboard's arrow was taken")
+    check(bridge.call("gamepad.test", kind="motion", axes={
+        "AXIS_X": 0.0, "AXIS_Y": 1.0, "AXIS_RZ": -0.6, "AXIS_HAT_X": -1.0, "AXIS_LTRIGGER": 0.8,
+    }), "joystick motion not taken")
+    expected = [
+        ("button", "A", True, "key"), ("button", "A", False, "key"),
+        ("button", "Menu", True, "key"), ("button", "Menu", False, "key"),
+        ("button", "Down", True, "key"), ("button", "Down", False, "key"),
+        ("axes", "left", 0.0, 1.0), ("axes", "right", 0.0, -0.6),
+        ("axes", "hat", -1.0, 0.0), ("axes", "triggers", 0.8, 0.0),
+    ]
+    yield Until(lambda: len(recorder.events) >= len(expected), 10, "the events in Python")
+    bridge.call("gamepad.test", kind="motion", axes={"AXIS_X": 0.0})  # sticks back
+    yield 0.5
+    check(recorder.events[:len(expected)] == expected, f"got {recorder.events[:len(expected)]}")
+    return "buttons, d-pad, sticks, hat and trigger reached Python; keyboard left alone"
+
+
+def _gamepad_ios(recorder):
+    import ctypes
+
+    from rubicon.objc import ObjCClass, ObjCInstance
+    from rubicon.objc.runtime import load_library, send_message
+
+    from kioku_platform import gamepad as ios_pads
+    from kioku_platform.webview import prop
+
+    lib = load_library("GameController")
+
+    def const(name: str):
+        return ObjCInstance(ctypes.c_void_p(ctypes.c_void_p.in_dll(lib, name).value))
+
+    try:
+        virtual_cls = ObjCClass("GCVirtualController")
+    except NameError:
+        raise Skip("no GCVirtualController (iOS 15+)")
+    button_a, button_b = const("GCInputButtonA"), const("GCInputButtonB")
+    config = ObjCClass("GCVirtualControllerConfiguration").alloc().init()
+    config.setElements_(ObjCClass("NSSet").setWithArray_([button_a, button_b, const("GCInputDirectionPad")]))
+    virtual = virtual_cls.virtualControllerWithConfiguration_(config)
+    before = set(ios_pads._pads)
+    virtual.connectWithReplyHandler_(None)
+    try:
+        yield Until(lambda: any(e[0] == "connected" and e[3] for e in recorder.events), 10,
+                    "the virtual controller connected")
+        check(len(set(ios_pads._pads) - before) == 1, "Kioku didn't watch the virtual controller")
+        detail = "connected"
+        can_press = send_message(virtual, "respondsToSelector:", _sel("setValue:forButtonElement:"),
+                                 restype=ctypes.c_bool, argtypes=[ctypes.c_void_p])
+        if can_press:  # iOS 17+
+            for value in (1.0, 0.0):
+                send_message(virtual, "setValue:forButtonElement:", value, button_a.ptr,
+                             restype=None, argtypes=[ctypes.c_double, ctypes.c_void_p])
+                yield 0.3
+            yield Until(lambda: ("button", "A", False) in [e[:3] for e in recorder.events], 5,
+                        "button A down and up")
+            check(("button", "A", True) in [e[:3] for e in recorder.events], "no press of A")
+            detail += ", A pressed and released through Kioku's handler"
+        else:
+            # iOS 15/16: no way to press; read a snapshot through the handler
+            pad = list(ios_pads._pads.values())[-1]
+            snap = ios_pads._Pad(ObjCInstance(send_message(
+                pad.controller, "capture", restype=ctypes.c_void_p, argtypes=[])))
+            element = prop(snap.pad, "buttonA")
+            send_message(element, "setValue:", 1.0, restype=None, argtypes=[ctypes.c_float])
+            snap._changed(None, element)
+            snap.close()
+            check(("button", "A", True) in [e[:3] for e in recorder.events], "snapshot A not read")
+            detail += ", a snapshot's A read by Kioku's handler"
+    finally:
+        virtual.disconnect()
+    yield Until(lambda: any(e[0] == "connected" and not e[3] for e in recorder.events), 10,
+                "the virtual controller disconnected")
+    return detail
+
+
+def _sel(name: str) -> int:
+    import ctypes
+
+    objc = ctypes.CDLL("/usr/lib/libobjc.dylib")
+    objc.sel_registerName.restype = ctypes.c_void_p
+    objc.sel_registerName.argtypes = [ctypes.c_char_p]
+    return objc.sel_registerName(name.encode())
+
+
 def t_review_picture():
     """The media server hands web views the collection's files."""
     url = f"{mw.serverURL()}{MEDIA}"
@@ -892,6 +1084,8 @@ TESTS = [
     ("study", t_study),
     ("review", t_review),
     ("undo", t_undo),
+    ("gamepad", t_gamepad),
+    ("gamepad-native", t_gamepad_native),
     ("media-server", t_review_picture),
     ("statistics", t_stats),
     ("deck-options", t_deck_options),

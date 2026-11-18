@@ -105,7 +105,7 @@ public class KiokuBridge {
      */
     static volatile boolean pagesTouchable = true;
 
-    private static void event(JSONObject json) {
+    static void event(JSONObject json) {
         try {
             nativeEvent(json.toString());
         } catch (UnsatisfiedLinkError e) {
@@ -122,7 +122,7 @@ public class KiokuBridge {
         }
     }
 
-    private static JSONObject obj(Object... keyValues) {
+    static JSONObject obj(Object... keyValues) {
         JSONObject o = new JSONObject();
         try {
             for (int i = 0; i < keyValues.length; i += 2) {
@@ -212,6 +212,12 @@ public class KiokuBridge {
             case "lifecycle.watch":
                 watchLifecycle = a.getBoolean("on");
                 return true;
+            case "gamepad.watch":
+                KiokuGamepad.watch(a.getBoolean("on"));
+                return true;
+            // the in-app tests (shared/tests/app/suite.py): a controller's events
+            case "gamepad.test":
+                return onUiThread(() -> KiokuGamepad.test(a));
             // PDFs for PyQt6.QtPdf, from Python's worker threads
             case "pdf.open":
                 return pdfOpen(a.getString("path"));

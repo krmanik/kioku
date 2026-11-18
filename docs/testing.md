@@ -65,6 +65,8 @@ removes it at the end:
 | deck-list | the deck list shows the deck |
 | browse | search, row count, the editor page shows the selected note, Add over Browse is the active window |
 | study, review, undo | overview, the picture card's question with its picture drawn, the answer, Good (review logged, next card), undo |
+| gamepad | the default controls through kioku.gamepad into Anki's shortcuts: Down highlights the test deck, A opens it, A studies, B on the question does nothing, A shows the answer, B answers Again (review logged), L1 undoes it, View and B go back |
+| gamepad-native | Android: real `KeyEvent`s (source gamepad: A, Start, d-pad) and a joystick `MotionEvent` (stick, right stick, hat, trigger) through `KiokuActivity` reach Python; a keyboard's arrow is not taken. iOS: Apple's `GCVirtualController` connects and disconnects as a controller Kioku watches; A pressed through Kioku's handler (iOS 17+; older: a snapshot's A) |
 | media-server | the media server hands out the picture |
 | statistics, deck-options | the pages load through the API (graphs drawn, inputs present) |
 | export-apkg, export-csv, export-window | packages and notes exported; the Export window opens |
@@ -1244,3 +1246,78 @@ field's blur, and not after its `focusout` or for another element).
 
 Not run: Tab with a hardware keyboard on a real iPad, returning from a
 dialog or the HTML editor (the same blur and focus without a tap).
+
+## Gamepads and controllers (issue #18) (2026-11-18)
+
+New: `kioku/gamepad.py` (buttons → actions), iOS
+`kioku_platform/gamepad.py` (GameController framework), Android
+`KiokuGamepad.java` (key and motion events of gamepad sources, taken in
+`KiokuActivity.dispatchKeyEvent` / `dispatchGenericMotionEvent`).
+
+Host tests: `test_gamepad.py` (9: settings round trip, review buttons, deck
+list and overview, the same button from two sources, triggers and sticks,
+repeat only for moves, off, keyboard shortcut run in the window, dialog
+Tab/press/close, Buttons dialog); all 186 passed.
+
+iOS Simulator (iPhone 17 Pro Max, repo Python synced in). The simulator
+lists an MFi "Gamepad" controller; a live controller ignores `setValue:`,
+so the handler block Kioku installs was called with a `capture()` snapshot
+whose values were set:
+
+| Input (snapshot) | Reported |
+| --- | --- |
+| d-pad `setValueForXAxis:0 yAxis:-1` | Down pressed, the others up |
+| button A 1.0 | A pressed |
+| right stick y −0.8 | `right` 0, +0.8 (y flipped to "down is positive") |
+| left trigger 0.9 | `triggers` 0.9, 0 |
+
+Actions through the listener on the real app: Down highlights the deck
+(outline in Anki's focus colour), A opens it, A Study Now, A shows the
+answer, A answers Good, View back to the overview, B back to the deck
+list. Preferences › Advanced shows the Gamepad group ("Connected:
+Gamepad"); Buttons… opens; R1 moved the focus to a combo box; B closed the
+Buttons dialog, then Preferences. No errors in kioku.log.
+
+### Controls like AnkiDroid's (2026-11-18, later)
+
+Settings are per action (AnkiDroid's Settings › Controls), version 2 in
+`pm.meta["kioku_gamepad"]`: `{"version": 2, "enabled", "review": {action:
+["A@answer", …]}, "other": {…}}`. Press-to-bind (`ButtonPicker`: the
+next press goes to the dialog, not to an action), card side per binding,
+"now used for …; OK moves it here". Actions run Anki's own shortcuts
+(Space only on the question side; answer keys from `pm.get_answer_key`;
+R, M, E, *, -, =, @, !, Ctrl+1–4, I, O, V, Shift+V, 5; D, S, A, B, Y);
+Back, Undo and the scrolls call `moveToState`/`undo`/page JS.
+
+Host tests: `test_gamepad.py` (13, against a window with real QShortcuts
+like Anki's) and `test_gamepad_anki.py` (4): Anki 26.09.4's
+`Reviewer._shortcutKeys` and `AnkiQt.setupKeys` run with stand-ins, and
+every key Kioku uses must reach the expected method; `onStudyKey` on the
+overview studies; the deck rows Anki renders have the `tr.deck`/id,
+`.current`, `a.collapse` "+" and `a.deck` the highlight reads. All 194
+passed. **After an Anki update**, a failure here means kioku/gamepad.py
+needs a look.
+
+Samsung M30s (Android 11), dev build with `gamepad.test`:
+`apptest.py android --only gamepad,gamepad-native`: 6 passed (version,
+setup, add, gamepad, gamepad-native, cleanup). Through Android's own input
+pipeline (`adb shell input gamepad keyevent`): DPAD_DOWN highlighted a deck,
+a keyboard's DPAD_DOWN (`input keyevent`) didn't move it, BUTTON_A opened
+the deck, BUTTON_B went back. Controls dialog: list of actions with their
+buttons; Add Button… took a BUTTON_A / BUTTON_Y key event and said "Now
+used for “Good”" / "“Easy”". Fixed from the screenshots: PlayStation's
+✕ ○ □ △ were empty boxes in Android's font (now words), and the pressed
+button's large label stayed small (Android fonts have a pixel size).
+
+iPhone 15 Pro Max (iOS 27), dev build: `apptest.py ios --only
+gamepad,gamepad-native`: 6 passed; `gamepad-native` connected Apple's
+virtual controller ("Apple Touch Controller", its on-screen buttons
+shown) and pressed A with `setValue:forButtonElement:`, through
+GameController and Kioku's handler. Controls dialog (dark mode) with the
+virtual controller connected: Add Button… took a virtual Y press, "Now
+used for “Easy”"; Cancel left the settings unchanged; after disconnect
+no controller and no capture left.
+
+Not run: a real controller (none here). (Earlier, on the 2 GB emulator, Android's
+low-memory killer ended Kioku, ~1.2 GB PSS at idle, before any gamepad
+input.)

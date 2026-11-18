@@ -20,6 +20,7 @@
   - [AnkiDroid's Media](features/ankidroid.md)
   - [Remote Desktop (Termux)](features/remote-desktop.md)
   - [kioku:// Links](features/links.md)
+  - [Gamepads and Controllers](features/gamepad.md)
 - [Troubleshooting](troubleshooting.md)
 
 [FAQs](faqs.md)

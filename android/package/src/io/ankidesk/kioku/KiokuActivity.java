@@ -8,6 +8,8 @@ import android.os.Bundle;
 import android.system.ErrnoException;
 import android.system.Os;
 import android.util.Log;
+import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.WindowInsets;
 
 import org.qtproject.qt.android.bindings.QtActivity;
@@ -118,6 +120,17 @@ public class KiokuActivity extends QtActivity {
             }
         }
         f.delete();
+    }
+
+    // gamepads go to kioku.gamepad (KiokuGamepad), not to Qt or a web view
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        return KiokuGamepad.onKey(event) || super.dispatchKeyEvent(event);
+    }
+
+    @Override
+    public boolean dispatchGenericMotionEvent(MotionEvent event) {
+        return KiokuGamepad.onMotion(event) || super.dispatchGenericMotionEvent(event);
     }
 
     @Override
