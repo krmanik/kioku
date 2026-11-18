@@ -76,6 +76,22 @@ Upload / Files panel ◀───────────────▶ /config
   `/config/.cache/anki-ms-fonts`, and the next start fetches only the
   missing ones. `ANKI_MS_FONTS_URL` replaces the SourceForge address (a
   folder with the same `.exe` files).
+- **`INSTALL_PACKAGES`** (s6-rc oneshot `init-anki-packages`, running
+  `/usr/local/bin/anki-packages` as root after the base's `init-mods` and
+  before its `init-mods-package-install`): Debian packages for add-ons,
+  separated by spaces, commas or `|` (the separator of LinuxServer's
+  `universal-package-install` mod, which reads the same variable; both
+  together only install twice), `name=version` to pin one. The ones
+  `dpkg-query` doesn't show as installed (at that version) go on the
+  base's `/mod-repo-packages-to-install.list`, which its package-install
+  step installs with `apt-get update` and `apt-get install
+  --no-install-recommends` before the desktop starts. A restart of the same
+  container finds them installed and downloads nothing; a new container
+  installs them again. Words that aren't package names (an apt option, a
+  shell character) are skipped with a message. A failed install is logged
+  and Anki starts without it. Python packages for add-ons belong in the
+  add-on (Anki runs its own venv, `/opt/anki`), not in the mod's
+  `INSTALL_PIP_PACKAGES`, which installs into `/lsiopy`.
 - **Compose file:** `SELKIES_DESKTOP=true` (the base's taskbar, to switch
   between Anki's windows) and, commented out, `/dev/dri` for the server's
   GPU (the base then renders and encodes on it; without it everything is
@@ -96,7 +112,8 @@ script on Anki's main thread), and drives it through headless Chrome
 (`test/browser.mjs`): logging in, the first-run window seen in the stream
 and answered with the browser's keyboard, typing and clicking, Browse,
 a phone-size page (with `ANKI_FIT_SCREEN`: pages zoomed out, Browse
-maximized), the Microsoft fonts downloaded and seen by Anki, the taskbar, sound reaching PulseAudio, dialogs not maximized,
+maximized), the Microsoft fonts downloaded and seen by Anki, packages from
+`INSTALL_PACKAGES` installed once, the taskbar, sound reaching PulseAudio, dialogs not maximized,
 uploading a deck from the browser and importing it, downloading an export,
 syncing with Anki's sync server, quitting Anki, `docker stop` closing the
 collection, the data in a new container, and nginx and Caddy in front.

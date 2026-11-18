@@ -51,7 +51,7 @@ RUN \
 
 COPY root/ /
 RUN chmod 755 /usr/local/bin/anki-session /usr/local/bin/anki-close \
-    /usr/local/bin/anki-ms-fonts
+    /usr/local/bin/anki-ms-fonts /usr/local/bin/anki-packages
 
 EXPOSE 3000 3001
 VOLUME /config

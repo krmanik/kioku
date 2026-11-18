@@ -1,0 +1,35 @@
+#!/usr/bin/with-contenv bash
+# INSTALL_PACKAGES="ffmpeg imagemagick ..." (s6-rc's init-anki-packages,
+# before the base's init-mods-package-install): Debian packages that add-ons
+# need, without building another image. Names are separated by spaces,
+# commas or "|" (LinuxServer's universal-package-install mod uses "|"); a
+# version is pinned with "name=version". Only the ones not installed yet are
+# put on the base's list (/mod-repo-packages-to-install.list), which it
+# installs with apt-get before the desktop starts; when all are installed,
+# as after a restart of the same container, nothing is downloaded. A new
+# container (an image update) installs them again at its first start. A
+# failed install doesn't stop the container: Anki starts without them, and
+# the next start tries again.
+set -f
+[ -n "${INSTALL_PACKAGES//[[:space:],|]/}" ] || exit 0
+
+missing=()
+for pkg in ${INSTALL_PACKAGES//[,|]/ }; do
+    if ! [[ $pkg =~ ^[a-z0-9][a-z0-9+.-]*(:[a-z0-9-]+)?(=[A-Za-z0-9.+~:-]+)?$ ]]; then
+        echo "[anki-packages] not a package name, skipped: $pkg"
+        continue
+    fi
+    name=${pkg%%=*}
+    status=$(dpkg-query -W -f='${db:Status-Abbrev}|${Version}' "$name" 2>/dev/null)
+    if [[ $status == "ii |"* ]] && { [ "$name" = "$pkg" ] || [ "${status#*|}" = "${pkg#*=}" ]; }; then
+        continue
+    fi
+    missing+=("$pkg")
+done
+
+if [ ${#missing[@]} = 0 ]; then
+    echo "[anki-packages] already installed: $INSTALL_PACKAGES"
+    exit 0
+fi
+echo "[anki-packages] to install: ${missing[*]}"
+printf '%s\n' "${missing[@]}" >> /mod-repo-packages-to-install.list

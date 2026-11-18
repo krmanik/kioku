@@ -41,6 +41,9 @@ services:
       # download Microsoft's core fonts (Arial, Times New Roman, ...) on
       # the first start, for decks that use them; you accept their licence
       # ANKI_MS_FONTS: "true"
+      # Debian packages your add-ons need, installed when the container
+      # starts (only the first time: a restart finds them installed)
+      # INSTALL_PACKAGES: "imagemagick sox"
     # the server's GPU (Intel, AMD) instead of the CPU, for drawing and
     # the video; only if the server has /dev/dri
     # devices:
@@ -178,6 +181,7 @@ sideways for more room.
 | `TZ` | `Etc/UTC` | time zone (Anki's day starts by it) |
 | `ANKI_FIT_SCREEN` | | `true`: fit Anki on phones (above) |
 | `ANKI_MS_FONTS` | | `true`: download Microsoft's fonts ([Fonts](#fonts)) |
+| `INSTALL_PACKAGES` | | Debian packages to install ([Add-ons](#add-ons)) |
 | `SELKIES_DESKTOP` | | `true`: the taskbar |
 | `ANKI_ARGS` | | extra arguments for Anki |
 
@@ -196,7 +200,14 @@ for example to also use AnkiDroid or the Kioku apps.
 Add-ons run in Anki on the server, as on a Linux computer: install them from
 **Tools › Add-ons** as usual. Add-ons that only ship code for Windows or
 macOS don't work. `ffmpeg`, `ffprobe` and `ffplay` are installed, for
-add-ons that record, convert or play sound and video with them. To reach
+add-ons that record, convert or play sound and video with them. An add-on
+that needs another program can have it from Debian: list the packages in
+`INSTALL_PACKAGES`, separated by spaces (`INSTALL_PACKAGES: "imagemagick
+sox"`). They are installed when the container starts, before Anki, and
+again in a new container (after `docker compose pull`), which makes that
+start slower and needs Debian's servers; a restart finds them installed.
+If installing fails, Anki starts without them and the next start tries
+again (`docker compose logs` shows why). To reach
 an add-on's web server (such as AnkiConnect) from outside, make it listen
 on `0.0.0.0` in its settings and publish its port in `compose.yaml`.
 

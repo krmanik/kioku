@@ -54,6 +54,7 @@ start() {
         -e PUID="$(id -u)" -e PGID="$(id -g)" -e TZ=Asia/Kolkata \
         -e CUSTOM_USER=anki -e PASSWORD=$PASS -e ANKI_FIT_SCREEN=true \
         -e SELKIES_DESKTOP=true -e ANKI_MS_FONTS=true \
+        -e INSTALL_PACKAGES="jq, sqlite3|bad;name" \
         -v "$cfg:/config" "$IMAGE" >/dev/null
     for _ in $(seq 120); do
         [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:$PORT/)" = 401 ] && return 0
@@ -123,6 +124,14 @@ check "Anki has Arial and Webdings" '[ "$(echo "$out" | field arial)$(echo "$out
 check "Arial Greek falls back to Arial" \
     '[ "$(docker exec -u abc -e HOME=/config $NAME fc-match -f "%{family}" "Arial Greek")" = Arial ]'
 check "font installers removed after installing" '[ ! -e "$cfg/.cache/anki-ms-fonts" ]'
+# INSTALL_PACKAGES: installed before the desktop starts, once
+check "INSTALL_PACKAGES: jq and sqlite3 installed" \
+    'docker exec $NAME dpkg-query -W jq sqlite3 >/dev/null'
+check "INSTALL_PACKAGES: Anki finds them on the PATH" \
+    '[ "$(py "import shutil; out[\"w\"] = bool(shutil.which(\"jq\") and shutil.which(\"sqlite3\"))" | field w)" = True ]'
+check "INSTALL_PACKAGES: a bad name is skipped" 'docker logs $NAME 2>&1 | grep -qF "skipped: bad;name"'
+check "INSTALL_PACKAGES: nothing to install the next time" \
+    'docker exec $NAME /usr/local/bin/anki-packages | grep -q "already installed" && docker exec $NAME test ! -e /mod-repo-packages-to-install.list'
 check "SELKIES_DESKTOP: taskbar running" 'docker exec $NAME pgrep -f selkies-desktop >/dev/null'
 check "one anki-session" '[ "$(docker exec $NAME pgrep -fc "^/bin/bash /usr/local/bin/anki-session")" = 1 ]'
 

@@ -21,6 +21,9 @@ services:
       # download Microsoft's core fonts (Arial, Times New Roman, ...) on
       # the first start, for decks that use them; you accept their licence
       # ANKI_MS_FONTS: "true"
+      # Debian packages your add-ons need, installed when the container
+      # starts (only the first time: a restart finds them installed)
+      # INSTALL_PACKAGES: "imagemagick sox"
     # the server's GPU (Intel, AMD) instead of the CPU, for drawing and
     # the video; only if the server has /dev/dri
     # devices:
