@@ -296,6 +296,17 @@ EDITOR_JS = """(() => { window.__kt = {
   // where there is one (Blink), else the document's (WebKit)
   sel() { const r = this.field().getRootNode();
       return r.getSelection ? r.getSelection() : document.getSelection(); },
+  // move the focus to the second field, sending the first one's blur where
+  // focus() sends none (an Android WebView that was never tapped): before
+  // the selection moves, as a real blur comes
+  away() { const e = this.field(), o = this.eds()[1];
+      if (document.hasFocus()) return o.focus();
+      e.dispatchEvent(new FocusEvent('blur'));
+      e.dispatchEvent(new FocusEvent('focusout', {bubbles: true, composed: true}));
+      o.focus();
+      o.dispatchEvent(new FocusEvent('focus')); },
+  caret() { const s = this.sel();
+      return s.rangeCount ? {node: s.focusNode.nodeName, offset: s.focusOffset} : null; },
   // select characters a..b of the field's first text node
   select(a, b) { const t = this.text(); this.focus(); this.sel().setBaseAndExtent(t, a, t, b); },
   click(title) {
@@ -319,13 +330,8 @@ def kt(web: AnkiWebView, call: str) -> Js:
     return Js(web, f"window.__kt.{call}")
 
 
-def t_editor_formatting():
-    """The editor's toolbar on a selection inside a field. The fields live in
-    shadow roots, whose selection WebKit (iOS) reported on the shadow host:
-    the surround buttons did nothing and MathJax lost the text (issue #17,
-    kioku.webscripts.SHADOW_SELECTION)."""
-    from aqt.utils import tr
-
+def open_editor():
+    """The Add window, with EDITOR_JS on its editor page."""
     mw.col.decks.select(deck_id())
     mw.onAddCard()
     yield Until(lambda: windows_of("NewAddCards") or windows_of("AddCards"), 15, "Add window")
@@ -335,6 +341,9 @@ def t_editor_formatting():
     if chooser is None:
         raise Skip("new editor (no note type chooser)")
     first_notetype = chooser.selected_notetype_id
+    basic = col().models.by_name("Basic")["id"]
+    chooser.selected_notetype_id = basic
+    yield Until(lambda: win.editor.note is not None and win.editor.note.mid == basic, 15, "a Basic note")
     fields = 0
     for _ in range(40):
         fields = yield Js(web, EDITOR_JS)
@@ -342,6 +351,28 @@ def t_editor_formatting():
             break
         yield 0.5
     check((fields or 0) >= 2, f"{fields} fields in the editor page")
+    return win, web, chooser, first_notetype
+
+
+def close_editor(win, web, chooser, first_notetype):
+    """Empty the field and close the Add window, as open_editor found it."""
+    yield kt(web, "set('')")
+    yield 0.3
+    win.editor.note.fields[0] = ""
+    chooser.selected_notetype_id = first_notetype
+    yield 0.5
+    close_window(win)
+    yield Until(lambda: not windows_of(type(win).__name__), 10, "Add window closed")
+
+
+def t_editor_formatting():
+    """The editor's toolbar on a selection inside a field. The fields live in
+    shadow roots, whose selection WebKit (iOS) reported on the shadow host:
+    the surround buttons did nothing and MathJax lost the text (issue #17,
+    kioku.webscripts.SHADOW_SELECTION)."""
+    from aqt.utils import tr
+
+    win, web, chooser, first_notetype = yield from open_editor()
 
     def apply(html: str, title: str, menu_item: str = ""):
         """Put html in the first field, select "hello", press the button."""
@@ -427,14 +458,45 @@ def t_editor_formatting():
         check((state.get("html") or "").startswith("{{c1::hello}}"), f"cloze: field is {state.get('html')!r}")
         done.append("cloze")
 
-    yield kt(web, "set('')")
-    yield 0.3
-    win.editor.note.fields[0] = ""
-    chooser.selected_notetype_id = first_notetype
-    yield 0.5
-    close_window(win)
-    yield Until(lambda: not windows_of(type(win).__name__), 10, "Add window closed")
+    yield from close_editor(win, web, chooser, first_notetype)
     return ", ".join(done)
+
+
+# a dozen buttons, each a few round trips to the page: a minute on a slow
+# emulator
+t_editor_formatting.timeout = 90.0
+
+
+def t_editor_caret():
+    """The caret stays where it was when a field gets the focus back without
+    a tap (Tab from the next field, back from a dialog). WebKit (iOS) empties
+    the selection before the field's blur, where Anki saves it: the caret
+    went to the end of the field (kioku.webscripts.SHADOW_SELECTION)."""
+    win, web, chooser, first_notetype = yield from open_editor()
+    yield kt(web, "set('hello world')")
+    yield 0.3
+    yield kt(web, "select(3, 3)")
+    yield 0.2
+    yield kt(web, "away()")
+    yield 0.4
+    yield kt(web, "focus()")
+    yield 0.4
+    caret = (yield kt(web, "caret()")) or {}
+    check(caret == {"node": "#text", "offset": 3},
+          f"caret after the field got the focus back is {caret}, expected offset 3 in the text")
+    # and a selection made backwards
+    yield kt(web, "select(8, 2)")
+    yield 0.2
+    yield kt(web, "away()")
+    yield 0.4
+    yield kt(web, "focus()")
+    yield 0.4
+    state = (yield kt(web, "state()")) or {}
+    caret = (yield kt(web, "caret()")) or {}
+    check(state.get("selected") == "llo wo" and caret.get("offset") == 2,
+          f"selection after the field got the focus back is {state.get('selected')!r}, focus at {caret}")
+    yield from close_editor(win, web, chooser, first_notetype)
+    return "caret and a backward selection kept"
 
 
 def t_browse():
@@ -824,6 +886,7 @@ TESTS = [
     ("add", t_add_notes),
     ("add-window", t_add_window),
     ("editor-formatting", t_editor_formatting),
+    ("editor-caret", t_editor_caret),
     ("deck-list", t_deck_browser),
     ("browse", t_browse),
     ("study", t_study),
@@ -885,7 +948,7 @@ class Runner:
         name, fn = self.tests[self.index]
         self.name = name
         self.started = time.monotonic()
-        self.deadline = self.started + STEP_TIMEOUT
+        self.deadline = self.started + getattr(fn, "timeout", STEP_TIMEOUT)
         try:
             self.gen = fn()
         except Exception as err:  # noqa: BLE001
@@ -921,7 +984,7 @@ class Runner:
             return
         if time.monotonic() > self.deadline:
             self.gen.close()
-            self.finish("fail", f"took longer than {STEP_TIMEOUT:.0f} s")
+            self.finish("fail", f"took longer than {self.deadline - self.started:.0f} s")
             return
         if isinstance(item, Until):
             self.wait_until(item, time.monotonic() + item.timeout)

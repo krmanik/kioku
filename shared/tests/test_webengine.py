@@ -385,6 +385,10 @@ def test_stand_ins_have_every_web_engine_name_anki_uses() -> None:
 # positions, addRange() ignores ranges inside the tree (issue #17)
 SHADOW_PAGE = """
 globalThis.window = globalThis;
+const listeners = {};
+function listen(name, fn) { (listeners[name] = listeners[name] || []).push(fn); }
+function fire(name, event) { (listeners[name] || []).forEach(fn => fn(event)); }
+globalThis.addEventListener = listen;
 class ShadowRoot { constructor(host) { this.host = host; this.activeElement = null; } }
 class Node {
   constructor(name, root) { this.nodeName = name; this.root = root; this.childNodes = []; }
@@ -394,7 +398,9 @@ const doc = {};
 const host = new Node("DIV", doc);
 host.shadowRoot = new ShadowRoot(host);
 const text = new Node("#text", host.shadowRoot);
-host.shadowRoot.activeElement = new Node("ANKI-EDITABLE", host.shadowRoot);
+const field = new Node("ANKI-EDITABLE", host.shadowRoot);
+field.contains = n => n === text;
+host.shadowRoot.activeElement = field;
 class Range {
   setStart(n, o) { this.startContainer = n; this.startOffset = o; }
   setEnd(n, o) { this.endContainer = n; this.endOffset = o; }
@@ -403,7 +409,7 @@ class Range {
 const real = {startContainer: text, startOffset: 0, endContainer: text, endOffset: 5, collapsed: false};
 const calls = [];
 class Selection {
-  get rangeCount() { return 1; }
+  get rangeCount() { return globalThis.nativeCount ?? 1; }
   get anchorNode() { return host; }
   get anchorOffset() { return 0; }
   get focusNode() { return host; }
@@ -415,9 +421,14 @@ class Selection {
   setBaseAndExtent(a, ao, b, bo) { calls.push(["setBaseAndExtent", a.nodeName, ao, b.nodeName, bo]); }
 }
 const sel = new Selection();
-Object.assign(doc, {activeElement: host, getSelection: () => sel, createRange: () => new Range()});
+Object.assign(doc, {activeElement: host, getSelection: () => sel, createRange: () => new Range(),
+                   addEventListener: listen});
 Object.assign(globalThis, {document: doc, Selection, ShadowRoot});
 %s
+%s
+"""
+
+SHADOW_RANGE = """
 const r = sel.getRangeAt(0);
 const inner = new Range(); inner.setStart(text, 1); inner.setEnd(text, 3);
 sel.addRange(inner);
@@ -430,8 +441,32 @@ console.log(JSON.stringify({
 """
 
 
-def run_shadow_page(prefix: str = "") -> dict:
-    js = SHADOW_PAGE % (prefix + webscripts.SHADOW_SELECTION)
+# WebKit empties the selection before a field's blur: during the blur it
+# reports where it last was in the field, and nothing once the blur is over
+# or for an element it wasn't in
+SHADOW_BLUR = """
+const seen = [];
+function look() {
+  seen.push(sel.rangeCount ? [sel.rangeCount, sel.getRangeAt(0).startContainer.nodeName,
+                              sel.anchorOffset, sel.focusOffset] : 0);
+}
+fire("selectionchange");
+globalThis.nativeCount = 0;
+look();
+fire("blur", {composedPath: () => [field]});
+look();
+fire("focusout");
+look();
+const other = new Node("INPUT", doc);
+other.contains = () => false;
+fire("blur", {composedPath: () => [other]});
+look();
+console.log(JSON.stringify(seen));
+"""
+
+
+def run_shadow_page(prefix: str = "", scenario: str = SHADOW_RANGE):
+    js = SHADOW_PAGE % (prefix + webscripts.SHADOW_SELECTION, scenario)
     return json.loads(subprocess.run(["node", "-e", js], capture_output=True, text=True, check=True).stdout)
 
 
@@ -450,6 +485,10 @@ def test_shadow_selection_is_off_where_shadow_roots_have_their_own() -> None:
     out = run_shadow_page("ShadowRoot.prototype.getSelection = () => null;\n")
     assert out["range"] == ["DIV", 0, "DIV", 0]
     assert out["calls"] == ["addRange", "addRange"]
+
+
+def test_shadow_selection_reports_the_selection_during_blur() -> None:
+    assert run_shadow_page(scenario=SHADOW_BLUR) == [0, [1, "#text", 0, 5], 0, 0]
 
 
 def test_shadow_selection_script_is_installed(platform) -> None:

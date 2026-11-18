@@ -8,6 +8,8 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
   italic, underline, superscript, subscript, text colour, highlight and
   remove formatting. MathJax and cloze keep the selected text
   ([issue #17](https://github.com/krmanik/kioku/issues/17)).
+- iOS: a field keeps its caret when it gets the focus back without a tap
+  (Tab with a keyboard, back from a dialog); the caret went to the end.
 - Self-hosted server (Docker): FFmpeg is in the image, so add-ons that
   use `ffmpeg`, `ffprobe` or `ffplay` work without installing it
   ([issue #15](https://github.com/krmanik/kioku/issues/15)).

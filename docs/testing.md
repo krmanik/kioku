@@ -61,6 +61,7 @@ removes it at the end:
 | add | adds Basic and Cloze notes, one with a picture |
 | add-window | Add window: the note's text reaches the editor page, Add saves it to the deck, the editor clears; `activeWindow()` is Add |
 | editor-formatting | Add window: on a selection in a field, bold, italic, underline, superscript, subscript (on and off again), text colour, highlight, remove formatting, MathJax inline, cloze (Cloze note); underline at the caret, then a typed letter is underlined |
+| editor-caret | Add window: a field that gets the focus back without a tap (after the next field had it) keeps its caret, and a backward selection |
 | deck-list | the deck list shows the deck |
 | browse | search, row count, the editor page shows the selected note, Add over Browse is the active window |
 | study, review, undo | overview, the picture card's question with its picture drawn, the answer, Good (review logged, next card), undo |
@@ -1175,7 +1176,7 @@ the fix (sim, the same test page actions):
 | Cloze (Cloze note) | — | `{{c1::hello}} world` | works |
 | Underline at the caret, then typing (iOS: real keyboard input through `WKContentView insertText:`) | typed text not underlined | `hello world<u>XY</u>` | works |
 | Backward selection (anchor after focus) | — | `anchorOffset` 5, `focusOffset` 0, underline applied | — |
-| Caret restore when a field gets the focus without a tap | caret at the end | caret at the end: WebKit empties the selection before `blur` (`rangeCount` 0), so Anki saves nothing; a tap places the caret itself | — |
+| Caret restore when a field gets the focus without a tap | caret at the end | caret at the end: WebKit empties the selection before `blur` (`rangeCount` 0), so Anki saves nothing; a tap places the caret itself (fixed later the same day, below) | — |
 
 New in-app test `editor-formatting` (above): passes on the iOS simulator and
 the Android emulator; fails on the simulator without the fix (`b: field is
@@ -1190,3 +1191,30 @@ for it staying off where shadow roots have `getSelection`.
 Not run: a real iPhone or iPad (taps on the toolbar), the web version in
 Safari, iOS 17/18 (`getComposedRanges` takes shadow roots as arguments
 there; the script tries that form when the options form throws).
+
+### Caret restore (2026-11-18, later)
+
+Same simulator and emulator. The new in-app test `editor-caret` puts the
+caret at offset 3 of "hello world", moves the focus to the next field and
+back with `focus()` (no tap), and reads the caret; then the same with a
+backward selection (8 → 2).
+
+| | Before (iOS) | After (iOS) | Android |
+| --- | --- | --- | --- |
+| Caret after the field gets the focus back | end of the field (`ANKI-EDITABLE`/1) | `#text`/3 | `#text`/3 |
+| Backward selection | — | "llo wo", focus at 2 | "llo wo", focus at 2 |
+
+Android needed the field's blur sent before `focus()` on the next field:
+Blink moves the selection to the next field with `focus()`, and a blur sent
+after that saved the wrong place (a real blur comes first).
+
+`editor-formatting` took 56 s on an emulator slowed by a busy host (load
+average 7): it now has a 90 s budget (a test function's `timeout`), the
+others keep 45 s. Results: simulator full suite and crash sweep 50 passed;
+emulator 49 passed, 1 failed: `browse` took longer than 45 s, also with
+the suite from before this change (57 s after an editor test, 10 s on its
+own). Host tests: 175 passed (node test for the selection reported during a
+field's blur, and not after its `focusout` or for another element).
+
+Not run: Tab with a hardware keyboard on a real iPad, returning from a
+dialog or the HTML editor (the same blur and focus without a tap).

@@ -113,6 +113,10 @@ PRELUDE = r"""
 # each field in a shadow root, so underline, bold and the other surround
 # buttons left the text as it was (GitHub issue #17). Report the real
 # positions (getComposedRanges) and select with setBaseAndExtent, which work.
+# WebKit also empties the selection before a field's blur, where Anki saves
+# the caret to put it back when the field gets the focus without a tap (Tab,
+# back from a dialog): it went to the end of the field. During a field's blur
+# the selection reports where it last was in that field.
 # Blink has ShadowRoot.getSelection and Anki uses that, so this stays off.
 SHADOW_SELECTION = r"""
 (function () {
@@ -149,6 +153,10 @@ SHADOW_SELECTION = r"""
     }
     // the real range when the selection is inside a shadow tree, else null
     function composed(sel) {
+        if (sel === document.getSelection() && blurring) return blurring;
+        return live(sel);
+    }
+    function live(sel) {
         if (sel !== document.getSelection() || !native.rangeCount.call(sel)) return null;
         var rs = roots(sel);
         if (!rs.length) return null;
@@ -163,8 +171,36 @@ SHADOW_SELECTION = r"""
         return c;
     }
     function backward(sel) {
-        return sel.direction === "backward";
+        return blurring ? blurring.backward : sel.direction === "backward";
     }
+    // where the selection last was in each shadow root, and the one reported
+    // while a field in that root gets its blur
+    var last = new WeakMap(), blurring = null;
+    function remember() {
+        if (blurring) return;
+        var sel = document.getSelection(), c = sel && live(sel);
+        if (c) last.set(c.startContainer.getRootNode(), {
+            startContainer: c.startContainer, startOffset: c.startOffset,
+            endContainer: c.endContainer, endOffset: c.endOffset,
+            collapsed: c.collapsed, backward: sel.direction === "backward"
+        });
+    }
+    document.addEventListener("selectionchange", remember);
+    window.addEventListener("keydown", remember, true);  // Tab before it moves on
+    function done() { blurring = null; }
+    window.addEventListener("blur", function (event) {
+        var field = event.composedPath()[0];
+        if (!field || field === window || !field.getRootNode) return;
+        var sel = document.getSelection(), here = sel && live(sel);
+        if (here && field.contains(here.startContainer)) return;
+        var saved = last.get(field.getRootNode());
+        if (!saved || !field.contains(saved.startContainer)
+                || !field.contains(saved.endContainer)) return;
+        blurring = saved;
+        setTimeout(done, 0);
+    }, true);
+    window.addEventListener("focusout", done);  // after the blur's listeners
+    window.addEventListener("focus", done, true);
     proto.getRangeAt = function (index) {
         var c = index === 0 && composed(this);
         if (!c) return getRangeAt.apply(this, arguments);
@@ -182,6 +218,13 @@ SHADOW_SELECTION = r"""
         }
         return addRange.apply(this, arguments);
     };
+    Object.defineProperty(proto, "rangeCount", {
+        configurable: true, enumerable: true,
+        get: function () {
+            var n = native.rangeCount.call(this);
+            return !n && this === document.getSelection() && blurring ? 1 : n;
+        }
+    });
     function define(name, fromComposed) {
         Object.defineProperty(proto, name, {
             configurable: true, enumerable: true,
