@@ -4,6 +4,10 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
 
 ## 0.2.9
 
+- iOS: the editor's formatting buttons work on selected text: bold,
+  italic, underline, superscript, subscript, text colour, highlight and
+  remove formatting. MathJax and cloze keep the selected text
+  ([issue #17](https://github.com/krmanik/kioku/issues/17)).
 - Self-hosted server (Docker): FFmpeg is in the image, so add-ons that
   use `ffmpeg`, `ffprobe` or `ffplay` work without installing it
   ([issue #15](https://github.com/krmanik/kioku/issues/15)).

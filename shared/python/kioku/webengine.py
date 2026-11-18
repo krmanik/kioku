@@ -642,6 +642,7 @@ class QWebEnginePage(QObject, _Lenient):
             # token (WKWebView; on Android the bridge and the token script still run in every frame)
             (platform.WebView.BRIDGE, start, True),
             (webscripts.PRELUDE, start, True),
+            (webscripts.SHADOW_SELECTION, start, True),
             (webscripts.VIEWPORT, end, True),
         ]
         headers = self._profile._headers_for(_media_server_url(), api=True)

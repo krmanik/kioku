@@ -378,3 +378,83 @@ def test_stand_ins_have_every_web_engine_name_anki_uses() -> None:
                 used.setdefault(name, os.path.relpath(path, aqt_dir))
     missing = {n: where for n, where in used.items() if n not in provided}
     assert not missing, f"used by aqt but not in kioku.webengine: {missing}"
+
+
+# A WebKit-like page for SHADOW_SELECTION: document.getSelection() reports a
+# selection inside a shadow root on its host, getComposedRanges() the real
+# positions, addRange() ignores ranges inside the tree (issue #17)
+SHADOW_PAGE = """
+globalThis.window = globalThis;
+class ShadowRoot { constructor(host) { this.host = host; this.activeElement = null; } }
+class Node {
+  constructor(name, root) { this.nodeName = name; this.root = root; this.childNodes = []; }
+  getRootNode() { return this.root; }
+}
+const doc = {};
+const host = new Node("DIV", doc);
+host.shadowRoot = new ShadowRoot(host);
+const text = new Node("#text", host.shadowRoot);
+host.shadowRoot.activeElement = new Node("ANKI-EDITABLE", host.shadowRoot);
+class Range {
+  setStart(n, o) { this.startContainer = n; this.startOffset = o; }
+  setEnd(n, o) { this.endContainer = n; this.endOffset = o; }
+  get collapsed() { return this.startContainer === this.endContainer && this.startOffset === this.endOffset; }
+}
+const real = {startContainer: text, startOffset: 0, endContainer: text, endOffset: 5, collapsed: false};
+const calls = [];
+class Selection {
+  get rangeCount() { return 1; }
+  get anchorNode() { return host; }
+  get anchorOffset() { return 0; }
+  get focusNode() { return host; }
+  get focusOffset() { return 0; }
+  get isCollapsed() { return true; }
+  getRangeAt() { const r = new Range(); r.setStart(host, 0); r.setEnd(host, 0); return r; }
+  getComposedRanges(opts) { return opts.shadowRoots.includes(host.shadowRoot) ? [real] : []; }
+  addRange(r) { calls.push("addRange"); }
+  setBaseAndExtent(a, ao, b, bo) { calls.push(["setBaseAndExtent", a.nodeName, ao, b.nodeName, bo]); }
+}
+const sel = new Selection();
+Object.assign(doc, {activeElement: host, getSelection: () => sel, createRange: () => new Range()});
+Object.assign(globalThis, {document: doc, Selection, ShadowRoot});
+%s
+const r = sel.getRangeAt(0);
+const inner = new Range(); inner.setStart(text, 1); inner.setEnd(text, 3);
+sel.addRange(inner);
+sel.addRange(r === null ? null : (() => { const o = new Range(); o.setStart(host, 0); o.setEnd(host, 0); return o; })());
+console.log(JSON.stringify({
+  range: [r.startContainer.nodeName, r.startOffset, r.endContainer.nodeName, r.endOffset],
+  anchor: [sel.anchorNode.nodeName, sel.anchorOffset], focus: [sel.focusNode.nodeName, sel.focusOffset],
+  collapsed: sel.isCollapsed, calls,
+}));
+"""
+
+
+def run_shadow_page(prefix: str = "") -> dict:
+    js = SHADOW_PAGE % (prefix + webscripts.SHADOW_SELECTION)
+    return json.loads(subprocess.run(["node", "-e", js], capture_output=True, text=True, check=True).stdout)
+
+
+def test_shadow_selection_reports_the_real_range() -> None:
+    assert run_shadow_page() == {
+        "range": ["#text", 0, "#text", 5],
+        "anchor": ["#text", 0],
+        "focus": ["#text", 5],
+        "collapsed": False,
+        "calls": [["setBaseAndExtent", "#text", 1, "#text", 3], "addRange"],
+    }
+
+
+def test_shadow_selection_is_off_where_shadow_roots_have_their_own() -> None:
+    # Blink: Anki uses ShadowRoot.getSelection, nothing to fix
+    out = run_shadow_page("ShadowRoot.prototype.getSelection = () => null;\n")
+    assert out["range"] == ["DIV", 0, "DIV", 0]
+    assert out["calls"] == ["addRange", "addRange"]
+
+
+def test_shadow_selection_script_is_installed(platform) -> None:
+    page = webengine.QWebEnginePage()
+    installed: list[tuple] = []
+    page._web.set_user_scripts = installed.extend
+    page.setHtml("<p>x</p>")
+    assert (webscripts.SHADOW_SELECTION, webscripts.AT_DOCUMENT_START, True) in installed

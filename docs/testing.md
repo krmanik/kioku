@@ -60,6 +60,7 @@ removes it at the end:
 | version, profile | Anki is `ANKI_TAG`; a profile and collection are open |
 | add | adds Basic and Cloze notes, one with a picture |
 | add-window | Add window: the note's text reaches the editor page, Add saves it to the deck, the editor clears; `activeWindow()` is Add |
+| editor-formatting | Add window: on a selection in a field, bold, italic, underline, superscript, subscript (on and off again), text colour, highlight, remove formatting, MathJax inline, cloze (Cloze note); underline at the caret, then a typed letter is underlined |
 | deck-list | the deck list shows the deck |
 | browse | search, row count, the editor page shows the selected note, Add over Browse is the active window |
 | study, review, undo | overview, the picture card's question with its picture drawn, the answer, Good (review logged, next card), undo |
@@ -1157,3 +1158,35 @@ Not run: opening the menu bar on screen and using it with touch or a
 pointer, hardware keyboard shortcuts through the key commands (⌘Z, ⌘P), the
 iPad app on a Mac, a real iPad, iPadOS 18 (the module only checks that
 `UIMainMenuSystem` is missing there).
+
+## Editor formatting on iOS (issue #17) (2026-11-18)
+
+iOS Simulator, iPad Pro 13-inch (M5), iPadOS 27.0 (sim app with the repo's
+Python synced in); Android emulator, Android 13, WebView Chrome 109. Before
+the fix (sim, the same test page actions):
+
+| Action on "hello" selected in a field | Before (iOS) | After (iOS) | Android |
+| --- | --- | --- | --- |
+| `getRangeAt(0)` | `DIV/0–DIV/0` (field's host, collapsed) | `#text/0–#text/5` | (uses the shadow root's selection) |
+| Bold, italic, underline, superscript, subscript | unchanged | `<b>hello</b> world` …, selection kept; pressed again: removed | works |
+| Text colour, highlight | unchanged | `<span style="color: …">hello</span>` / `background-color` | works |
+| Remove formatting on `<b>hello</b>` | unchanged | `hello world` | works |
+| Equations › MathJax inline | MathJax inserted empty, the text lost | `data-mathjax="hello"` | works |
+| Cloze (Cloze note) | — | `{{c1::hello}} world` | works |
+| Underline at the caret, then typing (iOS: real keyboard input through `WKContentView insertText:`) | typed text not underlined | `hello world<u>XY</u>` | works |
+| Backward selection (anchor after focus) | — | `anchorOffset` 5, `focusOffset` 0, underline applied | — |
+| Caret restore when a field gets the focus without a tap | caret at the end | caret at the end: WebKit empties the selection before `blur` (`rangeCount` 0), so Anki saves nothing; a tap places the caret itself | — |
+
+New in-app test `editor-formatting` (above): passes on the iOS simulator and
+the Android emulator; fails on the simulator without the fix (`b: field is
+'hello world'`). Android needed two test-only measures: a WebView that was
+never tapped has no focus, and a field's `focus()` then fires no focus
+events (the toolbar stays disabled), so the test sends them; Blink's
+`execCommand('insertText')` fires no `beforeinput`, so the keystroke is a
+`beforeinput` event. Full simulator suite and crash sweep: 49 passed. Host
+tests: 174 passed, with node tests for the script on a WebKit-like page and
+for it staying off where shadow roots have `getSelection`.
+
+Not run: a real iPhone or iPad (taps on the toolbar), the web version in
+Safari, iOS 17/18 (`getComposedRanges` takes shadow roots as arguments
+there; the script tries that form when the options form throws).

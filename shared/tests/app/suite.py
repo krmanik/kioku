@@ -275,6 +275,168 @@ def t_add_window():
     return "typed text reached the page, Add saved it to the deck, editor cleared"
 
 
+# Helpers for the editor page, kept on window between evaluations. Buttons are
+# found by their tooltip (translated: the titles come from Python's tr).
+EDITOR_JS = """(() => { window.__kt = {
+  eds: () => [...document.querySelectorAll('.rich-text-editable')]
+      .map(h => h.shadowRoot && h.shadowRoot.querySelector('anki-editable')).filter(Boolean),
+  field() { return this.eds()[0]; },
+  // focus the field. An Android WebView that was never tapped doesn't have
+  // the focus, and its page then gets no focus events from focus(): the
+  // editor's buttons stayed disabled. Send the events a tap would have.
+  focus() { const e = this.field(); e.focus();
+      if (!document.hasFocus()) {
+          e.dispatchEvent(new FocusEvent('focus'));
+          e.dispatchEvent(new FocusEvent('focusin', {bubbles: true, composed: true}));
+      } },
+  set(html) { const e = this.field(); this.focus(); e.innerHTML = html;
+      e.dispatchEvent(new Event('input', {bubbles: true})); },
+  text() { return document.createTreeWalker(this.field(), NodeFilter.SHOW_TEXT).nextNode(); },
+  // the selection as Anki gets it (cross-browser.ts): the shadow root's
+  // where there is one (Blink), else the document's (WebKit)
+  sel() { const r = this.field().getRootNode();
+      return r.getSelection ? r.getSelection() : document.getSelection(); },
+  // select characters a..b of the field's first text node
+  select(a, b) { const t = this.text(); this.focus(); this.sel().setBaseAndExtent(t, a, t, b); },
+  click(title) {
+      const b = [...document.querySelectorAll('button')].find(b => (b.title || '').startsWith(title));
+      if (!b) return 'no button ' + title;
+      b.click(); return 'ok'; },
+  item(label) {
+      const i = [...document.querySelectorAll('button, .dropdown-item')]
+          .find(b => (b.textContent || '').trim().startsWith(label));
+      if (!i) return 'no menu item ' + label;
+      i.click(); return 'ok'; },
+  html() { return this.field().innerHTML.replace(/<br>$/, ''); },
+  state() { const s = this.sel();
+      return {html: this.html(), selected: String(s),
+              range: s.rangeCount ? s.getRangeAt(0).startContainer.nodeName : '',
+              anchor: s.anchorNode ? s.anchorNode.nodeName : ''}; },
+}; return window.__kt.eds().length; })()"""
+
+
+def kt(web: AnkiWebView, call: str) -> Js:
+    return Js(web, f"window.__kt.{call}")
+
+
+def t_editor_formatting():
+    """The editor's toolbar on a selection inside a field. The fields live in
+    shadow roots, whose selection WebKit (iOS) reported on the shadow host:
+    the surround buttons did nothing and MathJax lost the text (issue #17,
+    kioku.webscripts.SHADOW_SELECTION)."""
+    from aqt.utils import tr
+
+    mw.col.decks.select(deck_id())
+    mw.onAddCard()
+    yield Until(lambda: windows_of("NewAddCards") or windows_of("AddCards"), 15, "Add window")
+    win = (windows_of("NewAddCards") or windows_of("AddCards"))[0]
+    web = win.editor.web
+    chooser = getattr(win, "notetype_chooser", None)
+    if chooser is None:
+        raise Skip("new editor (no note type chooser)")
+    first_notetype = chooser.selected_notetype_id
+    fields = 0
+    for _ in range(40):
+        fields = yield Js(web, EDITOR_JS)
+        if (fields or 0) >= 2:
+            break
+        yield 0.5
+    check((fields or 0) >= 2, f"{fields} fields in the editor page")
+
+    def apply(html: str, title: str, menu_item: str = ""):
+        """Put html in the first field, select "hello", press the button."""
+        yield kt(web, f"set({json.dumps(html)})")
+        yield 0.3
+        yield kt(web, "select(0, 5)")
+        yield 0.1
+        clicked = yield kt(web, f"click({json.dumps(title)})")
+        check(clicked == "ok", str(clicked))
+        if menu_item:
+            yield 0.4
+            clicked = yield kt(web, f"item({json.dumps(menu_item)})")
+            check(clicked == "ok", str(clicked))
+        yield 0.4
+        return (yield kt(web, "state()")) or {}
+
+    done = []
+    for tag, title in [
+        ("b", tr.editing_bold_text()),
+        ("i", tr.editing_italic_text()),
+        ("u", tr.editing_underline_text()),
+        ("sup", tr.editing_superscript()),
+        ("sub", tr.editing_subscript()),
+    ]:
+        state = yield from apply("hello world", title)
+        want = f"<{tag}>hello</{tag}> world"
+        check(state.get("html") == want, f"{tag}: field is {state.get('html')!r}, expected {want!r}")
+        check(state.get("selected") == "hello", f"{tag}: selection is {state.get('selected')!r} after the button")
+        check(state.get("range") == "#text", f"{tag}: getRangeAt(0) starts in {state.get('range')!r}, not the text")
+        # pressing it again on the same selection removes it
+        yield kt(web, f"click({json.dumps(title)})")
+        yield 0.4
+        html = yield kt(web, "html()")
+        check(html == "hello world", f"{tag} off: field is {html!r}")
+        done.append(tag)
+
+    for name, prop, title in [
+        ("text color", "color", tr.editing_text_color()),
+        ("highlight", "background-color", tr.editing_text_highlight_color()),
+    ]:
+        state = yield from apply("hello world", title)
+        html = state.get("html") or ""
+        check(html.startswith('<span style="' + prop + ":") and html.endswith(">hello</span> world"),
+              f"{name}: field is {html!r}")
+        done.append(name)
+
+    state = yield from apply("<b>hello</b> world", tr.editing_remove_formatting())
+    check(state.get("html") == "hello world", f"remove formatting: field is {state.get('html')!r}")
+    done.append("remove formatting")
+
+    state = yield from apply("hello world", tr.editing_equations(), tr.editing_mathjax_inline())
+    check('data-mathjax="hello"' in (state.get("html") or ""),
+          f"MathJax inline: field is {(state.get('html') or '')[:120]!r}")
+    done.append("MathJax")
+
+    # underline at a caret, then type: the typed text is underlined. The
+    # keystroke is the beforeinput event Anki handles (it inserts the text
+    # itself); execCommand fires none in Blink.
+    yield kt(web, "set('hello world')")
+    yield 0.3
+    yield kt(web, "select(11, 11)")
+    yield 0.1
+    yield kt(web, f"click({json.dumps(tr.editing_underline_text())})")
+    yield 0.3
+    yield kt(web, "field().dispatchEvent(new InputEvent('beforeinput', "
+                  "{inputType: 'insertText', data: 'X', bubbles: true, cancelable: true}))")
+    yield 0.4
+    html = yield kt(web, "html()")
+    check(html == "hello world<u>X</u>", f"underline at the caret, then typing: field is {html!r}")
+    done.append("caret")
+
+    # the cloze button wraps the selection (a Cloze note's text field)
+    cloze = col().models.by_name("Cloze")
+    if cloze:
+        chooser.selected_notetype_id = cloze["id"]
+        yield Until(lambda: win.editor.note is not None and win.editor.note.mid == cloze["id"], 15, "a Cloze note")
+        for _ in range(20):
+            fields = yield Js(web, EDITOR_JS)
+            if fields:
+                break
+            yield 0.5
+        state = yield from apply("hello world", tr.editing_cloze_deletion())
+        check((state.get("html") or "").startswith("{{c1::hello}}"), f"cloze: field is {state.get('html')!r}")
+        done.append("cloze")
+
+    yield kt(web, "set('')")
+    yield 0.3
+    win.editor.note.fields[0] = ""
+    chooser.selected_notetype_id = first_notetype
+    yield 0.5
+    close_window(win)
+    yield Until(lambda: not windows_of(type(win).__name__), 10, "Add window closed")
+    return ", ".join(done)
+
+
 def t_browse():
     browser = aqt.dialogs.open("Browser", mw)
     yield Until(lambda: windows_of("Browser"), 15, "Browse window")
@@ -661,6 +823,7 @@ TESTS = [
     ("setup", t_setup),
     ("add", t_add_notes),
     ("add-window", t_add_window),
+    ("editor-formatting", t_editor_formatting),
     ("deck-list", t_deck_browser),
     ("browse", t_browse),
     ("study", t_study),

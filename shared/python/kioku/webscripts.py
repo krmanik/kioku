@@ -106,7 +106,100 @@ PRELUDE = r"""
 })();
 """
 
-VIEWPORT_META = '<meta name="viewport" content="width=device-width, initial-scale=1">'
+# WebKit (WKWebView, Safari) has no ShadowRoot.getSelection, and
+# document.getSelection() reports a selection inside a shadow tree retargeted
+# to the shadow host: getRangeAt() gave a collapsed range on the field's host
+# and addRange() of a range inside the tree did nothing. Anki's editor keeps
+# each field in a shadow root, so underline, bold and the other surround
+# buttons left the text as it was (GitHub issue #17). Report the real
+# positions (getComposedRanges) and select with setBaseAndExtent, which work.
+# Blink has ShadowRoot.getSelection and Anki uses that, so this stays off.
+SHADOW_SELECTION = r"""
+(function () {
+    var proto = window.Selection && Selection.prototype;
+    if (!proto || !proto.getComposedRanges || !window.ShadowRoot
+            || ShadowRoot.prototype.getSelection || proto.__kiokuShadow) return;
+    proto.__kiokuShadow = true;
+    function getter(name) {
+        return Object.getOwnPropertyDescriptor(proto, name).get;
+    }
+    var getRangeAt = proto.getRangeAt, addRange = proto.addRange;
+    var native = {
+        anchorNode: getter("anchorNode"), anchorOffset: getter("anchorOffset"),
+        focusNode: getter("focusNode"), focusOffset: getter("focusOffset"),
+        isCollapsed: getter("isCollapsed"), rangeCount: getter("rangeCount")
+    };
+    // the open shadow roots the selection may be in: down from the focused
+    // element, and down from the node the retargeted range points at
+    function roots(sel) {
+        var found = [];
+        function down(node) {
+            while (node && node.shadowRoot && found.indexOf(node.shadowRoot) < 0) {
+                found.push(node.shadowRoot);
+                node = node.shadowRoot.activeElement;
+            }
+        }
+        down(document.activeElement);
+        if (native.rangeCount.call(sel)) {
+            var r = getRangeAt.call(sel, 0);
+            down(r.startContainer);
+            down(r.startContainer.childNodes[r.startOffset]);
+        }
+        return found;
+    }
+    // the real range when the selection is inside a shadow tree, else null
+    function composed(sel) {
+        if (sel !== document.getSelection() || !native.rangeCount.call(sel)) return null;
+        var rs = roots(sel);
+        if (!rs.length) return null;
+        var c;
+        try { c = sel.getComposedRanges({shadowRoots: rs}); }
+        catch (e) {
+            try { c = sel.getComposedRanges.apply(sel, rs); }  // Safari 17
+            catch (e2) { return null; }
+        }
+        c = c && c[0];
+        if (!c || !(c.startContainer.getRootNode() instanceof ShadowRoot)) return null;
+        return c;
+    }
+    function backward(sel) {
+        return sel.direction === "backward";
+    }
+    proto.getRangeAt = function (index) {
+        var c = index === 0 && composed(this);
+        if (!c) return getRangeAt.apply(this, arguments);
+        var range = document.createRange();
+        range.setStart(c.startContainer, c.startOffset);
+        range.setEnd(c.endContainer, c.endOffset);
+        return range;
+    };
+    proto.addRange = function (range) {
+        if (this === document.getSelection() && range
+                && range.startContainer.getRootNode() instanceof ShadowRoot) {
+            this.setBaseAndExtent(range.startContainer, range.startOffset,
+                                  range.endContainer, range.endOffset);
+            return;
+        }
+        return addRange.apply(this, arguments);
+    };
+    function define(name, fromComposed) {
+        Object.defineProperty(proto, name, {
+            configurable: true, enumerable: true,
+            get: function () {
+                var c = composed(this);
+                return c ? fromComposed(c, backward(this)) : native[name].call(this);
+            }
+        });
+    }
+    define("anchorNode", function (c, b) { return b ? c.endContainer : c.startContainer; });
+    define("anchorOffset", function (c, b) { return b ? c.endOffset : c.startOffset; });
+    define("focusNode", function (c, b) { return b ? c.startContainer : c.endContainer; });
+    define("focusOffset", function (c, b) { return b ? c.startOffset : c.endOffset; });
+    define("isCollapsed", function (c) { return c.collapsed; });
+})();
+"""
+
+VIEWPORT_META ='<meta name="viewport" content="width=device-width, initial-scale=1">'
 
 PHONE_CSS_ID = "kioku-phone"
 # add-on tables under the deck list (Anki Leaderboard: 7 columns that don't
