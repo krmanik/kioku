@@ -11,6 +11,11 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
 - Self-hosted server (Docker): FFmpeg is in the image, so add-ons that
   use `ffmpeg`, `ffprobe` or `ffplay` work without installing it
   ([issue #15](https://github.com/krmanik/kioku/issues/15)).
+- Self-hosted server (Docker): `INSTALL_PACKAGES` installs Debian
+  packages that add-ons need when the container starts, such as
+  `INSTALL_PACKAGES: "imagemagick sox"`. A restart finds them installed
+  and downloads nothing
+  ([issue #15](https://github.com/krmanik/kioku/issues/15)).
 - Phones with a narrow screen (such as 720 px wide ones) or a larger
   interface size: the main screen fits the screen. The top bar, the
   deck list and the buttons under it were shifted right and cut off
