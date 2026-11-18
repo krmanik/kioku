@@ -13,6 +13,12 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
   ([issue #14](https://github.com/krmanik/kioku/issues/14)).
 - iOS, Android: add-ons with a hidden page, such as Contanki, no longer
   leave a white box over the top left of the main window.
+- Phones: the top bar's buttons wrap to a second row when their labels
+  are too long for the screen (Russian, German). They ran off both sides.
+- iOS: no crash after shaking the device and choosing Undo. Shake to
+  undo and the three-finger undo gestures are off; use Anki's Undo
+  (Edit menu or Cmd-Z).
+- iPad: no crash on a touch after using an Apple Pencil.
 - iOS, Android: `kioku://` links let other apps and Shortcuts add notes,
   sync and search, with AnkiMobile's actions and parameters
   ([kioku:// links](features/links.md)).

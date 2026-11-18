@@ -3,6 +3,7 @@ audio and UIKit helpers, all through rubicon-objc."""
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any
 
@@ -54,6 +55,13 @@ def prepare() -> None:
         import truststore._api  # noqa: F401
     finally:
         platform.system, platform.mac_ver = system, mac_ver
+
+    try:
+        from .keys import disable_undo_gestures
+
+        disable_undo_gestures()
+    except Exception:
+        logging.getLogger("kioku").exception("undo gestures")
 
 
 def dev_allowed() -> bool:

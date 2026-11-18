@@ -1092,3 +1092,35 @@ it is allowed, then works.
 
 Not run: Shortcuts on the iPhone, Tasker or another automation app on
 Android, iPad.
+
+## TestFlight feedback round: crashes and the top bar (2026-11-18)
+
+Feedback and crash reports from Xcode's Organizer (its local copy; the App
+Store Connect API refused with "a required agreement is missing or has
+expired"). Crash logs symbolicated with the 0.2.8 (215) archive's dSYM
+(`ios/build/xcode-dist`).
+
+iOS Simulator (iPhone SE, 375 pt), app built by `tools/run_sim.sh` with Qt
+rebuilt from source with all `ios/patches/qios-*.patch`; device library
+(`tools/build_qt_plugin.sh`) builds with no new warnings. Fake touches: a
+rubicon `UITouch` subclass (`type` 2 = Pencil, `phase` settable) sent to the
+main `QUIMetalView` with `touchesBegan:withEvent:`.
+
+| Test | Result |
+| --- | --- |
+| `applicationSupportsShakeToEdit`, `QIOSViewController.editingInteractionConfiguration` after a cold start | False, 0 (none); set in `prepare()`, before the first web view (its hook is the first one registered) |
+| Pencil touch begins, its end never sent, touch released by Python; then a second Pencil touch begins and ends | no crash; the second touch is taken (no "ignoring additional Pencil") |
+| Same, first touch still active | Qt's "ignoring additional Pencil while first is still active", no crash |
+| Qt text field focused, unfocused, input method reset; then the window's undo manager's undo and redo | no crash |
+| Top bar with Russian labels (swapped in by script), 375 pt | two balanced rows (3 + 2), bar height follows; deck list fits, its options column scrolls sideways as before |
+| Top bar in headless Chrome, 420/375/360 px: Russian, German, English, with and without an add-on button | nothing past the edges; English stays one row |
+| Host tests (`shared/tests/run.sh`) | all pass |
+
+Not run: a real Pencil (iPad), a real shake (the Simulator here has no
+window), a text responder freed while Qt has no focus window (UIKit kept the
+responder alive in every attempt, so `qios-undo-freed-responder.patch` is
+tested only for doing no harm), Android.
+
+Seen, not changed: the Samsung M30s's WebView is Chrome 87 (never updated),
+which has no CSS `:has()`; none of `PHONE_CSS`'s rules apply there (its deck
+list runs off the right edge). Current WebViews (Chrome 105+) have it.

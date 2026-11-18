@@ -14,6 +14,11 @@ the page first responder again, which reactivates its window, as before the
 tap, and goes to Qt; the page gets it too if Qt doesn't take it. Qt offers
 no key commands while it has no active window. A text field in a page keeps
 every key.
+
+The system's undo gestures (shaking the device, three-finger swipes) are
+off: they undo through UIKit's undo manager, where Qt's text responder
+leaves actions aimed at itself after it is freed, and choosing Undo then
+crashed the app. Anki's own Undo (Edit menu, Cmd-Z) is unaffected.
 """
 
 from __future__ import annotations
@@ -38,11 +43,16 @@ _objc.class_getInstanceMethod.restype = c_void_p
 _objc.class_getInstanceMethod.argtypes = [c_void_p, c_void_p]
 _objc.method_setImplementation.restype = c_void_p
 _objc.method_setImplementation.argtypes = [c_void_p, c_void_p]
+_objc.class_addMethod.restype = c_bool
+_objc.class_addMethod.argtypes = [c_void_p, c_void_p, c_void_p, c_char_p]
 
 # -[UIResponder pressesBegan:withEvent:] and the like
 _PRESSES = ctypes.CFUNCTYPE(None, c_void_p, c_void_p, c_void_p, c_void_p)
 # -[UIResponder keyCommands]
 _GETTER = ctypes.CFUNCTYPE(c_void_p, c_void_p, c_void_p)
+# -[UIResponder editingInteractionConfiguration]
+_INTEGER_GETTER = ctypes.CFUNCTYPE(ctypes.c_long, c_void_p, c_void_p)
+UI_EDITING_INTERACTION_NONE = 0
 
 # QEvent::Type
 KEY_PRESS = 6
@@ -146,6 +156,37 @@ def _replace(cls_name: bytes, name: str, kind: Any, handler: Any) -> None:
     _originals[name] = kind(original)
 
 
+def _no_editing_interactions(controller: int, cmd: int) -> int:
+    return UI_EDITING_INTERACTION_NONE
+
+
+_undo_gestures_off = False
+
+
+def disable_undo_gestures() -> None:
+    """At start-up (kioku_platform.prepare), before the first window with a
+    text field (profiles, first-run language)."""
+    global _undo_gestures_off
+    if _undo_gestures_off:
+        return
+    from . import _app
+
+    _app().setApplicationSupportsShakeToEdit_(False)
+    # UIKit asks the view controllers for the three-finger gestures: Qt's
+    # doesn't override the getter, so add it there (not to UIResponder,
+    # which would turn them off in web pages' text fields too)
+    cls = _objc.objc_getClass(b"QIOSViewController")
+    if not cls:
+        logger.warning("no QIOSViewController: undo gestures stay on")
+        return
+    hook = _INTEGER_GETTER(_no_editing_interactions)
+    _hooks.append(hook)
+    sel = _objc.sel_registerName(b"editingInteractionConfiguration")
+    if not _objc.class_addMethod(cls, sel, ctypes.cast(hook, c_void_p), b"q@:"):
+        _objc.method_setImplementation(_objc.class_getInstanceMethod(cls, sel), ctypes.cast(hook, c_void_p))
+    _undo_gestures_off = True
+
+
 def install() -> None:
     global _no_commands
     if _originals:
@@ -159,3 +200,7 @@ def install() -> None:
     }.items():
         _replace(b"WKContentView", name, _PRESSES, handler)
     _replace(b"QIOSViewController", "keyCommands", _GETTER, _key_commands)
+    try:
+        disable_undo_gestures()
+    except Exception:
+        logger.exception("undo gestures")

@@ -1,0 +1,54 @@
+diff --git a/src/plugins/platforms/ios/qiostextresponder.mm b/src/plugins/platforms/ios/qiostextresponder.mm
+--- a/src/plugins/platforms/ios/qiostextresponder.mm
++++ b/src/plugins/platforms/ios/qiostextresponder.mm
+@@ -335,6 +335,11 @@
+ @implementation QIOSTextInputResponder {
+     QString m_markedText;
+     BOOL m_inSelectionChange;
++    // The undo manager holding the dummy actions aimed at this responder.
++    // self.undoManager comes from the focus window and is nil when there is
++    // none, e.g. while a system alert is up: dealloc then left the actions
++    // behind, and UIKit's Undo (shake to undo) messaged a freed responder
++    NSUndoManager *m_registeredUndoManager;
+ }
+ 
+ - (instancetype)initWithInputContext:(QT_PREPEND_NAMESPACE(QIOSInputContext) *)inputContext
+@@ -429,6 +434,8 @@
+     self.inputView = 0;
+     self.inputAccessoryView = 0;
+     [self.undoManager removeAllActions];
++    [m_registeredUndoManager removeAllActionsWithTarget:self];
++    [m_registeredUndoManager release];
+ 
+     [super dealloc];
+ }
+@@ -564,11 +571,21 @@
+ {
+     [self sendShortcut:QKeySequence::Redo];
+     [self rebuildUndoStack];
++}
++
++- (void)rememberUndoManager:(NSUndoManager *)undoMgr
++{
++    if (undoMgr == m_registeredUndoManager)
++        return;
++    [m_registeredUndoManager removeAllActionsWithTarget:self];
++    [m_registeredUndoManager release];
++    m_registeredUndoManager = [undoMgr retain];
+ }
+ 
+ - (void)registerRedo
+ {
+     NSUndoManager *undoMgr = self.undoManager;
++    [self rememberUndoManager:undoMgr];
+     [undoMgr beginUndoGrouping];
+     [undoMgr registerUndoWithTarget:self selector:@selector(redo) object:nil];
+     [undoMgr endUndoGrouping];
+@@ -582,6 +599,7 @@
+         // will treat registerUndoWithTarget as registering a redo when called
+         // from within a undo callback.
+         NSUndoManager *undoMgr = self.undoManager;
++        [self rememberUndoManager:undoMgr];
+         [undoMgr removeAllActions];
+ 
+         [undoMgr beginUndoGrouping];

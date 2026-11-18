@@ -1,0 +1,50 @@
+diff --git a/src/plugins/platforms/ios/quiview.mm b/src/plugins/platforms/ios/quiview.mm
+--- a/src/plugins/platforms/ios/quiview.mm
++++ b/src/plugins/platforms/ios/quiview.mm
+@@ -148,6 +148,7 @@
+ {
+     [m_accessibleElements release];
+     [m_scrollGestureRecognizer release];
++    [m_activePencilTouch release];
+ 
+     [super dealloc];
+ }
+@@ -498,11 +499,21 @@
+     for (UITouch *touch in touches) {
+ #if QT_CONFIG(tabletevent)
+         if (touch.type == UITouchTypeStylus) {
++            // The view keeps the Pencil's touch until it ends. A touch whose
++            // end never reached the view (it left the window meanwhile) is
++            // over: drop it rather than ignoring the Pencil from now on
++            if (m_activePencilTouch && (m_activePencilTouch.phase == UITouchPhaseEnded
++                                        || m_activePencilTouch.phase == UITouchPhaseCancelled)) {
++                [m_activePencilTouch release];
++                m_activePencilTouch = nil;
++            }
+             if (Q_UNLIKELY(m_activePencilTouch)) {
+                 qWarning("ignoring additional Pencil while first is still active");
+                 continue;
+             }
+-            m_activePencilTouch = touch;
++            // retained: UIKit frees a touch once it ends, and an unretained
++            // pointer left behind crashed the next touch ([touches containsObject:])
++            m_activePencilTouch = [touch retain];
+         } else
+         {
+             Q_ASSERT(!m_activeTouches.contains(touch.hash));
+@@ -541,6 +552,7 @@
+     for (UITouch *touch in touches) {
+ #if QT_CONFIG(tabletevent)
+         if (touch.type == UITouchTypeStylus) {
++            [m_activePencilTouch release];
+             m_activePencilTouch = nil;
+         } else
+ #endif
+@@ -584,6 +596,7 @@
+         qWarning("Subset of active touches cancelled by UIKit");
+ 
+     m_activeTouches.clear();
++    [m_activePencilTouch release];
+     m_activePencilTouch = nil;
+ 
+     ulong timestamp = event ? getTimeStamp(event) : ([[NSProcessInfo processInfo] systemUptime] * 1000);

@@ -133,9 +133,15 @@ PHONE_CSS = (
     "  table:has(.decktd) td, table:has(.decktd) th { padding-left: 4px !important; padding-right: 4px !important; }"
     "  body:has(.decktd) { margin-left: 0.5em; margin-right: 0.5em; }"
     f"  body:has(.decktd) table:not(:has(.decktd)):not(table:has(.decktd) table) {{ {WIDE_TABLE} }}"
-    # add-on buttons in the top bar (right-tray) covered Sync: share one row
-    # with the links, or wrap to a second one
-    "  .header:has(.tray-item) { display: flex; flex-wrap: wrap; justify-content: center; align-items: start; }"
+    # the top bar's links (Decks, Add, Browse, Stats, Sync) didn't wrap and
+    # sat in the middle third of a grid: long labels (Russian: Синхронизация)
+    # ran off both sides of the screen. Add-on buttons (right-tray) covered
+    # Sync. Links and add-on buttons share one row, or wrap to a second one
+    "  .header:has(> .toolbar) { display: flex; flex-wrap: wrap; justify-content: center; align-items: start; }"
+    "  .header > .toolbar { white-space: normal; text-wrap: balance; text-align: center; max-width: 100%; }"
+    "  .header > .toolbar .hitem { padding-left: 8px; padding-right: 8px; }"
+    "  body.fancy .header > .toolbar .hitem:first-child { padding-left: 12px; }"
+    "  body.fancy .header > .toolbar .hitem:last-child { padding-right: 12px; }"
     "  .header:has(.tray-item) .hitem { padding-left: 6px; padding-right: 6px; }"
     "  .header .tray-item { margin-left: 2px !important; margin-right: 2px !important; }"
     # add-on pop-ups made with tippy.js (AMBOSS: 480-550px wide) ran off the
