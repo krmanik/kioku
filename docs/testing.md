@@ -1123,9 +1123,35 @@ window), a text responder freed while Qt has no focus window (UIKit kept the
 responder alive in every attempt, so `qios-undo-freed-responder.patch` is
 tested only for doing no harm), Android.
 
-Seen, not changed: the Samsung M30s's WebView is Chrome 87 (never updated),
-which has no CSS `:has()`; none of `PHONE_CSS`'s rules apply there (its deck
-list runs off the right edge). Current WebViews (Chrome 105+) have it.
+Seen here: the Samsung M30s's WebView is Chrome 87 (never updated),
+which has no CSS `:has()`; none of `PHONE_CSS`'s rules applied there (its
+deck list ran off the right edge). Fixed below ("Deck list on WebViews
+without `:has()`").
+
+## Deck list on WebViews without `:has()` (2026-11-18)
+
+`PHONE_CSS` rules come twice: with `:has()` and with classes that
+`VIEWPORT` sets when the WebView has no `:has()`. New `webscripts.py` was
+hot-loaded into the running app (exec into the module, deck list
+refreshed). "Fallback" = the same file with `:has(` renamed to an unknown
+pseudo-class, so only the class rules can apply (what Chrome 87 sees).
+Measured in the page: window width, deck table left/right edge.
+
+| Device | `:has()` rules | Fallback |
+| --- | --- | --- |
+| Samsung M30s, Android 11, WebView 87 (real, no `:has()`) | before: table 15–533 px in a page wider than the screen, Learn cut off, Due off screen | table fits, all columns on screen |
+| Emulator API 33, WebView 109, 412 dp | 69–343 of 412 | same, `kioku-decks` set |
+| Emulator at 720×1280 @ 320 dpi (360 dp) | 42–318 of 360 | same |
+| iPad Pro 13-inch (M5) sim, iPadOS 26.4 | 257–775 of 1032 (wide layout, phone CSS off) | same |
+| iPhone 17 Pro Max sim, iOS 26.4 | 81–359 of 440 | same |
+| iPhone SE (3rd gen) sim "Kioku narrow" | 48–327 of 375 | same |
+| Host tests | all pass, new `test_phone_css.py` | |
+
+Emulator gotcha: with its default 2 GB, Kioku_API33 got Kioku killed by
+the low-memory killer while the deck list loaded; a cold boot with
+`-memory 4096` and swiftshader crashed Kioku at its first paint
+(`QOpenGLProgramBinaryCache::save`, SIGSEGV), twice. A cold boot with
+`-memory 4096 -gpu host` worked.
 
 ## iPad menu bar (iPadOS 26) (2026-11-18)
 

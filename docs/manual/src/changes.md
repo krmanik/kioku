@@ -22,6 +22,9 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
   interface size: the main screen fits the screen. The top bar, the
   deck list and the buttons under it were shifted right and cut off
   ([issue #14](https://github.com/krmanik/kioku/issues/14)).
+- Android phones with an older system WebView (before Chrome 105, such
+  as Android 11's built-in one without updates): the deck list fits the
+  screen again; its Learn and Due columns ran off the right side.
 - iOS, Android: add-ons with a hidden page, such as Contanki, no longer
   leave a white box over the top left of the main window.
 - Phones: the top bar's buttons wrap to a second row when their labels

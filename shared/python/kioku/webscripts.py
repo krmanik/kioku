@@ -11,6 +11,7 @@ small BRIDGE script first that defines window.__kiokuNative:
 
 import json
 import re
+from string import Template
 
 # Event names used with __kiokuNative.send()
 CONSOLE = "console"
@@ -252,46 +253,75 @@ WIDE_TABLE = "display: block; width: fit-content; max-width: 100%; box-sizing: b
 # the same in add-ons' shadow roots on the deck list page (Anki Leaderboard
 # draws its table in one), which PHONE_CSS doesn't reach
 SHADOW_CSS = "@media (max-width: 600px) { :host table:not(table table) { %s } }" % WIDE_TABLE
-PHONE_CSS = (
-    "html { -webkit-text-size-adjust: 100%; }"
+# Rules below pick elements with :has(), which WebViews before Chrome 105
+# don't know (Android 11's built-in WebView 87, when its updates are
+# removed): they dropped those rules and the deck list ran off the screen.
+# There VIEWPORT marks the same elements with classes, and each rule that
+# uses $deck_table etc. comes twice: with :has() and with the classes.
+_HAS = {
+    "deck_table": "table:has(.decktd)",
+    "deck_html": "html:has(.decktd)",
+    "deck_body": "body:has(.decktd)",
+    "other_table": "body:has(.decktd) table:not(:has(.decktd)):not(table:has(.decktd) table)",
+    "toolbar_header": ".header:has(> .toolbar)",
+    "tray_header": ".header:has(.tray-item)",
+}
+_MARKED = {
+    "deck_table": "table.kioku-decks",
+    "deck_html": "html.kioku-decks",
+    "deck_body": "html.kioku-decks body",
+    "other_table": "table.kioku-wide",
+    "toolbar_header": ".header.kioku-toolbar",
+    "tray_header": ".header.kioku-tray",
+}
+
+
+def _rule(rule: str) -> str:
+    if "$" not in rule:
+        return rule
+    return Template(rule).substitute(_HAS) + Template(rule).substitute(_MARKED)
+
+
+PHONE_CSS = "".join(_rule(r) for r in (
+    "html { -webkit-text-size-adjust: 100%; }",
     # add-on columns (Mature/Young, progress bars) made the deck list wider
     # than a phone, and the whole page panned sideways: the list scrolls
     # sideways inside its own box instead. It is the containing block of
     # add-on hover tooltips in its cells (Enhance main window), which
     # otherwise made the page 1800px wide; whatever else pokes out by a few
     # px (Review Heatmap's tooltip) is clipped.
-    "table:has(.decktd) { display: block; position: relative; width: fit-content; max-width: 100%; box-sizing: border-box; overflow-x: auto; margin: 0 auto; }"
-    "html:has(.decktd) { overflow-x: clip; }"
-    "@media (max-width: 600px) {"
-    "  table:has(.decktd) { padding: 0.5rem; max-width: 100%; }"
-    "  table:has(.decktd) .decktd { min-width: 6em; max-width: calc(100vw - 13em); }"
-    "  table:has(.decktd) .count { min-width: 2em; }"
-    "  table:has(.decktd) td, table:has(.decktd) th { padding-left: 4px !important; padding-right: 4px !important; }"
-    "  body:has(.decktd) { margin-left: 0.5em; margin-right: 0.5em; }"
-    f"  body:has(.decktd) table:not(:has(.decktd)):not(table:has(.decktd) table) {{ {WIDE_TABLE} }}"
+    "$deck_table { display: block; position: relative; width: fit-content; max-width: 100%; box-sizing: border-box; overflow-x: auto; margin: 0 auto; }",
+    "$deck_html { overflow-x: hidden; overflow-x: clip; }",
+    "@media (max-width: 600px) {",
+    "  $deck_table { padding: 0.5rem; max-width: 100%; }",
+    "  $deck_table .decktd { min-width: 6em; max-width: calc(100vw - 13em); }",
+    "  $deck_table .count { min-width: 2em; }",
+    "  $deck_table td, $deck_table th { padding-left: 4px !important; padding-right: 4px !important; }",
+    "  $deck_body { margin-left: 0.5em; margin-right: 0.5em; }",
+    f"  $other_table {{ {WIDE_TABLE} }}",
     # the top bar's links (Decks, Add, Browse, Stats, Sync) didn't wrap and
     # sat in the middle third of a grid: long labels (Russian: Синхронизация)
     # ran off both sides of the screen. Add-on buttons (right-tray) covered
     # Sync. Links and add-on buttons share one row, or wrap to a second one
-    "  .header:has(> .toolbar) { display: flex; flex-wrap: wrap; justify-content: center; align-items: start; }"
-    "  .header > .toolbar { white-space: normal; text-wrap: balance; text-align: center; max-width: 100%; }"
-    "  .header > .toolbar .hitem { padding-left: 8px; padding-right: 8px; }"
-    "  body.fancy .header > .toolbar .hitem:first-child { padding-left: 12px; }"
-    "  body.fancy .header > .toolbar .hitem:last-child { padding-right: 12px; }"
-    "  .header:has(.tray-item) .hitem { padding-left: 6px; padding-right: 6px; }"
-    "  .header .tray-item { margin-left: 2px !important; margin-right: 2px !important; }"
+    "  $toolbar_header { display: flex; flex-wrap: wrap; justify-content: center; align-items: start; }",
+    "  .header > .toolbar { white-space: normal; text-wrap: balance; text-align: center; max-width: 100%; }",
+    "  .header > .toolbar .hitem { padding-left: 8px; padding-right: 8px; }",
+    "  body.fancy .header > .toolbar .hitem:first-child { padding-left: 12px; }",
+    "  body.fancy .header > .toolbar .hitem:last-child { padding-right: 12px; }",
+    "  $tray_header .hitem { padding-left: 6px; padding-right: 6px; }",
+    "  .header .tray-item { margin-left: 2px !important; margin-right: 2px !important; }",
     # add-on pop-ups made with tippy.js (AMBOSS: 480-550px wide) ran off the
     # screen, which doesn't scroll sideways
-    "  .tippy-popper { max-width: calc(100vw - 16px) !important; }"
-    "  .tippy-popper .tippy-tooltip { min-width: 0 !important; max-width: calc(100vw - 16px) !important; }"
-    "  .tippy-popper img { max-width: 100%; height: auto; }"
-    "}"
+    "  .tippy-popper { max-width: calc(100vw - 16px) !important; }",
+    "  .tippy-popper .tippy-tooltip { min-width: 0 !important; max-width: calc(100vw - 16px) !important; }",
+    "  .tippy-popper img { max-width: 100%; height: auto; }",
+    "}",
     # a tap leaves :hover on the tapped element until the next tap elsewhere,
     # so the top bar's Decks/Add/Browse/Stats kept their hover border
-    "@media (hover: none) {"
-    "  .header .hitem:hover { border-color: transparent; }"
-    "}"
-)
+    "@media (hover: none) {",
+    "  .header .hitem:hover { border-color: transparent; }",
+    "}",
+))
 
 
 def _head_start(html: str) -> int:
@@ -380,7 +410,36 @@ VIEWPORT = r"""
             }
         });
     }
+    // Without :has() (WebView before Chrome 105) PHONE_CSS finds the deck
+    // list, the other tables beside it and the top bar by these classes.
+    var hasHas = false;
+    try { hasHas = CSS.supports("selector(:has(a))"); } catch (e) {}
+    function mark(el, name, on) {
+        if (el.classList.contains(name) !== on) el.classList.toggle(name, on);
+    }
+    function markForOldWebView() {
+        if (hasHas) return;
+        var decks = !!document.querySelector(".decktd");
+        mark(document.documentElement, "kioku-decks", decks);
+        document.querySelectorAll("table").forEach(function (table) {
+            var deckTable = !!table.querySelector(".decktd");
+            mark(table, "kioku-decks", deckTable);
+            // document order: tables around this one are marked already
+            var parent = table.parentElement;
+            mark(table, "kioku-wide", decks && !deckTable &&
+                 !(parent && parent.closest("table.kioku-decks")));
+        });
+        document.querySelectorAll(".header").forEach(function (header) {
+            var toolbar = false;
+            for (var i = 0; i < header.children.length; i++) {
+                if (header.children[i].classList.contains("toolbar")) toolbar = true;
+            }
+            mark(header, "kioku-toolbar", toolbar);
+            mark(header, "kioku-tray", !!header.querySelector(".tray-item"));
+        });
+    }
     function fit() {
+        markForOldWebView();
         fitCharts();
         fitShadowTables();
     }
