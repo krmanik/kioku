@@ -11,6 +11,13 @@
 - **The main window** (deck list, overview, reviewer) fills the screen, with
   Anki's menu bar at the top: **File, Edit, View, Tools, Help** and add-on
   menus.
+  - iPad with iPadOS 26 or later: Anki's menus are also in the iPad's own
+    menu bar (swipe down from the top of the screen, or move the pointer
+    there), with their ⌘, ⌃ and ⌥ shortcuts. Browse's menus are there while
+    Browse is open. If you keep the iPad's menu bar on screen (iPadOS 27:
+    Settings › Multitasking & Gestures, **Automatically Show and Hide Menu
+    Bar** off), turn off **View › Show Menu Row** to have the menus only
+    once. Kioku remembers it; turn it back on from the iPad's View menu.
 - **Every other window** (Browse, Add, Statistics, Preferences, Deck Options…)
   opens full screen on top, with a title bar.
 - **Closing a window:**
@@ -42,6 +49,12 @@ To leave it, **swipe right** on the screen and tap **Exit Full Screen**
 (or **Cancel** to stay in full screen).
 Kioku reminds you of this for a few seconds when you enter full screen.
 On a page that scrolls sideways, scroll it back to its left edge first.
+
+On an iPad with iPadOS 26 or later this item is called **View › Hide
+Toolbars**: it hides Anki's bars, but the iPad doesn't let apps resize
+their window. To make the window fill the screen, use the iPad's **Window ›
+Full Screen**. To get the bars back, choose **View › Show Toolbars** in the
+iPad's menu bar (or press F11); a swipe right there is the iPad's own.
 
 <img src="../images/ios-full-screen.png" width="200" alt="Full screen: after a swipe right, Kioku asks Exit full screen? with Cancel and Exit Full Screen">
 

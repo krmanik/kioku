@@ -20,6 +20,9 @@ from aqt.qt import QMessageBox, Qt
 
 GUIDE_SECONDS = 5
 TIP = "Swipe right to exit full screen"
+# off on the iPad: a swipe from the left edge shows its window list there,
+# and its menu bar (View › Show Toolbars) is always at hand (patches.py)
+SWIPE = True
 COMMAND = "kioku:swipe-right"
 
 # A quick, mostly sideways swipe of one finger to the right that scrolls
@@ -76,7 +79,17 @@ def apply() -> None:
         show_menubar(self)
 
     def toggle_with_guide(self: Any) -> None:
-        toggle(self)
+        app = self.app
+        if app.activeWindow() is None:
+            # Anki toggles app.activeWindow(), and there is none while the
+            # iPad's menu bar has the focus: toggle the main window then
+            app.activeWindow = lambda: self
+            try:
+                toggle(self)
+            finally:
+                del app.activeWindow
+        else:
+            toggle(self)
         if self.fullscreen:
             aqt.utils.tooltip(TIP, period=GUIDE_SECONDS * 1000, parent=self)
         else:
@@ -95,14 +108,15 @@ def _leave(mw: Any) -> None:
 
 
 def _add_swipe(web_content: Any, context: Any) -> None:
-    web_content.head += SWIPE_RIGHT
+    if SWIPE:
+        web_content.head += SWIPE_RIGHT
 
 
 def _on_message(handled: tuple[bool, Any], message: str, context: Any) -> tuple[bool, Any]:
     if message != COMMAND:
         return handled
     mw = aqt.mw
-    if mw is not None and mw.fullscreen:
+    if SWIPE and mw is not None and mw.fullscreen:
         _confirm(mw)
     return (True, None)
 

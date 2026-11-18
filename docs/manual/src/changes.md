@@ -19,6 +19,13 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
   undo and the three-finger undo gestures are off; use Anki's Undo
   (Edit menu or Cmd-Z).
 - iPad: no crash on a touch after using an Apple Pencil.
+- iPad (iPadOS 26): the iPad's menu bar (swipe down from the top of the
+  screen) has Anki's menus, with their ⌘ shortcuts, instead of empty File,
+  Edit, Format, View, Window and Help menus. Browse's menus are there while
+  Browse is open. Anki's own menu row stays; with the iPad's menu bar
+  always shown, turn it off with **View › Show Menu Row**. Anki's View ›
+  Full Screen is called **Hide Toolbars** on the iPad, next to the iPad's
+  own Window › Full Screen.
 - iOS, Android: `kioku://` links let other apps and Shortcuts add notes,
   sync and search, with AnkiMobile's actions and parameters
   ([kioku:// links](features/links.md)).

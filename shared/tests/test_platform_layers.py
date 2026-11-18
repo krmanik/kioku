@@ -157,3 +157,39 @@ def test_web_server_origin_is_the_page_origin(monkeypatch) -> None:
         http.setup(page_origin)
         server_url = aqt.main.AnkiQt.serverURL(None)
         assert webengine._origin(QUrl(server_url)) == page_origin
+
+
+def test_ios_menu_bar_rows_and_key_commands(ios) -> None:
+    """Anki's menus in the iPadOS menu bar: which shortcuts become UIKit key
+    commands (Cmd/Ctrl/Option ones; single keys stay with Qt, they would take
+    letters from text fields) and how rows are titled."""
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtGui import QAction, QKeySequence
+    from PyQt6.QtWidgets import QApplication
+
+    app = QApplication.instance() or QApplication([])  # noqa: F841
+    menubar = importlib.import_module("ios_kioku_platform.menubar")
+
+    def command(shortcut: str, context=None):  # type: ignore[no-untyped-def]
+        action = QAction("x")
+        action.setShortcut(QKeySequence(shortcut))
+        if context is not None:
+            action.setShortcutContext(context)
+        return menubar._key_command(action)
+
+    # Qt's Ctrl is Command on Apple platforms, Meta is Control
+    assert command("Ctrl+Z") == ("z", menubar.COMMAND)
+    assert command("Ctrl+Shift+Z") == ("z", menubar.COMMAND | menubar.SHIFT)
+    assert command("Ctrl+Alt+F") == ("f", menubar.COMMAND | menubar.OPTION)
+    assert command("Meta+1") == ("1", menubar.CONTROL)
+    assert command("Ctrl+0") == ("0", menubar.COMMAND)
+    assert command("D") is None
+    assert command("Shift+V") is None
+    assert command("/") is None
+    assert command("") is None
+    # the review menu's rows are inert (patches._patch_review_menu)
+    assert command("Ctrl+1", Qt.ShortcutContext.WidgetShortcut) is None
+
+    assert menubar._plain("&File") == "File"
+    assert menubar._plain("Save && Close") == "Save & Close"
+    assert menubar._plain("&Undo\tCtrl+Z") == "Undo"

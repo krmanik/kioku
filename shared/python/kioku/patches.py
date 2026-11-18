@@ -64,6 +64,7 @@ def apply() -> None:
     _patch_review_menu()
     _patch_full_screen()
     _patch_screen_edges()
+    _patch_native_menu_bar()
     _patch_main_view_width()
     _patch_splitters()
     _patch_docks()
@@ -413,6 +414,113 @@ def _patch_screen_edges() -> None:
     from . import screenedges
 
     screenedges.apply()
+
+
+MENU_ROW_KEY = "kioku_menu_row"
+
+
+def _patch_native_menu_bar() -> None:
+    """Where the system has a menu bar of its own (iPadOS 26), the platform
+    fills it with Anki's menus. Anki's menu row stays by default: the system
+    bar normally shows only on demand (pointer at the top, swipe down). Who
+    keeps the system bar on screen (iPadOS 27: Settings › Multitasking &
+    Gestures, "Automatically Show and Hide Menu Bar" off) sees the menus
+    twice, and can turn the row off with View › Show Menu Row; apps can't
+    tell whether the system bar stays. The choice is the same for every
+    profile, and applies to Browse too.
+
+    iPadOS makes the window fill the screen with its own Window › Full
+    Screen, and gives apps no way to do it; Anki's full screen there only
+    hides Anki's bars. So View › Toggle Full Screen is called Hide Toolbars
+    (Show Toolbars while they are hidden), not a second Full Screen. The
+    swipe right that leaves it elsewhere is off: from the left edge it
+    shows the iPad's window list, and the iPad's menu bar has View › Show
+    Toolbars."""
+    install = getattr(platform, "install_menu_bar", None)
+    if install is None:
+        return
+    import aqt
+    import aqt.main
+    from aqt import gui_hooks
+    from aqt.qt import QWIDGETSIZE_MAX, QAction, QMenuBar, qconnect
+
+    def shown() -> bool:
+        return bool(aqt.mw.pm.meta.get(MENU_ROW_KEY, True))
+
+    def apply_row(window) -> None:  # type: ignore[no-untyped-def]
+        if window is aqt.mw:
+            # Anki's full screen mode hides the row too
+            if shown() and not window.fullscreen:
+                show_menubar(window)
+            elif not shown():
+                window.hide_menubar()
+            return
+        bar = window.menuWidget()
+        if not isinstance(bar, QMenuBar):
+            return
+        if shown():
+            bar.setMaximumHeight(QWIDGETSIZE_MAX)
+            bar.setMinimumHeight(0)
+        else:
+            # like Anki's full screen: of no height, its shortcuts still work
+            bar.setFixedHeight(0)
+
+    def label(window) -> None:  # type: ignore[no-untyped-def]
+        window.form.actionFullScreen.setText(
+            "Show Toolbars" if window.fullscreen else "Hide Toolbars"
+        )
+
+    show_menubar = aqt.main.AnkiQt.show_menubar
+    hide_menubar = aqt.main.AnkiQt.hide_menubar
+
+    # Anki's full screen hides the row on entering and shows it on leaving
+    def show_menubar_if_wanted(self) -> None:  # type: ignore[no-untyped-def]
+        show_menubar(self)  # fullscreen.py leaves full screen in it
+        if not shown():
+            self.hide_menubar()
+        label(self)
+
+    def hide_menubar_labelled(self) -> None:  # type: ignore[no-untyped-def]
+        hide_menubar(self)
+        label(self)
+
+    def toggle(checked: bool) -> None:
+        pm = aqt.mw.pm
+        pm.meta[MENU_ROW_KEY] = checked
+        # the profile list (no profile open) has no pm.save(); write _global
+        pm.db.execute("update profiles set data = ? where name = ?", pm._pickle(pm.meta), "_global")
+        pm.db.commit()
+        apply_row(aqt.mw)
+        browser = aqt.dialogs._dialogs.get("Browser", [None, None])[1]
+        if browser is not None:
+            apply_row(browser)
+
+    def setup() -> None:
+        mw = aqt.mw
+        if not install(mw):
+            return
+        aqt.main.AnkiQt.show_menubar = show_menubar_if_wanted
+        aqt.main.AnkiQt.hide_menubar = hide_menubar_labelled
+        label(mw)
+        from . import fullscreen
+
+        fullscreen.SWIPE = False
+        fullscreen.TIP = "Show them again with View › Show Toolbars in the iPad's menu bar"
+        action = QAction("Show Menu Row", mw)
+        action.setCheckable(True)
+        action.setChecked(shown())
+        qconnect(action.toggled, toggle)
+        view = mw.form.menuqt_accel_view
+        actions = view.actions()
+        index = actions.index(mw.form.actionFullScreen) if mw.form.actionFullScreen in actions else -1
+        if 0 <= index < len(actions) - 1:
+            view.insertAction(actions[index + 1], action)
+        else:
+            view.addAction(action)
+        apply_row(mw)
+        gui_hooks.browser_will_show.append(apply_row)
+
+    gui_hooks.main_window_did_init.append(setup)
 
 
 _INSERT_MEDIA_JS = """(function(html,index){

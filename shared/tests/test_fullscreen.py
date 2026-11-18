@@ -7,6 +7,8 @@ import os
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import aqt
+import aqt.main
+import aqt.utils
 from aqt.qt import QApplication, QWidget
 
 from kioku import fullscreen
@@ -64,3 +66,39 @@ def test_confirm_exits_or_stays(monkeypatch) -> None:  # type: ignore[no-untyped
     box = mw._kioku_full_screen_box
     next(b for b in box.buttons() if b.text() == "Exit Full Screen").click()
     assert left == [mw]
+
+
+def test_toggle_without_active_window(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """The iPad's menu bar has the focus: Anki's toggle gets the main window."""
+    toggled: list = []
+    monkeypatch.setattr(
+        aqt.main.AnkiQt,
+        "on_toggle_full_screen",
+        lambda self: toggled.append(self.app.activeWindow()),
+    )
+    monkeypatch.setattr(aqt.main.AnkiQt, "show_menubar", lambda self: None)
+    monkeypatch.setattr(aqt.utils, "closeTooltip", lambda: None)
+    hooks = type("Hooks", (), {})()
+    hooks.webview_will_set_content = hooks.webview_did_receive_js_message = []
+    monkeypatch.setattr(fullscreen, "gui_hooks", hooks)
+    fullscreen.apply()
+
+    mw = MainWindow(False)
+    mw.app = app
+    assert app.activeWindow() is None
+    aqt.main.AnkiQt.on_toggle_full_screen(mw)
+    assert toggled == [mw]
+    assert app.activeWindow() is None  # the real one again
+
+
+def test_swipe_off(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """The iPad: no swipe script, its message shows nothing."""
+    shown: list = []
+    monkeypatch.setattr(fullscreen, "_confirm", shown.append)
+    monkeypatch.setattr(fullscreen, "SWIPE", False)
+    content = Content()
+    fullscreen._add_swipe(content, object())
+    assert fullscreen.COMMAND not in content.head
+    monkeypatch.setattr(aqt, "mw", MainWindow(True), raising=False)
+    assert fullscreen._on_message((False, None), fullscreen.COMMAND, None) == (True, None)
+    assert shown == []

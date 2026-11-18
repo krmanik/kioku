@@ -23,6 +23,7 @@ __all__ = [
     "delete_cookies",
     "dev_allowed",
     "documents_dir",
+    "install_menu_bar",
     "keep_awake",
     "key_window",
     "open_folder",
@@ -125,6 +126,14 @@ def tts_player(taskman: Any) -> Any:
 
 def _app() -> Any:
     return prop(ObjCClass("UIApplication"), "sharedApplication")
+
+
+def install_menu_bar(mw: Any) -> bool:
+    """Anki's menus in the iPadOS menu bar (menubar.py); False where there
+    is none."""
+    from .menubar import install
+
+    return install(mw)
 
 
 def keep_awake() -> None:

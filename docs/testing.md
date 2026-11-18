@@ -1124,3 +1124,36 @@ tested only for doing no harm), Android.
 Seen, not changed: the Samsung M30s's WebView is Chrome 87 (never updated),
 which has no CSS `:has()`; none of `PHONE_CSS`'s rules apply there (its deck
 list runs off the right edge). Current WebViews (Chrome 105+) have it.
+
+## iPad menu bar (iPadOS 26) (2026-11-18)
+
+iOS Simulator, iPad Pro 13-inch (M5), iPadOS 26.4, and the narrow iPhone
+simulator (iOS 26.4); the sim app from `tools/run_sim.sh` with the repo's
+Python synced into it. No Simulator window here, so the menu bar was never
+opened on screen: the built menus were read in the app through
+`UIMainMenuSystem.sharedSystem._rootMenu` (private, test only; it runs the
+build handler), and rows were run through `UIApplication`'s
+`canPerformAction:withSender:`, `validateCommand:` and `kiokuMenuRow:` as
+UIKit calls them.
+
+| Test | Result |
+| --- | --- |
+| Main window, deck list | Kioku, File (Anki's), Edit (Anki's Undo, then the system's Cut/Copy/Paste…), View, Tools, Window, Help; no Format, no Find |
+| Shortcuts | ⌘Z Undo, ⇧⌘P Switch Profile, ⌘P Preferences, F1 Guide, F11 Toggle Full Screen; Study Deck (/), Create Filtered Deck (F) without keys |
+| Help › About Anki from the menu | About opens; while it's up, every row is disabled (`canPerformAction` NO, attribute disabled); after closing it, enabled again |
+| Browse opened | its Edit, View, Notes, Cards, Go, Help in their order; no File; Find and Replace ⌥⌘F and Create Filtered Deck ⌘G (both the system's Find keys until its Find group was removed; with it, they were rows without keys). Closed → the main window's menus again |
+| Reviewing | Edit shows Undo, Edit Current and More (flags submenu, bury, suspend, card info…), rebuilt for each card; More's rows have no keys (inert, as before) |
+| More › Mark Note from the menu | note marked; Undo row retitled "Undo Update Tag" and enabled, Redo disabled; Undo from the menu unmarks it |
+| iPhone simulator | no menu bar module installed |
+| On screen (DeviceHub, by the user) | the system bar shows only on hover; with Anki's row hidden (first version) the menus were out of sight, so the row stays |
+| iPadOS 27.0 simulator (iPad Pro 13-inch (M5), runtime 24A434, downloaded with `xcodebuild -downloadPlatform iOS`; the 27.1 runtime that was installed supports only "iPhone Duo"): user turned "Automatically Show and Hide Menu Bar" off, the bar stayed on screen | key window safe area top 32, status bar frame height 32, Qt safe area 32 in both states; preference files: no menu bar key (only the multitasking mode, `SBChamoisWindowingEnabled`); app-side classes: only `SBSMenuBarSystemService toggleMenuBarVisibility`/`isMenuBarSupported` → not detectable |
+| View › Show Menu Row run from the iPad's menu bar | row height 0, check mark off in the iPad's View menu, `kioku_menu_row` False; after relaunch still hidden; full screen on and off (`fullscreen._exit`): still hidden; Browse: its row hidden too |
+| View › Toggle Full Screen from the iPad's menu bar (iPadOS 27 sim, by the user) | first: Anki's error dialog, `'NoneType' object has no attribute 'setWindowState'` (`app.activeWindow()` None); fixed in `fullscreen.toggle_with_guide` |
+| Two full screen items (the iPad's Window › Full Screen resizes the window, Anki's only hides its bars) → Anki's renamed on the iPad | `actionFullScreen` text: Hide Toolbars → (toggle) Show Toolbars → (toggle) Hide Toolbars; enter then `fullscreen._exit` (swipe) → Hide Toolbars; the iPad's View menu shows "Hide Toolbars" with F11; no tracebacks |
+| Swipe right on the iPad (user: shows the window list) → swipe off there | pages without the swipe script, `kioku:swipe-right` ignored; tooltip points to View › Show Toolbars |
+| Host tests (`shared/tests/run.sh`) | all pass, with new tests for the shortcut → key command mapping and full screen without an active window |
+
+Not run: opening the menu bar on screen and using it with touch or a
+pointer, hardware keyboard shortcuts through the key commands (⌘Z, ⌘P), the
+iPad app on a Mac, a real iPad, iPadOS 18 (the module only checks that
+`UIMainMenuSystem` is missing there).
