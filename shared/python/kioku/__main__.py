@@ -67,6 +67,10 @@ def _setup_environment() -> None:
     os.environ.setdefault("XDG_CACHE_HOME", platform.cache_dir())
     os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
     os.environ.setdefault("LANG", "en_US.UTF-8")
+    if sys.platform == "ios":
+        # Anki's getpass.getuser() needs it; the simulator sets none when
+        # the app is opened from the home screen (iOS has no pwd module)
+        os.environ.setdefault("USER", "mobile")
 
 
 def main() -> None:
