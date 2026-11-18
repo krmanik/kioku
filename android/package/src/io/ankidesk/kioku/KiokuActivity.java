@@ -2,6 +2,7 @@ package io.ankidesk.kioku;
 
 import android.content.Intent;
 import android.content.pm.PackageInfo;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.system.ErrnoException;
@@ -26,6 +27,8 @@ import java.util.zip.ZipInputStream;
  */
 public class KiokuActivity extends QtActivity {
     private static final String TAG = "Kioku";
+    /** A kioku:// link from KiokuLinkActivity */
+    static final String EXTRA_LINK = "io.ankidesk.kioku.LINK";
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -45,7 +48,26 @@ public class KiokuActivity extends QtActivity {
         } catch (IOException | ErrnoException e) {
             Log.e(TAG, "preparing the Python runtime failed", e);
         }
+        // Qt hands a VIEW intent to QDesktopServices once it runs. Not when
+        // Android brings the activity back after the process died: the
+        // link was followed then already
+        boolean restored = savedInstanceState != null
+                || (getIntent().getFlags() & Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0;
+        if (!restored) {
+            setIntent(linkIntent(getIntent()));
+        }
         super.onCreate(savedInstanceState);
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(linkIntent(intent));
+    }
+
+    /** A link from KiokuLinkActivity as the VIEW intent Qt expects. */
+    private static Intent linkIntent(Intent intent) {
+        String link = intent == null ? null : intent.getStringExtra(EXTRA_LINK);
+        return link == null ? intent : new Intent(Intent.ACTION_VIEW, Uri.parse(link));
     }
 
     private void unpackIfNeeded(File target) throws IOException {

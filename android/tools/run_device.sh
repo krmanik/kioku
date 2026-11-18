@@ -20,7 +20,10 @@ fi
 "$ADB" logcat -c
 "$ADB" shell am force-stop $APP
 "$ADB" shell "mkdir -p $DOCS && touch $DOCS/.kioku-dev"
-"$ADB" shell am start -n $APP/.KiokuActivity --ez dev true > /dev/null
+# the app icon's intent: started with another one, a later tap on the icon
+# could start a second activity (KiokuLinkActivity.java)
+"$ADB" shell am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER \
+    -n $APP/.KiokuActivity --ez dev true > /dev/null
 sleep "$SECS"
 "$ADB" logcat -d -v brief > "$LOGDIR/logcat.txt"
 "$ADB" pull $DOCS/kioku.log "$LOGDIR/kioku.log" > /dev/null 2>&1

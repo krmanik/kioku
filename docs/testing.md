@@ -1039,3 +1039,56 @@ synced from the repo), Contanki's steps run with devcmd: `AnkiWebView(mw)`,
 | `document.visibilityState`, `navigator.getGamepads` | — | `visible`, function |
 
 Not run: Contanki itself with a real game controller (none here), Android.
+
+## kioku:// links (2026-11-17, devices 2026-11-18)
+
+TestFlight feedback asked for a URL scheme to add cards and sync. Host
+tests: `shared/tests/test_urlscheme.py` (parsing, notes on a real
+collection, refusals, media).
+
+iOS Simulator (iPhone SE, 2026-11-17): the installed build with
+`CFBundleURLTypes` added to its Info.plist and Python synced from the repo;
+links opened with `xcrun simctl openurl` (iOS asks "Open in Kioku?") and in
+the app with `QDesktopServices.openUrl`. A Simulator app started by the
+system (not `simctl launch`) has no `USER`, and Anki's `getpass.getuser()`
+fails before Kioku starts: `xcrun simctl spawn booted launchctl setenv USER
+mobile` for cold-start tests.
+
+iPhone 15 Pro Max (iOS 27, dev build from the repo) and Samsung M30s
+(Android 11, dev build): links sent with `xcrun devicectl device process
+launch --payload-url <link> io.ankidesk.kioku` (iPhone) and `adb shell am
+start -a android.intent.action.VIEW -d <link>` (Android); results read with
+devcmd. Tests used the deck "Kioku Link Test" and the tag `linktest`.
+
+| Test | iPhone | Android |
+| --- | --- | --- |
+| addnote, Kioku open: `日本語 🍣 C++ & a=b #x`, `<br>`, tags | ✓ all kept | ✓ |
+| no deck / note type / field, empty first field, duplicate, unknown action, `file:` x-success, other profile | ✓ the right warning, nothing added | ✓ |
+| no `type`/`deck` | ✓ the Add screen's choice (current deck, last note type) | ✓ |
+| `dupes=1`, Cloze | ✓ | ✓ |
+| image link (https, Wikimedia), sound link (mp3 from the Mac) | ✓ downloaded, `<img>` / `[sound:]` | ✓ (offline: the warning "Couldn't download a file for the note: … Network is unreachable", nothing added) |
+| download 404 | ✓ warning, nothing added | ✓ |
+| Kioku in the background (Home; another app for 40–60 s) | ✓ | ✓ (after the fixes below) |
+| Kioku not running: addnote, a refused link, search | ✓ | ✓ |
+| a link before the first profile exists (first-run language list) | – | ✓ waits for the profile |
+| with review, Browse, Add window or Preferences open | ✓ note added, review stays on its card, "Added to …" and warnings shown on top | ✓ |
+| search, again with Browse open | ✓ Browse shows the new search | ✓ |
+| sync, logged out | ✓ AnkiWeb login, as the Sync button | ✓ |
+| x-success | ✓ Safari opened the page (seen in the Mac's server log) | ✓ Chrome opened |
+| links tapped in a browser (test page on the Mac): add, image, sound, Cloze, x-success back to the browser | ✓ Safari (by the user) | ✓ Chrome: opens Kioku without asking; duplicate and unknown-deck warnings, search, sync too; Kioku stays out of Chrome's task |
+| Android: started by a link, file picker open, Home, app icon (3×) | – | ✓ same process, picker still open |
+| Android: started by a link, process killed in the background, reopened from Recents | – | ✓ Kioku restarts, the note isn't added again |
+
+Found and fixed during the runs (details in fixes.md, "Runtime: platform"):
+opening Browse from inside Qt's `QDesktopServices::openUrl` call crashed the
+app (Simulator); on Android, links never arrived (Qt calls the handler on
+Android's UI thread), links sent while Kioku was in the background were
+dropped (`singleTop`), and after a link had started Kioku, tapping the app
+icon could start a second activity and restart Kioku.
+
+On the first link that downloads from the local network, iOS asks for Local
+Network access; the download fails with "Couldn't download a file …" until
+it is allowed, then works.
+
+Not run: Shortcuts on the iPhone, Tasker or another automation app on
+Android, iPad.

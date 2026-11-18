@@ -70,6 +70,22 @@
                 android:name="android.app.arguments"
                 android:value="-- %%INSERT_APP_ARGUMENTS%% --" />
         </activity>
+        <!-- kioku:// links (kioku/urlscheme.py): add notes, sync, search.
+             Passed on to KiokuActivity, see KiokuLinkActivity.java -->
+        <activity
+            android:name="io.ankidesk.kioku.KiokuLinkActivity"
+            android:theme="@android:style/Theme.NoDisplay"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="kioku" />
+            </intent-filter>
+        </activity>
 
         <!-- keeps the process alive while the sync server runs; a local
              server matches none of the other foreground service types -->
