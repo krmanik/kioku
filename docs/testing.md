@@ -1402,3 +1402,27 @@ access denied).
 Not run: the screen locked, longer than 7 minutes, battery use, iPad,
 the location alert itself (access was already granted on this phone), a
 TestFlight build and App Review.
+
+### Protecting the location from add-ons and pages (2026-11-19, later)
+
+Same iPhone, new dev build with the location guard and
+`NSLocationDefaultAccuracyReduced`; then Precise Location turned off for
+Kioku in the Settings app (as new installs get it by default).
+
+| Test | Result |
+| --- | --- |
+| Start-up | "location guard installed" logged before add-ons load; Kioku's own manager started, option "on" |
+| Stand-in add-on (devcmd): its own `CLLocationManager`, best accuracy, own delegate; `requestWhenInUseAuthorization`, `requestAlwaysAuthorization`, `startUpdatingLocation`, `requestLocation`, `startMonitoringSignificantLocationChanges` | all blocked (logged once each); `location` nil on its manager and on Kioku's; no locations or errors delivered in 20 s |
+| Same add-on sets its delegate on Kioku's manager | refused; Kioku's delegate kept; option still "on" |
+| Card page: `navigator.geolocation.getCurrentPosition` (high accuracy, 15 s timeout) | no position after 20 s, no iOS or WebKit prompt (WebKit's location goes through the guarded `CLLocationManager`) |
+| `accuracyAuthorization` with Precise off | 1 (reduced) |
+| Approximate location: Kioku in the background 7 min, Safari asks AnkiConnect | `{"apiVersion": "AnkiConnect v.6"}`; the location arrow showed at first, not after 7 min |
+| Heartbeat thread in Kioku (a timestamp every 10 s), Kioku in the background 415 s, nothing asking it anything | 42 beats, largest gap 11 s: Kioku ran the whole time. The screen locked by itself during the run (screenshot black): it keeps running with the screen locked too |
+
+Host tests: `shared/tests/run.sh`, all passed; new: the guard's rules
+(only Kioku's manager, only with Kioku's delegate, temporary full accuracy
+never), the warning before the option turns on, the "take it back in
+Settings" status, the Info.plist key.
+
+Not run: an add-on written to undo the guard (it can: same process;
+documented), battery use, iPad, longer than 7 minutes, App Review.

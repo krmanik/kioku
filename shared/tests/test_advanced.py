@@ -419,6 +419,10 @@ def test_background_saved_and_applied(prefs, platform, monkeypatch) -> None:
     group = advanced.AdvancedTab(prefs).background
     assert group is not None and not group.enabled.isChecked()
     assert group.status.isHidden()
+    prefs.answers.append(False)  # the warning declined
+    group.enabled.setChecked(True)
+    assert not group.enabled.isChecked() and calls == []
+    assert not advanced.background_wanted(prefs.mw.pm.meta)
     state[0] = "asking"
     group.enabled.setChecked(True)
     assert calls == [True]
@@ -435,5 +439,7 @@ def test_background_saved_and_applied(prefs, platform, monkeypatch) -> None:
     # next start: applied from the saved setting
     advanced.apply_background(prefs.mw)
     assert calls == [True, True]
+    state[0] = "allowed"
     group.enabled.setChecked(False)
     assert calls[-1] is False and not advanced.background_wanted(prefs.mw.pm.meta)
+    assert "Never" in group.status.text()

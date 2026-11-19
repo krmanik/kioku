@@ -9,8 +9,10 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
   Background › Keep running in the background** (off by default). iOS
   pauses apps a few seconds after they leave the screen, so dictionary and
   reader apps couldn't reach AnkiConnect and kept spinning. The option uses
-  location updates to keep Kioku running, at the lowest accuracy. Kioku
-  ignores the location: nothing is saved or sent
+  location updates to keep Kioku running, at the lowest accuracy and
+  approximate by default. Kioku ignores the location: nothing is saved or
+  sent. Only Kioku's own location request works: add-ons and web pages
+  that ask for location get nothing
   ([Add-ons that other apps connect to](using/addons.md#add-ons-that-other-apps-connect-to-iphone-ipad),
   [issue #21](https://github.com/krmanik/kioku/issues/21)).
 - iOS, Android: pictures and sounds keep downloading after a sync with

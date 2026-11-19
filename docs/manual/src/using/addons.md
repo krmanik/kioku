@@ -37,15 +37,18 @@ spinner that never stops. On Android this doesn't happen.
 To keep such add-ons answering, turn on **Preferences › Advanced ›
 Background › Keep running in the background**:
 
-1. Tick **Keep running in the background**.
+1. Tick **Keep running in the background**, read the note and choose
+   **Yes**.
 2. iOS asks whether Kioku may use your location: choose **Allow While Using
-   the App**. (Location is only the means, see below.)
+   the App**, and leave **Precise** off (iOS's default for Kioku). Location
+   is only the means, see below.
 3. The group shows **On: Kioku keeps running in the background.** Now
    switch to the other app.
 
-While Kioku runs in the background, iOS shows the location arrow at the top
-of the screen. Kioku keeps running until you turn the option off, or close
-Kioku from the app switcher.
+When Kioku goes to the background, iOS shows the location arrow at the top
+of the screen; with approximate location it can disappear after a while,
+and Kioku keeps running. It keeps running, with the screen locked too,
+until you turn the option off or close Kioku from the app switcher.
 
 **Why location?** iOS lets an app keep running in the background only for a
 few purposes: playing audio, navigation, calls and a few others. Location
@@ -54,8 +57,29 @@ use them to keep connections open the same way.
 
 **Your location is not collected.** Kioku asks iOS for the lowest accuracy
 it offers (about 3 km, from cell towers and Wi-Fi, without GPS) and ignores
-what it receives: the location isn't read, saved, shown or sent anywhere,
-and add-ons don't get it from Kioku. See the [privacy policy](../privacy.md).
+what it receives: the location isn't read, saved, shown or sent anywhere.
+See the [privacy policy](../privacy.md).
+
+**Add-ons and location.** iOS gives location access to the whole app, and
+add-ons are programs that run inside Kioku. Kioku protects your location
+from them:
+
+- Only Kioku's own location request works. When an add-on, or a web page
+  in a card or add-on window, asks iOS for location access or for
+  locations, it gets nothing, and no permission prompt appears.
+- iOS gives Kioku **approximate** location (several kilometres) unless you
+  turn **Precise** on in the Settings app. Leave it off: the option works
+  without it.
+- Kioku never asks for **Always** access, and add-ons can't ask for it.
+
+An add-on written on purpose to get around these protections could still
+read your approximate location while access is allowed, since it runs
+inside Kioku. Install only add-ons you trust, as on a computer.
+
+**Turning it off.** Untick the option and Kioku stops using location at
+once. iOS keeps the permission until you take it back: the Settings app ›
+**Apps** › **Kioku** › **Location** › **Never**. The group reminds you of
+this while access is still allowed.
 
 **Battery:** at this accuracy iOS uses no GPS and wakes Kioku rarely, but an
 app that stays running uses more battery than a paused one, especially if

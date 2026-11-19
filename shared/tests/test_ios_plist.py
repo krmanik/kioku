@@ -27,3 +27,8 @@ def test_location_background_mode() -> None:
     assert "location" in plist.get("UIBackgroundModes", [])
     text = plist.get("NSLocationWhenInUseUsageDescription", "")
     assert isinstance(text, str) and "AnkiConnect" in text
+
+
+def test_location_approximate_by_default() -> None:
+    # the permission is the whole app's, add-ons included
+    assert load().get("NSLocationDefaultAccuracyReduced") is True

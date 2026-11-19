@@ -199,6 +199,7 @@ class FakeLocationManager:
     def __init__(self) -> None:
         self.authorizationStatus = 0  # not determined
         self.calls: list[tuple] = []
+        self.ptr = types.SimpleNamespace(value=id(self))
 
     def __getattr__(self, name: str):  # type: ignore[no-untyped-def]
         if name.startswith("_"):
@@ -234,9 +235,33 @@ def test_ios_keep_running_asks_then_starts_and_stops(ios, monkeypatch) -> None:
 
     ios.keep_running_in_background(False)
     assert manager.calls[-2:] == [("stopUpdatingLocation",), ("setAllowsBackgroundLocationUpdates_", False)]
-    assert ios.keep_running_in_background_status() == "off"
+    assert ios.keep_running_in_background_status() == "allowed"  # take it back in Settings
 
     manager.authorizationStatus = 2  # denied in the Settings app
     ios.keep_running_in_background(True)
     assert ios.keep_running_in_background_status() == "denied"
     assert names()[-1] == "setAllowsBackgroundLocationUpdates_"
+
+
+def test_ios_location_guard_only_kiokus_manager(ios, monkeypatch) -> None:
+    import importlib
+
+    location = importlib.import_module("ios_kioku_platform.location")
+    ours = types.SimpleNamespace(ptr=types.SimpleNamespace(value=1000))
+    delegate = types.SimpleNamespace(ptr=types.SimpleNamespace(value=2000))
+    monkeypatch.setattr(location, "_manager", ours)
+    monkeypatch.setattr(location, "_delegate", delegate)
+    for name in ("requestWhenInUseAuthorization", "startUpdatingLocation", "requestLocation"):
+        assert location.allowed(1000, name)
+        assert not location.allowed(3000, name)  # an add-on's or WebKit's manager
+    assert not location.allowed(1000, "requestTemporaryFullAccuracyAuthorizationWithPurposeKey:", (5,))
+    assert location.allowed(1000, "setDelegate:", (2000,))
+    assert not location.allowed(1000, "setDelegate:", (4000,))  # someone else's delegate on ours
+    assert location.allowed(3000, "setDelegate:", (4000,))  # theirs never gets locations
+    monkeypatch.setattr(location, "_manager", None)
+    assert not location.allowed(1000, "startUpdatingLocation")
+    assert not location.allowed(None, "startUpdatingLocation")
+    assert set(location.GUARDED) >= {
+        "requestWhenInUseAuthorization", "requestAlwaysAuthorization", "startUpdatingLocation",
+        "requestLocation", "startMonitoringSignificantLocationChanges", "startMonitoringVisits",
+    }

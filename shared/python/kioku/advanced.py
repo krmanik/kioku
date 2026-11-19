@@ -102,12 +102,25 @@ BACKGROUND_KEY = "kioku_keep_running_in_background"
 BACKGROUND_NOTE = """\
 iOS pauses Kioku a few seconds after you leave it, so add-ons that answer \
 other apps, such as AnkiConnect, stop answering. With this on, Kioku asks \
-for location updates and keeps running like a navigation app. It asks for \
-the lowest accuracy and doesn’t use or store your location. It uses some \
-battery; the location indicator shows while Kioku runs in the background."""
+for location updates and keeps running like a navigation app. Kioku \
+ignores the location: it isn’t saved or sent. It uses some battery; iOS \
+shows the location arrow when Kioku goes to the background."""
+
+BACKGROUND_WARNING = """\
+Kioku will ask iOS for location access, to keep running in the background.
+
+• Kioku ignores the location: it isn’t saved, shown or sent anywhere.
+• Add-ons are programs that run inside Kioku. Kioku lets only itself use \
+location, but an add-on written to get around that could read it while \
+access is allowed. Keep Precise Location off (iOS’s default for Kioku) and \
+install only add-ons you trust.
+• Location stays allowed until you change it in the Settings app › Apps › \
+Kioku › Location; turning this option off stops Kioku using it."""
 
 BACKGROUND_STATUS = {
     "off": "",
+    "allowed": "Off. iOS still allows Kioku location access; to take it back: "
+    "Settings app › Apps › Kioku › Location › Never.",
     "asking": "Waiting for location access.",
     "denied": "Location access is off for Kioku: turn it on in the Settings app › "
     "Apps › Kioku › Location (While Using the App).",
@@ -246,6 +259,15 @@ class BackgroundGroup:
         self.status.setVisible(bool(self.status.text()))
 
     def _on_enabled(self, on: bool) -> None:
+        from aqt.utils import askUser
+
+        if on and not askUser(BACKGROUND_WARNING, parent=self.box.window(), title="Background"):
+            from aqt.qt import QSignalBlocker
+
+            blocker = QSignalBlocker(self.enabled)
+            self.enabled.setChecked(False)
+            del blocker
+            return
         self.mw.pm.meta[BACKGROUND_KEY] = on
         pm = self.mw.pm
         # like gamepad.save_settings: the profile list has no pm.save()

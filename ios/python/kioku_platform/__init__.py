@@ -63,6 +63,14 @@ def prepare() -> None:
         platform.system, platform.mac_ver = system, mac_ver
 
     try:
+        # before add-ons load: only Kioku's own location manager works
+        from .location import install_guard
+
+        install_guard()
+    except Exception:
+        logging.getLogger("kioku").exception("location guard")
+
+    try:
         from .keys import disable_undo_gestures
 
         disable_undo_gestures()
@@ -169,7 +177,7 @@ def keep_running_in_background(on: bool) -> None:
 
 
 def keep_running_in_background_status() -> str:
-    """"off", "asking", "denied" or "on"."""
+    """"off", "allowed", "asking", "denied" or "on" (.location.status)."""
     from .location import status
 
     return status()

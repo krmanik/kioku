@@ -46,14 +46,21 @@ AnkiConnect answering other apps after you leave Kioku. iOS keeps an app
 running in the background while it receives location updates; that is the
 only reason Kioku asks for them.
 
-- Kioku asks iOS for the lowest accuracy it offers (about 3 km, without GPS).
+- Kioku asks iOS for the lowest accuracy it offers (about 3 km, without
+  GPS), and iOS grants only approximate location unless you turn Precise
+  on yourself.
 - The locations iOS delivers are ignored: Kioku doesn't read, save, show or
-  send them, and doesn't pass them to add-ons.
+  send them.
 - No location data leaves your device, and the developer never receives
   any.
-- With the option off (the default), Kioku receives no location at all. You
-  can also turn location access off for Kioku in the Settings app at any
-  time.
+- With the option off (the default), Kioku receives no location at all.
+  Turning it off stops location use at once; to take back the permission,
+  use the Settings app › Apps › Kioku › Location › Never.
+- **Add-ons** are third-party programs that run inside Kioku and share its
+  permissions. Kioku lets only its own location request work: add-ons and
+  web pages that ask for location get nothing. An add-on written to get
+  around this could still read your approximate location while access is
+  allowed, so install only add-ons you trust.
 
 ## TestFlight
 
