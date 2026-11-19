@@ -24,6 +24,7 @@ __all__ = [
     "delete_cookies",
     "dev_allowed",
     "documents_dir",
+    "install_done_bar",
     "install_menu_bar",
     "keep_awake",
     "key_window",
@@ -128,6 +129,13 @@ def tts_player(taskman: Any) -> Any:
 
 def _app() -> Any:
     return prop(ObjCClass("UIApplication"), "sharedApplication")
+
+
+def install_done_bar(app: Any) -> None:
+    """A Done bar above the iPhone's number pad (donebar.py)."""
+    from .donebar import install
+
+    install(app)
 
 
 def install_menu_bar(mw: Any) -> bool:

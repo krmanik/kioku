@@ -18,6 +18,10 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
   **View › Columns**. Anki offers them in the column headers' context
   menu, which needs a right-click
   ([issue #20](https://github.com/krmanik/kioku/issues/20)).
+- iPhone: number fields, such as Custom Study's "Increase today's new
+  card limit by", get a **Done** button above the number pad. The pad
+  has no Return key, so the keyboard couldn't be closed and covered the
+  OK button.
 
 ## 0.2.9
 

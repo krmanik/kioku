@@ -573,6 +573,55 @@ def t_browse_columns():
     return f"{len(rows)} columns in View › Columns; {key} shown and hidden"
 
 
+def t_numpad_done():
+    """iPhone: number fields (Custom Study's limit) show the number pad,
+    which has no Return key and covered the dialog's OK: a Done bar above it
+    closes the keyboard and keeps the number (donebar.py)."""
+    if sys.platform != "ios":
+        raise Skip(sys.platform)
+    import kioku_platform.donebar as donebar
+    from aqt.customstudy import CustomStudy
+    from aqt.qt import QGuiApplication, QInputMethodQueryEvent, Qt
+    from rubicon.objc import ObjCClass
+
+    from kioku_platform.webview import prop
+
+    if donebar._filter is None:
+        raise Skip("not an iPhone")
+    col().decks.select(deck_id())
+    QTimer.singleShot(0, lambda: CustomStudy.fetch_data_and_show(mw))
+    yield Until(lambda: windows_of("CustomStudy"), 10, "Custom Study")
+    dialog = windows_of("CustomStudy")[0]
+    try:
+        spin = dialog.form.spin
+        spin.setFocus()
+        yield 0.3
+        query = QInputMethodQueryEvent(
+            Qt.InputMethodQuery.ImPlatformData | Qt.InputMethodQuery.ImHints
+        )
+        QApplication.sendEvent(spin, query)
+        data = query.value(Qt.InputMethodQuery.ImPlatformData)
+        check(isinstance(data, dict) and donebar.ACCESSORY_KEY in data,
+              f"no Done bar in the number field's platform data: {data!r}")
+        hints = query.value(Qt.InputMethodQuery.ImHints)
+        check(int(getattr(hints, "value", hints)) & Qt.InputMethodHint.ImhDigitsOnly.value,
+              f"hints {hints!r} are not digits only")
+        im = QGuiApplication.inputMethod()
+        im.show()
+        yield Until(lambda: im.isVisible(), 5, "keyboard")
+        spin.lineEdit().setText("7")
+        prop(ObjCClass("UIApplication"), "sharedApplication").sendAction_to_from_forEvent_(
+            donebar.SEL("done:"), donebar._filter._target, None, None
+        )
+        yield Until(lambda: not im.isVisible(), 5, "keyboard closed by Done")
+        check(QApplication.focusWidget() is not spin, "the number field kept the focus")
+        check(spin.value() == 7, f"value {spin.value()} after Done, not 7")
+    finally:
+        dialog.reject()
+    yield Until(lambda: not windows_of("CustomStudy"), 10, "Custom Study closed")
+    return "Done bar on the number pad closes it; the number stays"
+
+
 def picture_card_id() -> int:
     nid = col().find_notes(f'tag:{TAG} "Front:kioku picture*"')[0]
     return col().get_note(nid).card_ids()[0]
@@ -1174,6 +1223,7 @@ TESTS = [
     ("deck-list", t_deck_browser),
     ("browse", t_browse),
     ("browse-columns", t_browse_columns),
+    ("numpad-done", t_numpad_done),
     ("study", t_study),
     ("review", t_review),
     ("undo", t_undo),

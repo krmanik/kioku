@@ -179,11 +179,21 @@ def _patch_app() -> None:
         original_init(self, argv)
         _fix_highlighted_text(self)
         windows.install(self)
+        _install_done_bar(self)
         mediaserver.install()
         syncserver.install()
         devtools.install()
 
     aqt.AnkiApp.__init__ = init
+
+
+def _install_done_bar(app) -> None:  # type: ignore[no-untyped-def]
+    """iOS: a Done bar above the number pad, which has no Return key."""
+    import kioku_platform as platform
+
+    install = getattr(platform, "install_done_bar", None)
+    if install is not None:
+        install(app)
 
 
 def _fix_highlighted_text(app) -> None:  # type: ignore[no-untyped-def]
