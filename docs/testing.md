@@ -1322,3 +1322,56 @@ no controller and no capture left.
 Not run: a real controller (none here). (Earlier, on the 2 GB emulator, Android's
 low-memory killer ended Kioku, ~1.2 GB PSS at idle, before any gamepad
 input.)
+
+## Missing pictures after a sync with AnkiWeb, iOS (2026-11-19)
+
+Reported by many iPhone users (image occlusion too); the reporter's
+screenshot showed Sync still spinning. Setup: a local `anki.syncserver`
+on the Mac with a test collection (75 media cases: every image format,
+names with spaces, NFC/NFD, CJK, Arabic, emoji, `# % & + ' ( ) ; , @ = $`,
+a 180-character name, case and normalisation mismatches, 10 image
+occlusion cards; plus 300 incompressible 200 KB files and a 36 MB
+picture), reached through a proxy limited to 300 KB/s. iOS Simulator
+(iPhone 17 Pro Max, iOS 27) and the iPhone 15 Pro Max (dev build with the
+fix hot-loaded, over Wi-Fi).
+
+| Test | Before the fix | With the fix |
+| --- | --- | --- |
+| Download, app kept open: files on disk | 347/347, same SHA-1 as the server | 347/347, same SHA-1 |
+| Every test card's answer in the reviewer (`naturalWidth` of each `<img>`) | 76/80; failing: `.jp2` (WebKit has no JPEG 2000, nor has Chromium), raw `%20` in `src`, `LOWER_CASE.PNG` for `lower_case.png` (case-sensitive file system), a double-escaped test name | not repeated (rendering untouched) |
+| Image occlusion cards | 10/10 draw (canvas + picture) | not repeated |
+| Leave for 60 s, connection kept | suspended within 5 s, resumes on return | download goes on ~27 s in the background (background task), then suspended; expiry handled |
+| Leave, connection drops, back after 70 s | **"Connection timed out" / raw `HttpError { code: 303 … }`, media sync stops at 72/347**, nothing retries | retry queued, resumes on return, 347/347, same SHA-1, no message |
+| iPhone: same, over Wi-Fi | not run | download continued in the background until the drop, resumed on return, 347/347 |
+| Kioku killed during the download, opened again | auto sync resumes it | not repeated |
+| Screen lock during a sync (idle timer off beforehand, as in release builds) | locks | stays on while syncing, back to locking after |
+| Sync button while downloading | spinner only | `↓N` badge (top right of Sync, inside the bar) |
+
+Host tests: `shared/tests/run.sh`, all passed, 13 new in
+`test_ankiwebsync.py` (retries, quiet start, completion, return to the
+foreground, error handling and text, badge count).
+
+### Full round on the iPhone, dev build with the fix (2026-11-19)
+
+iPhone 15 Pro Max (iOS 27), dev build installed with
+`ios/tools/run_device.sh` (no hot-loading), fresh profiles
+MediaTestPhone2/3 against the local server over Wi-Fi (300 KB/s, then
+100 KB/s).
+
+| Test | Result |
+| --- | --- |
+| `apptest.py ios` (in-app suite + crash sweep), first build and final build | 52 passed, 0 failed, 1 skipped (programs: none on iOS); 22/22 sweep steps, both times |
+| Screen lock during a sync (idle timer off beforehand, as in release builds) | off while syncing; afterwards the phone locked by itself again |
+| Leave for 60 s, connection kept | 33 → 98 files while away; task ran out after ~27 s and ended cleanly; continued on return |
+| Leave, connection drops (`NetworkError` "Connection timed out" this time) | no message; resumed on return 2 s later |
+| Kioku killed during the download, opened again | resumed by the sync on open |
+| All 347 files after the download | same SHA-1 as the server |
+| Every test card's answer in the reviewer | 76/80, the same 4 as on the simulator (none Kioku's); 10/10 image occlusion cards drawn |
+| Check Media | 20 "missing": the test's `%`-encoded links (`with%20space.png`…; Anki's check doesn't decode them, the reviewer does) and `LOWER_CASE.PNG` |
+| Leave twice in one sync, the first time until the task ran out | **bug, fixed**: the second trip got no background time. Now a new task starts on return: 111 → 150 files during the second trip |
+| Connection gone while Kioku stays open | **bug, fixed**: after the last retry nothing was shown (the retries run as periodic syncs, whose errors Anki keeps quiet). Now: retries at 5 s, 30 s, 2 min, then "A network error occurred. … Some pictures and sounds are not downloaded yet. Kioku continues when you come back to it, or tap Sync." (2.8 min after the drop) |
+| Then connection back, leave and return | resumed, 347/347 |
+
+Not run: real AnkiWeb (the test account has no big media), a release
+(TestFlight) build, the Android emulator (the shared retry code is new
+there too; Android already kept the network through its service).

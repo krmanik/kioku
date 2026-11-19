@@ -2,6 +2,19 @@
 
 All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
 
+## Next release
+
+- iOS, Android: pictures and sounds keep downloading after a sync with
+  AnkiWeb when the connection drops. On iPhone, leaving Kioku or locking
+  the screen during the download stopped it with "Connection timed out"
+  (or an `HttpError` message): the cards were there, but most pictures,
+  image occlusion ones included, were missing until the next manual
+  sync. Kioku now tries again by itself, and again when you come back
+  to it, until the download completes. While it runs, the Sync button
+  shows how many files came down.
+- iOS: a sync keeps running for a short while after you leave Kioku,
+  and the screen doesn't lock while one runs.
+
 ## 0.2.9
 
 - iOS, Android: gamepads and game controllers (Bluetooth or USB: Xbox,

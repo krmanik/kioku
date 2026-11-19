@@ -562,8 +562,8 @@ def _exclude_from_backup(path: str) -> None:
 
 
 def _keep_network(on: bool) -> None:
-    """Android cuts the network of apps in the background."""
-    if sys.platform == "android":
+    """Android cuts the network of apps in the background; iOS suspends them."""
+    if sys.platform in ("android", "ios"):
         from kioku import ankiwebsync
 
         ankiwebsync.hold("packs", on)

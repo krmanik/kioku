@@ -170,6 +170,7 @@ def _patch_app() -> None:
     packs.install()
     if sys.platform == "android":
         ankidroid.install()
+    if sys.platform in ("android", "ios"):
         ankiwebsync.install()
     original_init = aqt.AnkiApp.__init__
 

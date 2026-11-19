@@ -16,6 +16,7 @@ from .webview import WebView, delete_cookies, prop, set_cookie
 __all__ = [
     "WebView",
     "prepare",
+    "ankiweb_sync_running",
     "audio_player",
     "cache_dir",
     "config_dir",
@@ -158,6 +159,51 @@ def key_window() -> Any:
     if window is None:
         raise RuntimeError("no window")
     return window
+
+
+_UIBackgroundTaskInvalid = 0
+_sync_task = [_UIBackgroundTaskInvalid]
+_sync_task_expired: list[Any] = []  # keeps the expiration block alive
+_idle_timer_before: list[bool] = []
+
+
+def ankiweb_sync_running(running: bool, title: str = "") -> None:
+    """While a sync with AnkiWeb (or kioku.packs' download) runs: a
+    background task gives it time after Kioku leaves the foreground (iOS
+    suspends an app about 5 s after that otherwise, and decides how long
+    the task may run), and the screen does not lock while Kioku is open.
+    kioku.ankiwebsync resumes a media sync that still got cut off."""
+    app = _app()
+    log = logging.getLogger("kioku.ankiwebsync")
+    if running:
+        if not _idle_timer_before:
+            _idle_timer_before.append(bool(prop(app, "isIdleTimerDisabled")))
+            app.setIdleTimerDisabled_(True)
+        if _sync_task[0] == _UIBackgroundTaskInvalid:
+
+            def expired() -> None:
+                # iOS kills an app whose task outlives its time: end it
+                log.warning("background time for the sync ran out")
+                _end_sync_task()
+
+            block = Block(expired, None)
+            _sync_task_expired[:] = [block]
+            _sync_task[0] = int(
+                app.beginBackgroundTaskWithName_expirationHandler_(at("Kioku sync"), block)
+            )
+            log.info("background task %s started", _sync_task[0])
+    else:
+        _end_sync_task()
+        if _idle_timer_before:
+            app.setIdleTimerDisabled_(_idle_timer_before.pop())
+
+
+def _end_sync_task() -> None:
+    task = _sync_task[0]
+    if task != _UIBackgroundTaskInvalid:
+        _sync_task[0] = _UIBackgroundTaskInvalid
+        _app().endBackgroundTask_(task)
+        logging.getLogger("kioku.ankiwebsync").info("background task %s ended", task)
 
 
 def sync_server_running(running: bool, text: str) -> None:
