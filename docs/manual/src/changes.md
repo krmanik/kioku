@@ -14,6 +14,10 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
   shows how many files came down.
 - iOS: a sync keeps running for a short while after you leave Kioku,
   and the screen doesn't lock while one runs.
+- iOS, Android: show and hide the browser's columns with touch, in
+  **View › Columns**. Anki offers them in the column headers' context
+  menu, which needs a right-click
+  ([issue #20](https://github.com/krmanik/kioku/issues/20)).
 
 ## 0.2.9
 

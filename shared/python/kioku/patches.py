@@ -62,6 +62,7 @@ def apply() -> None:
     _patch_ui_scale()
     _patch_bar_heights()
     _patch_review_menu()
+    _patch_browser_columns()
     _patch_full_screen()
     _patch_screen_edges()
     _patch_native_menu_bar()
@@ -404,6 +405,52 @@ def _patch_review_menu() -> None:
         update()
 
     gui_hooks.main_window_did_init.append(lambda: setup(aqt.mw))
+
+
+def _patch_browser_columns() -> None:
+    """Anki chooses the browser's columns in the table header's context
+    menu, which a touch can't open: a tap on a header sorts and a long press
+    starts moving the column (issue #20). Offer the same choices in the
+    browser's View menu.
+
+    The rows are kept, not refilled on each opening: the iPad's menu bar
+    (kioku_platform.menubar) holds on to them, and reads their checks."""
+    from aqt import gui_hooks
+    from aqt.qt import QAction, qconnect
+    from PyQt6 import sip
+
+    def setup(browser) -> None:  # type: ignore[no-untyped-def]
+        table = browser.table
+        model = table._model
+        menu = browser.form.menuqt_accel_view.addMenu("Columns")
+        menu.setToolTipsVisible(True)
+        actions: dict[str, QAction] = {}
+
+        def toggle(key: str, action: QAction) -> None:
+            table._on_column_toggled(action.isChecked(), key)
+            sync()  # the last column stays on
+
+        def sync() -> None:
+            if sip.isdeleted(menu):
+                return  # the browser closing
+            for key, column in model.columns.items():
+                action = actions.get(key)
+                if action is None:
+                    # add-ons may add columns
+                    action = actions[key] = QAction(menu)
+                    action.setCheckable(True)
+                    qconnect(action.triggered, lambda _=False, k=key, a=action: toggle(k, a))
+                    menu.addAction(action)
+                action.setText(table._state.column_label(column))
+                action.setToolTip(table._state.column_tooltip(column))
+                action.setChecked(model.active_column_index(key) is not None)
+
+        qconnect(menu.aboutToShow, sync)
+        # columns toggled in the header, or the cards/notes switch
+        qconnect(model.modelReset, sync)
+        sync()
+
+    gui_hooks.browser_will_show.append(setup)
 
 
 def _patch_full_screen() -> None:

@@ -533,6 +533,46 @@ def t_browse():
     return f"{rows} rows for tag:{TAG}, editor loads the selected note, Add over Browse is active"
 
 
+def t_browse_columns():
+    """View › Columns shows and hides the browser's columns (issue #20: the
+    header's context menu is out of a touch's reach)."""
+    browser = aqt.dialogs.open("Browser", mw)
+    yield Until(lambda: windows_of("Browser"), 15, "Browse window")
+    table = browser.table
+    model = table._model
+    menus = [a.menu() for a in browser.form.menuqt_accel_view.actions()
+             if a.menu() is not None and a.menu().title() == "Columns"]
+    check(len(menus) == 1, f"{len(menus)} Columns menus in View")
+    menu = menus[0]
+    menu.aboutToShow.emit()
+    rows = menu.actions()
+    check(len(rows) == len(model.columns), f"{len(rows)} rows for {len(model.columns)} columns")
+    key = next((k for k in model.columns if model.active_column_index(k) is None), None)
+    check(key is not None, "every column is shown")
+    action = rows[list(model.columns).index(key)]
+    check(action.text() == table._state.column_label(model.columns[key]),
+          f"row {action.text()!r} for column {key}")
+    check(not action.isChecked(), "a hidden column's row is checked")
+    try:
+        action.trigger()
+        yield 0.3
+        check(model.active_column_index(key) is not None, f"{key} not shown after its row")
+        check(action.isChecked(), "row not checked after showing the column")
+        action.trigger()
+        yield 0.3
+        check(model.active_column_index(key) is None, f"{key} still shown after its row")
+        # toggled elsewhere (the header's menu): the row follows
+        table._on_column_toggled(True, key)
+        yield 0.3
+        check(action.isChecked(), "row not checked after the header showed the column")
+    finally:
+        if model.active_column_index(key) is not None:
+            table._on_column_toggled(False, key)
+    close_extra_windows()
+    yield Until(lambda: not windows_of("Browser"), 10, "Browse closed")
+    return f"{len(rows)} columns in View › Columns; {key} shown and hidden"
+
+
 def picture_card_id() -> int:
     nid = col().find_notes(f'tag:{TAG} "Front:kioku picture*"')[0]
     return col().get_note(nid).card_ids()[0]
@@ -1133,6 +1173,7 @@ TESTS = [
     ("editor-caret", t_editor_caret),
     ("deck-list", t_deck_browser),
     ("browse", t_browse),
+    ("browse-columns", t_browse_columns),
     ("study", t_study),
     ("review", t_review),
     ("undo", t_undo),
