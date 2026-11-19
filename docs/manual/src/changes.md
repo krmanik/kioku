@@ -4,6 +4,15 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
 
 ## Next release
 
+- iOS: add-ons that other apps connect to, such as AnkiConnect, can keep
+  answering after you leave Kioku. Turn on **Preferences › Advanced ›
+  Background › Keep running in the background** (off by default). iOS
+  pauses apps a few seconds after they leave the screen, so dictionary and
+  reader apps couldn't reach AnkiConnect and kept spinning. The option uses
+  location updates to keep Kioku running, at the lowest accuracy. Kioku
+  ignores the location: nothing is saved or sent
+  ([Add-ons that other apps connect to](using/addons.md#add-ons-that-other-apps-connect-to-iphone-ipad),
+  [issue #21](https://github.com/krmanik/kioku/issues/21)).
 - iOS, Android: pictures and sounds keep downloading after a sync with
   AnkiWeb when the connection drops. On iPhone, leaving Kioku or locking
   the screen during the download stopped it with "Connection timed out"

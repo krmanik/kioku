@@ -1,6 +1,6 @@
 # Kioku privacy policy
 
-Last updated: 27 October 2026
+Last updated: 19 November 2026
 
 Kioku (the iOS, native Android and Termux apps, the web version and the
 Docker image from [github.com/krmanik/kioku](https://github.com/krmanik/kioku))
@@ -37,6 +37,23 @@ Kioku only connects to the internet when you use a feature that needs it:
 - **Kioku's sync server and remote desktop**, only if you turn them on: they
   accept connections from the devices you choose (this phone, your Tailscale
   network or your Wi-Fi). Nothing is sent to the developer.
+
+## Location (iPhone, iPad)
+
+Kioku asks for location access only if you turn on **Preferences › Advanced
+› Background › Keep running in the background**, which keeps add-ons such as
+AnkiConnect answering other apps after you leave Kioku. iOS keeps an app
+running in the background while it receives location updates; that is the
+only reason Kioku asks for them.
+
+- Kioku asks iOS for the lowest accuracy it offers (about 3 km, without GPS).
+- The locations iOS delivers are ignored: Kioku doesn't read, save, show or
+  send them, and doesn't pass them to add-ons.
+- No location data leaves your device, and the developer never receives
+  any.
+- With the option off (the default), Kioku receives no location at all. You
+  can also turn location access off for Kioku in the Settings app at any
+  time.
 
 ## TestFlight
 

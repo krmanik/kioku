@@ -90,6 +90,45 @@ def install() -> None:
 
     aqt.preferences.Preferences.accept_with_callback = accept_with_callback
 
+    from aqt import gui_hooks
+
+    gui_hooks.main_window_did_init.append(lambda: apply_background(aqt.mw))
+
+
+# --- Background (iOS): keep add-on servers answering ---------------------------
+
+BACKGROUND_KEY = "kioku_keep_running_in_background"
+
+BACKGROUND_NOTE = """\
+iOS pauses Kioku a few seconds after you leave it, so add-ons that answer \
+other apps, such as AnkiConnect, stop answering. With this on, Kioku asks \
+for location updates and keeps running like a navigation app. It asks for \
+the lowest accuracy and doesn’t use or store your location. It uses some \
+battery; the location indicator shows while Kioku runs in the background."""
+
+BACKGROUND_STATUS = {
+    "off": "",
+    "asking": "Waiting for location access.",
+    "denied": "Location access is off for Kioku: turn it on in the Settings app › "
+    "Apps › Kioku › Location (While Using the App).",
+    "on": "On: Kioku keeps running in the background.",
+}
+
+
+def background_wanted(meta: dict | None) -> bool:
+    return bool((meta or {}).get(BACKGROUND_KEY))
+
+
+def apply_background(mw) -> None:  # type: ignore[no-untyped-def]
+    import kioku_platform as platform
+
+    keep = getattr(platform, "keep_running_in_background", None)
+    if keep is not None and mw is not None:
+        try:
+            keep(background_wanted(mw.pm.meta))
+        except Exception:
+            logger.exception("keep running in the background")
+
 
 def _human_size(size: int) -> str:
     value = float(size)
@@ -116,6 +155,12 @@ class AdvancedTab:
         self.layout.addWidget(self.server.box)
         self.gamepad = GamepadGroup(self)
         self.layout.addWidget(self.gamepad.box)
+        self.background: BackgroundGroup | None = None
+        import kioku_platform as platform
+
+        if hasattr(platform, "keep_running_in_background"):
+            self.background = BackgroundGroup(self)
+            self.layout.addWidget(self.background.box)
         self.ankidroid: AnkiDroidGroup | None = None
         if sys.platform == "android" and self.mw.col is not None:
             self.ankidroid = AnkiDroidGroup(self)
@@ -164,6 +209,50 @@ class GamepadGroup:
 
     def _on_buttons(self) -> None:
         gamepad.ControlsDialog(self.box.window(), self.mw.pm).exec()
+
+
+class BackgroundGroup:
+    """iOS: keep Kioku running in the background (location updates) so
+    add-on servers keep answering."""
+
+    def __init__(self, tab: AdvancedTab) -> None:
+        from aqt.qt import QCheckBox, QGroupBox, QLabel, QTimer, QVBoxLayout, qconnect
+
+        self.mw = tab.mw
+        self.box = QGroupBox("Background")
+        layout = QVBoxLayout(self.box)
+        self.enabled = QCheckBox("Keep running in the background")
+        self.enabled.setChecked(background_wanted(self.mw.pm.meta))
+        qconnect(self.enabled.toggled, self._on_enabled)
+        layout.addWidget(self.enabled)
+        note = QLabel(BACKGROUND_NOTE)
+        note.setWordWrap(True)
+        layout.addWidget(note)
+        self.status = QLabel()
+        self.status.setWordWrap(True)
+        layout.addWidget(self.status)
+        # location access is answered in a system alert
+        self.timer = QTimer(self.box)
+        qconnect(self.timer.timeout, self._refresh)
+        self.timer.start(1000)
+        self._refresh()
+
+    def _refresh(self) -> None:
+        import kioku_platform as platform
+
+        get = getattr(platform, "keep_running_in_background_status", None)
+        state = get() if get else ("on" if self.enabled.isChecked() else "off")
+        self.status.setText(BACKGROUND_STATUS.get(state, ""))
+        self.status.setVisible(bool(self.status.text()))
+
+    def _on_enabled(self, on: bool) -> None:
+        self.mw.pm.meta[BACKGROUND_KEY] = on
+        pm = self.mw.pm
+        # like gamepad.save_settings: the profile list has no pm.save()
+        pm.db.execute("update profiles set data = ? where name = ?", pm._pickle(pm.meta), "_global")
+        pm.db.commit()
+        apply_background(self.mw)
+        self._refresh()
 
 
 class SyncServerGroup:

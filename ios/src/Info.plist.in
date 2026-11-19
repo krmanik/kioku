@@ -71,6 +71,16 @@
     <key>NSMicrophoneUsageDescription</key>
     <string>Add-ons can record your voice, for example to compare your pronunciation or to add recordings to notes.</string>
 
+    <!-- Preferences › Advanced › Background (kioku_platform/location.py):
+         location updates keep add-on servers such as AnkiConnect
+         answering after Kioku leaves the foreground (issue #21) -->
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>location</string>
+    </array>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>With “Keep running in the background” on, location updates keep Kioku running so add-ons such as AnkiConnect keep answering other apps. Kioku asks for the lowest accuracy and doesn’t use or store your location.</string>
+
     <key>UIFileSharingEnabled</key>
     <true/>
     <key>LSSupportsOpeningDocumentsInPlace</key>

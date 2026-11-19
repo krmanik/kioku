@@ -27,6 +27,8 @@ __all__ = [
     "install_done_bar",
     "install_menu_bar",
     "keep_awake",
+    "keep_running_in_background",
+    "keep_running_in_background_status",
     "key_window",
     "open_folder",
     "pick_files",
@@ -156,6 +158,21 @@ def watch_gamepads(listener: Any) -> None:
 
 def keep_awake() -> None:
     _app().setIdleTimerDisabled_(True)
+
+
+def keep_running_in_background(on: bool) -> None:
+    """For add-ons that serve other apps (AnkiConnect): location updates
+    keep Kioku running after it leaves the foreground (.location)."""
+    from .location import keep_running
+
+    keep_running(on)
+
+
+def keep_running_in_background_status() -> str:
+    """"off", "asking", "denied" or "on"."""
+    from .location import status
+
+    return status()
 
 
 def key_window() -> Any:

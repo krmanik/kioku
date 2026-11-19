@@ -1375,3 +1375,30 @@ MediaTestPhone2/3 against the local server over Wi-Fi (300 KB/s, then
 Not run: real AnkiWeb (the test account has no big media), a release
 (TestFlight) build, the Android emulator (the shared retry code is new
 there too; Android already kept the network through its service).
+
+## AnkiConnect with Kioku in the background, iOS (issue #21) (2026-11-19)
+
+iPhone 15 Pro Max (iOS 27), dev build installed with
+`ios/tools/run_device.sh`, profile User 1 with AnkiConnect (2055492159)
+listening on 127.0.0.1:8765. Safari as the client app
+(`devicectl device process launch --payload-url http://127.0.0.1:8765
+com.apple.mobilesafari`, which also sends Kioku to the background), whole
+screen captured with `devicectl device capture screenshot`.
+
+| Test | Result |
+| --- | --- |
+| Without the option (earlier the same day) | Kioku suspended about 5 s after leaving; requests hang until it's opened again |
+| Preferences › Advanced › Background, option ticked | status "On: Kioku keeps running in the background"; the setting saved in the profile list |
+| Built app's Info.plist | `UIBackgroundModes` = `location`, `NSLocationWhenInUseUsageDescription` present |
+| Kioku in the background, Safari asks right away | `{"apiVersion": "AnkiConnect v.6"}`; location arrow in the Dynamic Island |
+| Kioku in the background for 7 min, Safari asks again (new URL, not cached) | `{"apiVersion": "AnkiConnect v.6"}`; location arrow still shown |
+
+Host tests: `shared/tests/run.sh`, 210 passed; new: the Advanced group
+(only where the platform has it, saved and applied, status texts), the
+Info.plist keys, and `kioku_platform/location.py` with a stand-in
+`CLLocationManager` (asks for access, then starts; stops when turned off;
+access denied).
+
+Not run: the screen locked, longer than 7 minutes, battery use, iPad,
+the location alert itself (access was already granted on this phone), a
+TestFlight build and App Review.

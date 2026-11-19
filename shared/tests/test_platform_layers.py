@@ -193,3 +193,50 @@ def test_ios_menu_bar_rows_and_key_commands(ios) -> None:
     assert menubar._plain("&File") == "File"
     assert menubar._plain("Save && Close") == "Save & Close"
     assert menubar._plain("&Undo\tCtrl+Z") == "Undo"
+
+
+class FakeLocationManager:
+    def __init__(self) -> None:
+        self.authorizationStatus = 0  # not determined
+        self.calls: list[tuple] = []
+
+    def __getattr__(self, name: str):  # type: ignore[no-untyped-def]
+        if name.startswith("_"):
+            raise AttributeError(name)
+        return lambda *args: self.calls.append((name, *args))
+
+
+def test_ios_keep_running_asks_then_starts_and_stops(ios, monkeypatch) -> None:
+    import importlib
+
+    location = importlib.import_module("ios_kioku_platform.location")
+    manager = FakeLocationManager()
+    cls = MagicMock()
+    cls.alloc.return_value.init.return_value = manager
+    monkeypatch.setattr(location, "ObjCClass", lambda name: cls)
+    monkeypatch.setattr(location, "prop", lambda obj, name: getattr(obj, name))
+    monkeypatch.setattr(location, "_manager", None)
+    names = lambda: [c[0] for c in manager.calls]  # noqa: E731
+
+    ios.keep_running_in_background(False)
+    assert location._manager is None  # off: nothing created, nothing asked
+    ios.keep_running_in_background(True)
+    assert "requestWhenInUseAuthorization" in names()
+    assert "startUpdatingLocation" not in names()
+    assert ios.keep_running_in_background_status() == "asking"
+
+    manager.authorizationStatus = 4  # when in use: iOS calls the delegate
+    location._delegate.locationManagerDidChangeAuthorization_(manager)
+    assert ("setAllowsBackgroundLocationUpdates_", True) in manager.calls
+    assert ("setPausesLocationUpdatesAutomatically_", False) in manager.calls
+    assert names()[-1] == "startUpdatingLocation"
+    assert ios.keep_running_in_background_status() == "on"
+
+    ios.keep_running_in_background(False)
+    assert manager.calls[-2:] == [("stopUpdatingLocation",), ("setAllowsBackgroundLocationUpdates_", False)]
+    assert ios.keep_running_in_background_status() == "off"
+
+    manager.authorizationStatus = 2  # denied in the Settings app
+    ios.keep_running_in_background(True)
+    assert ios.keep_running_in_background_status() == "denied"
+    assert names()[-1] == "setAllowsBackgroundLocationUpdates_"

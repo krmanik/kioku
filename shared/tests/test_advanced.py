@@ -404,3 +404,36 @@ def test_ankidroid_back_to_own(prefs, droid_folder) -> None:
     group.radios[ankidroid.OFF].click()
     assert callable(group.before_close())
     assert ankidroid.load(prefs.mw.pm.profile).mode == ankidroid.OFF
+
+
+def test_background_group_only_where_the_platform_has_it(prefs) -> None:
+    tab = advanced.AdvancedTab(prefs)
+    assert tab.background is None
+
+
+def test_background_saved_and_applied(prefs, platform, monkeypatch) -> None:
+    calls: list[bool] = []
+    state = ["off"]
+    monkeypatch.setattr(platform, "keep_running_in_background", calls.append, raising=False)
+    monkeypatch.setattr(platform, "keep_running_in_background_status", lambda: state[0], raising=False)
+    group = advanced.AdvancedTab(prefs).background
+    assert group is not None and not group.enabled.isChecked()
+    assert group.status.isHidden()
+    state[0] = "asking"
+    group.enabled.setChecked(True)
+    assert calls == [True]
+    assert "Waiting" in group.status.text()
+    from aqt.profiles import ProfileManager
+
+    saved = ProfileManager._unpickle(
+        prefs.mw.pm, prefs.mw.pm.db.scalar("select data from profiles where name = '_global'")
+    )
+    assert advanced.background_wanted(saved)
+    state[0] = "denied"
+    group._refresh()
+    assert "Settings app" in group.status.text()
+    # next start: applied from the saved setting
+    advanced.apply_background(prefs.mw)
+    assert calls == [True, True]
+    group.enabled.setChecked(False)
+    assert calls[-1] is False and not advanced.background_wanted(prefs.mw.pm.meta)

@@ -18,3 +18,12 @@ def test_microphone_usage_description() -> None:
     # issue #19: add-ons recording through AVAudioRecorder (rubicon-objc)
     text = load().get("NSMicrophoneUsageDescription", "")
     assert isinstance(text, str) and len(text.strip()) > 20
+
+
+def test_location_background_mode() -> None:
+    # issue #21: kioku_platform/location.py sets allowsBackgroundLocationUpdates,
+    # which raises without the "location" background mode
+    plist = load()
+    assert "location" in plist.get("UIBackgroundModes", [])
+    text = plist.get("NSLocationWhenInUseUsageDescription", "")
+    assert isinstance(text, str) and "AnkiConnect" in text

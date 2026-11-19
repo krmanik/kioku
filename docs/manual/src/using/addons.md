@@ -22,6 +22,50 @@ On the native apps (iPhone, Android) add-ons work unless they need one of:
 
 On the Termux variant, add-ons behave as on Linux.
 
+## Add-ons that other apps connect to (iPhone, iPad)
+
+> **Applies to:** iPhone and iPad
+
+Some add-ons answer requests from other apps. **AnkiConnect** is the best
+known: dictionary and reader apps (Yomitan, Hoshi Reader and others) send it
+new cards at `http://127.0.0.1:8765`.
+
+iOS pauses an app a few seconds after you leave it, and a paused app
+answers nothing. The other app then waits, or shows "can't connect" or a
+spinner that never stops. On Android this doesn't happen.
+
+To keep such add-ons answering, turn on **Preferences › Advanced ›
+Background › Keep running in the background**:
+
+1. Tick **Keep running in the background**.
+2. iOS asks whether Kioku may use your location: choose **Allow While Using
+   the App**. (Location is only the means, see below.)
+3. The group shows **On: Kioku keeps running in the background.** Now
+   switch to the other app.
+
+While Kioku runs in the background, iOS shows the location arrow at the top
+of the screen. Kioku keeps running until you turn the option off, or close
+Kioku from the app switcher.
+
+**Why location?** iOS lets an app keep running in the background only for a
+few purposes: playing audio, navigation, calls and a few others. Location
+updates are the one that fits a server best; terminal apps such as Termius
+use them to keep connections open the same way.
+
+**Your location is not collected.** Kioku asks iOS for the lowest accuracy
+it offers (about 3 km, from cell towers and Wi-Fi, without GPS) and ignores
+what it receives: the location isn't read, saved, shown or sent anywhere,
+and add-ons don't get it from Kioku. See the [privacy policy](../privacy.md).
+
+**Battery:** at this accuracy iOS uses no GPS and wakes Kioku rarely, but an
+app that stays running uses more battery than a paused one, especially if
+an add-on keeps working in the background. Turn the option off when you
+don't need it.
+
+If you chose **Don't Allow**, the group says that location access is off:
+turn it on in the **Settings** app › **Apps** › **Kioku** › **Location** ›
+**While Using the App**.
+
 ## Extra files for add-ons
 
 > **Applies to:** iPhone/iPad, Android native
