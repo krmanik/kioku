@@ -86,7 +86,11 @@ int main(int argc, char *argv[]) {
 
         PyConfig config;
         PyConfig_InitIsolatedConfig(&config);
+#if PY_VERSION_HEX >= 0x030E0000
+        // stdout/stderr also to the system log (3.14+); Documents/kioku.log
+        // gets them either way (kioku/__main__.py)
         config.use_system_logger = 1;
+#endif
         config.buffered_stdio = 0;
         config.write_bytecode = 0;
         config.install_signal_handlers = 1;
@@ -113,7 +117,8 @@ int main(int argc, char *argv[]) {
         PyConfig_Clear(&config);
         if (PyStatus_Exception(status)) fail("init", status);
 
-        // Python takes the main thread's stack bounds from pthread here, inside
+#if PY_VERSION_HEX >= 0x030E0000
+        // Python 3.14+ takes the main thread's stack bounds from pthread here, inside
         // Qt's 512 KB block, and then runs below it in exec(). Seeing the stack
         // pointer under its limit, it took every object freed on the main thread
         // for deep recursion and parked it in its trashcan for good: nothing was
@@ -125,6 +130,9 @@ int main(int argc, char *argv[]) {
         if (PyUnstable_ThreadState_SetStackProtection(PyThreadState_Get(),
                                                       stack_top - stack_size, stack_size) < 0)
             PyErr_Print();
+#endif
+        // (3.13 counts C recursion instead of checking the stack, no bounds
+        // to fix)
     }
     return Py_RunMain();
 }

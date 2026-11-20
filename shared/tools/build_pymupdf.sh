@@ -96,7 +96,8 @@ make -C "$MUPDF" -j"$JOBS" OS=kioku-$TARGET build=release build_prefix=kioku-$TA
 MUBUILD=$MUPDF/build/kioku-$TARGET-release
 
 # C++ bindings, the _mupdf module and PyMuPDF's _extra -------------------------
-OBJ=$OUT/obj
+# per Python: _mupdf and _extra include its headers
+OBJ=$OUT/obj-cp${PYTHON_VERSION/./}
 mkdir -p "$OBJ"
 # SWIG dropped PyString_FromString with Python 2 (4.4); both .i files still use it
 CXXFLAGS="$FLAGS -O2 -DNDEBUG -DPyString_FromString=PyUnicode_FromString \

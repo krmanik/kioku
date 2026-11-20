@@ -3,6 +3,7 @@
 # (shared/python/kioku/devtools.py) by shared/tools/apptest.py, which prepends
 #
 #   EXPECTED_VERSION = "26.09.4"   # Anki version the build must report
+#   EXPECTED_RUNTIME = {...}       # Python, Qt, PyQt the release pins (versions.env)
 #   ONLY = []                      # test names to run (empty: all)
 #   NETWORK = True                 # run the tests that need the internet
 #
@@ -29,6 +30,7 @@ try:
     EXPECTED_VERSION  # noqa: B018
 except NameError:
     EXPECTED_VERSION = ""
+    EXPECTED_RUNTIME = {}
     ONLY = []
     NETWORK = True
 
@@ -189,6 +191,14 @@ def t_version():
     )
     if EXPECTED_VERSION:
         check(aqt.appVersion == EXPECTED_VERSION, f"{info}; expected Anki {EXPECTED_VERSION}")
+    # add-ons expect desktop Anki's Python and Qt (AnkiHub failed on 3.14)
+    runtime = {
+        "PYTHON_FULL_VERSION": pyplatform.python_version(),
+        "QT_VERSION": QT_VERSION_STR,
+        "PYQT6_VERSION": PYQT_VERSION_STR,
+    }
+    for key, want in globals().get("EXPECTED_RUNTIME", {}).items():
+        check(not want or runtime[key] == want, f"{info}; expected {key} {want}")
     yield 0
     return info
 

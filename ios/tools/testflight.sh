@@ -53,6 +53,7 @@ if [ "${1:-}" != --upload-only ]; then
         tail -30 "$ROOT/build/wheels.log"; exit 1; }
     rsync -a "$ROOT/../build/wheels/ios/site/" "$ROOT/build/site/"
 
+    "$ROOT/../shared/tools/cmake_fresh.sh" "$ROOT/build/xcode-dist" "$QT/ios"
     "$QT/ios/bin/qt-cmake" -S "$ROOT" -B "$ROOT/build/xcode-dist" -G Xcode \
         -DQT_HOST_PATH="$QT/macos" -DCMAKE_OSX_SYSROOT=iphoneos -DCMAKE_OSX_ARCHITECTURES=arm64 \
         -DKIOKU_TEAM="$TEAM" -DKIOKU_VERSION="$VERSION" -DKIOKU_BUILD="$BUILD_NUMBER" > /dev/null

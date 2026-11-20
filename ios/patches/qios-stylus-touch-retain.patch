@@ -1,15 +1,16 @@
 diff --git a/src/plugins/platforms/ios/quiview.mm b/src/plugins/platforms/ios/quiview.mm
+index 2d22362..965a3d7 100644
 --- a/src/plugins/platforms/ios/quiview.mm
 +++ b/src/plugins/platforms/ios/quiview.mm
-@@ -148,6 +148,7 @@
+@@ -147,6 +147,7 @@ inline ulong getTimeStamp(UIEvent *event)
+ - (void)dealloc
  {
      [m_accessibleElements release];
-     [m_scrollGestureRecognizer release];
 +    [m_activePencilTouch release];
  
      [super dealloc];
  }
-@@ -498,11 +499,21 @@
+@@ -497,11 +498,21 @@ inline ulong getTimeStamp(UIEvent *event)
      for (UITouch *touch in touches) {
  #if QT_CONFIG(tabletevent)
          if (touch.type == UITouchTypeStylus) {
@@ -32,7 +33,7 @@ diff --git a/src/plugins/platforms/ios/quiview.mm b/src/plugins/platforms/ios/qu
          } else
          {
              Q_ASSERT(!m_activeTouches.contains(touch.hash));
-@@ -541,6 +552,7 @@
+@@ -540,6 +551,7 @@ inline ulong getTimeStamp(UIEvent *event)
      for (UITouch *touch in touches) {
  #if QT_CONFIG(tabletevent)
          if (touch.type == UITouchTypeStylus) {
@@ -40,7 +41,7 @@ diff --git a/src/plugins/platforms/ios/quiview.mm b/src/plugins/platforms/ios/qu
              m_activePencilTouch = nil;
          } else
  #endif
-@@ -584,6 +596,7 @@
+@@ -583,6 +595,7 @@ inline ulong getTimeStamp(UIEvent *event)
          qWarning("Subset of active touches cancelled by UIKit");
  
      m_activeTouches.clear();

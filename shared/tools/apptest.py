@@ -253,7 +253,12 @@ def wait_ready(target: Target, timeout: float) -> bool:
 
 def run_suite(target: Target, expected: str, only: list[str], network: bool,
               timeout: float) -> tuple[list[dict], str]:
-    header = (f"EXPECTED_VERSION = {expected!r}\nONLY = {only!r}\nNETWORK = {network!r}\n")
+    pins = versions()
+    # the versions the Anki release pins (shared/tools/anki_pins.py): a build
+    # left with an old Python or Qt fails t_version
+    runtime = {k: pins.get(k, "") for k in ("PYTHON_FULL_VERSION", "QT_VERSION", "PYQT6_VERSION")}
+    header = (f"EXPECTED_VERSION = {expected!r}\nEXPECTED_RUNTIME = {runtime!r}\n"
+              f"ONLY = {only!r}\nNETWORK = {network!r}\n")
     with open(SUITE, encoding="utf8") as f:
         code = header + f.read()
     out = command(target, code, 30)

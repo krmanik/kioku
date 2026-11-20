@@ -19,7 +19,7 @@ source "$SHARED/versions.env"
 TARGET=${1:?ios, ios-sim or android}
 WORK=$ROOT/build/wheels
 SRC=$WORK/src
-WHEELS=$WORK/$TARGET/wheels
+WHEELS=$WORK/$TARGET/wheels-cp${PYTHON_VERSION/./}
 SITE=$WORK/$TARGET/site
 mkdir -p "$SRC" "$WHEELS"
 export ANDROID_HOME=${ANDROID_HOME:-$HOME/Library/Android/sdk}

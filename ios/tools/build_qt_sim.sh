@@ -9,7 +9,7 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 source "$ROOT/../shared/versions.env"
 QT=$ROOT/deps/qt/$QT_VERSION
 PREFIX=$QT/iossim
-SRC=$ROOT/deps/qt-src
+SRC=$ROOT/deps/qt-src-$QT_VERSION
 BUILD=$ROOT/build/qt-sim
 STAMP=$PREFIX/.kioku
 

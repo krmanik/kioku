@@ -18,6 +18,7 @@ cd "$ROOT/deps/sdist/pyqt6-$PYQT6_VERSION"
 rm -rf "$ROOT/build/pyqt6-gen"
 mkdir -p "$ROOT/cmake" "$ROOT/build"
 "$ROOT/.venv/bin/sip-build" --no-make --confirm-license --no-tools \
+    --abi-version "$("$ROOT/../shared/tools/sip_abi.sh" "$ROOT/deps/sdist/pyqt6_sip-$PYQT6_SIP_VERSION")" \
     --no-designer-plugin --no-qml-plugin --no-dbus-python \
     --qmake "$ROOT/deps/qt/$QT_VERSION/android_arm64_v8a/bin/qmake" \
     --android-abi arm64-v8a \
