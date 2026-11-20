@@ -4,6 +4,11 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
 
 ## Next release
 
+- Termux app: Anki starts again inside the desktop. 0.2.9 left out a file
+  Preferences › Advanced needs, so the desktop came up without Anki
+  ([issue #13](https://github.com/krmanik/kioku/issues/13)). The Termux
+  app no longer shows the Gamepad settings: its desktop gets no
+  controller input.
 - iOS: add-ons that other apps connect to, such as AnkiConnect, can keep
   answering after you leave Kioku. Turn on **Preferences › Advanced ›
   Background › Keep running in the background** (off by default). iOS

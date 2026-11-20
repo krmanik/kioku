@@ -166,11 +166,15 @@ class AdvancedTab:
         self.scroll.setWidget(body)
         self.server = SyncServerGroup(self)
         self.layout.addWidget(self.server.box)
-        self.gamepad = GamepadGroup(self)
-        self.layout.addWidget(self.gamepad.box)
-        self.background: BackgroundGroup | None = None
         import kioku_platform as platform
 
+        # only where the platform reads controllers (iOS, Android); the Termux
+        # app's X11 desktop gets no gamepad events
+        self.gamepad: GamepadGroup | None = None
+        if hasattr(platform, "watch_gamepads"):
+            self.gamepad = GamepadGroup(self)
+            self.layout.addWidget(self.gamepad.box)
+        self.background: BackgroundGroup | None = None
         if hasattr(platform, "keep_running_in_background"):
             self.background = BackgroundGroup(self)
             self.layout.addWidget(self.background.box)

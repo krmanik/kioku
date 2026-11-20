@@ -411,6 +411,15 @@ def test_background_group_only_where_the_platform_has_it(prefs) -> None:
     assert tab.background is None
 
 
+def test_gamepad_group_only_where_the_platform_reads_controllers(prefs, platform, monkeypatch) -> None:
+    # the Termux app's kioku_platform has no watch_gamepads: no Gamepad box
+    assert not hasattr(platform, "watch_gamepads")
+    assert advanced.AdvancedTab(prefs).gamepad is None
+    monkeypatch.setattr(platform, "watch_gamepads", lambda listener: None, raising=False)
+    group = advanced.AdvancedTab(prefs).gamepad
+    assert group is not None and group.box.title() == "Gamepad"
+
+
 def test_background_saved_and_applied(prefs, platform, monkeypatch) -> None:
     calls: list[bool] = []
     state = ["off"]

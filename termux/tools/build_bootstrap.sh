@@ -37,10 +37,12 @@ tools/fetch_python_deps.sh "$PYVER" build/python-deps
 
 tools/fetch_novnc.sh build/novnc-overlay
 
-# Shared with the native apps (launch_anki.py): Preferences > Advanced, add-on docks
+# Shared with the native apps (launch_anki.py): Preferences > Advanced, add-on docks.
+# Every kioku module launch_anki.py reaches through imports, not a hand-kept list.
 rm -rf build/kioku-overlay
 mkdir -p build/kioku-overlay/share/ankidx/kioku
-for m in advanced ankidroid background maindocks switchsync syncserver; do
+MODULES=$(python3 -I tools/kioku_modules.py)
+for m in $MODULES; do
 	cp ../shared/python/kioku/$m.py build/kioku-overlay/share/ankidx/kioku/
 done
 
