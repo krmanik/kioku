@@ -49,6 +49,7 @@ mkdir -p "$BUILD/package"
 rsync -a --delete --exclude assets "$ROOT/package/" "$BUILD/package/"
 "$ROOT/tools/pack_python.sh" "$ROOT/build/site" "$BUILD/package/assets/python.zip"
 
+"$ROOT/../shared/tools/cmake_fresh.sh" "$BUILD" "$QT/android_arm64_v8a"
 "$QT/android_arm64_v8a/bin/qt-cmake" -S "$ROOT" -B "$BUILD" -G Ninja \
     -DCMAKE_BUILD_TYPE=Release -DQT_HOST_PATH="$QT/$HOST_DIR" \
     -DANDROID_SDK_ROOT="$ANDROID_SDK_ROOT" -DANDROID_NDK_ROOT="$ANDROID_NDK_ROOT" \

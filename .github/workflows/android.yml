@@ -89,7 +89,7 @@ jobs:
         with:
           path: |
             android/deps/qt
-            android/deps/python-android
+            android/deps/python-android-*
           key: android-deps-${{ hashFiles('shared/versions.env') }}
 
       # programs and packages for add-ons (shared/tools/build_programs.sh,

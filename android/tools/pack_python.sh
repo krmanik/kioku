@@ -1,6 +1,6 @@
 #!/bin/bash
 # Pack the Python runtime that KiokuActivity unpacks on the first start:
-#   lib/python3.14/  the standard library with lib-dynload (python.org's build)
+#   lib/python3.X/   the standard library with lib-dynload (tools/build_python.sh)
 #   app/             the shared kioku package and PyQt6 overlay + the Android layer
 #   app_packages/    Anki and its dependencies (shared/tools/prepare_site.sh)
 #   dev-build        only with KIOKU_DEV_BUILD=1: allows the dev command channel
@@ -11,7 +11,7 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 source "$ROOT/../shared/versions.env"
 SITE=$1
 OUT=$2
-PREFIX=$ROOT/deps/python-android/prefix
+PREFIX=$ROOT/deps/python-android-$PYTHON_FULL_VERSION/prefix
 STAGE=$ROOT/build/python-stage
 # test-only modules and stubs; the extra files for add-ons are downloaded
 # (shared/tools/packs.py, kioku/packs.py)

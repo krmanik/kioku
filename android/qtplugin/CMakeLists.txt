@@ -22,7 +22,7 @@ set(SOURCES
     qandroidplatformservices.cpp qandroidplatformtheme.cpp qandroidplatformwindow.cpp
     qandroidsystemlocale.cpp androidwindowembedding.cpp androidbackendregister.cpp
     extract.cpp
-    qandroidplatformclipboard.cpp
+    qandroidplatformclipboard.cpp qandroidplatformdrag.cpp
     androidjniaccessibility.cpp qandroidplatformaccessibility.cpp
     qandroidplatformopenglcontext.cpp qandroidplatformopenglwindow.cpp
     qandroidplatformoffscreensurface.cpp

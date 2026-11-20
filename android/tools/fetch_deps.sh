@@ -2,7 +2,7 @@
 # Download everything the native Android build needs into android/deps
 # (skipping what is already there) and set up the host Python venv with sip.
 #   deps/qt/<ver>/{android_arm64_v8a,<host>}  Qt for Android and its host tools
-#   deps/python-android                       python.org's Android package
+#   deps/python-android-<ver>                 Anki's Python for Android (tools/build_python.sh)
 #   deps/anki                                 Anki source (for rsbridge)
 #   deps/sdist/*                              PyQt6, PyQt6-sip, orjson, rpds-py, markupsafe
 set -euo pipefail
@@ -19,8 +19,9 @@ else
     HOST_OS=linux; HOST_ARCH=linux_gcc_64; HOST_DIR=gcc_64; HOST_ICU=icu
 fi
 
-if [ ! -x "$ROOT/.venv/bin/sip-build" ]; then
-    uv venv -q -p "$PYTHON_VERSION" "$ROOT/.venv"
+venv_python=$("$ROOT/.venv/bin/python" -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null || true)
+if [ ! -x "$ROOT/.venv/bin/sip-build" ] || [ "$venv_python" != "$PYTHON_VERSION" ]; then
+    uv venv -q --clear -p "$PYTHON_VERSION" "$ROOT/.venv"
     uv pip install -q -p "$ROOT/.venv/bin/python" pip \
         "sip==$SIP_VERSION" "pyqt-builder==$PYQT_BUILDER_VERSION"
 fi
@@ -40,14 +41,7 @@ for tool in qmake qmake6; do
     rm -f "$QT/android_arm64_v8a/bin/$tool.bak"
 done
 
-if [ ! -d python-android/prefix ]; then
-    version=$(curl -fsSL https://www.python.org/ftp/python/ \
-        | grep -o "$PYTHON_VERSION\.[0-9]*/" | tr -d / | sort -uV | tail -1)
-    curl -fsSL -o python-android.tar.gz \
-        "https://www.python.org/ftp/python/$version/python-$version-aarch64-linux-android.tar.gz"
-    mkdir -p python-android && tar xzf python-android.tar.gz -C python-android
-    rm python-android.tar.gz
-fi
+"$ROOT/tools/build_python.sh"
 
 # Anki at ANKI_TAG with shared/patches/ applied; Kioku runs its sync server
 # on a thread it can stop and start again (Preferences > Advanced)

@@ -16,7 +16,7 @@ set(KIOKU_BUILD "1" CACHE STRING "Build number (versionCode)")
 set(KIOKU_PACKAGE_DIR "${CMAKE_BINARY_DIR}/package" CACHE PATH "Android package sources")
 
 set(DEPS ${CMAKE_SOURCE_DIR}/deps)
-set(PYTHON_PREFIX ${DEPS}/python-android/prefix)
+set(PYTHON_PREFIX ${DEPS}/python-android-${PYTHON_FULL_VERSION}/prefix)  # tools/build_python.sh
 set(KIOKU_PYTHON_INCLUDE ${PYTHON_PREFIX}/include/python${PYTHON_VERSION})
 set(RUST_TARGET aarch64-linux-android)
 

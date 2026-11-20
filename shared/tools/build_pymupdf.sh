@@ -80,7 +80,7 @@ android)
     CXX=$LLVM/aarch64-linux-android28-clang++
     AR=$LLVM/llvm-ar
     RANLIB=$LLVM/llvm-ranlib
-    PYPREFIX=$ROOT/android/deps/python-android/prefix
+    PYPREFIX=$ROOT/android/deps/python-android-$PYTHON_FULL_VERSION/prefix
     PYINC=$PYPREFIX/include/python$PYTHON_VERSION
     ;;
 *)
