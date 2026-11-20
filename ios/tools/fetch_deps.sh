@@ -12,8 +12,9 @@ DEPS=$ROOT/deps
 mkdir -p "$DEPS/sdist"
 cd "$DEPS"
 
-if [ ! -x "$ROOT/.venv/bin/sip-build" ]; then
-    uv venv -q -p "$PYTHON_VERSION" "$ROOT/.venv"
+venv_python=$("$ROOT/.venv/bin/python" -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null || true)
+if [ ! -x "$ROOT/.venv/bin/sip-build" ] || [ "$venv_python" != "$PYTHON_VERSION" ]; then
+    uv venv -q --clear -p "$PYTHON_VERSION" "$ROOT/.venv"
     uv pip install -q -p "$ROOT/.venv/bin/python" pip \
         "sip==$SIP_VERSION" "pyqt-builder==$PYQT_BUILDER_VERSION"
 fi
@@ -32,11 +33,15 @@ done
 sed -i '' 's|^HostPrefix=.*|HostPrefix=../../macos|; s|^HostData=.*|HostData=.|' \
     "$QT/ios/bin/target_qt.conf"
 
-if [ ! -d python-ios/Python.xcframework ]; then
+# Anki's Python (PYTHON_FULL_VERSION); again when versions.env moves
+python_ios() { grep -q "^Python version: $PYTHON_FULL_VERSION *$" python-ios/VERSIONS 2>/dev/null; }
+if [ ! -d python-ios/Python.xcframework ] || ! python_ios; then
     tag=$PYTHON_APPLE_SUPPORT_TAG
     curl -fsSL -o python-ios.tar.gz \
         "https://github.com/beeware/Python-Apple-support/releases/download/$tag/Python-$PYTHON_VERSION-iOS-support.${tag#*-}.tar.gz"
+    rm -rf python-ios
     mkdir -p python-ios && tar xzf python-ios.tar.gz -C python-ios && rm python-ios.tar.gz
+    python_ios || { echo "BeeWare $tag is not Python $PYTHON_FULL_VERSION (shared/versions.env):" >&2; head -1 python-ios/VERSIONS >&2; exit 1; }
 fi
 
 # Anki at ANKI_TAG with shared/patches/ applied; Kioku runs its sync server

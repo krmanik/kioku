@@ -29,10 +29,11 @@ cd "$ROOT/deps/anki"
 # link-time optimization, as Anki's release-lto profile: the translations are
 # generated as consts, which without it end up in the binary twice (~8 MB)
 CARGO_PROFILE_RELEASE_LTO=fat CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 \
-PYO3_CONFIG_FILE=$ROOT/../shared/tools/pyo3/abi3.cfg cargo rustc -p rsbridge --lib --release \
+PYO3_CONFIG_FILE=$("$ROOT/../shared/tools/pyo3/config.sh" "$ROOT/../shared/tools/pyo3/abi3.cfg") cargo rustc -p rsbridge --lib --release \
     --target "$TARGET" --features rustls --crate-type staticlib
 
-export PYO3_CONFIG_FILE=$ROOT/../shared/tools/pyo3/cp314.cfg
+PYO3_CONFIG_FILE=$("$ROOT/../shared/tools/pyo3/config.sh" "$ROOT/../shared/tools/pyo3/cpython.cfg")
+export PYO3_CONFIG_FILE
 cd "$ROOT/deps/sdist/orjson-$ORJSON_VERSION"
 cargo +nightly rustc --lib --release --target "$TARGET" --crate-type staticlib
 cd "$ROOT/deps/sdist/rpds_py-$RPDS_VERSION"

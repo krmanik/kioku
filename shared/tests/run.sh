@@ -4,23 +4,27 @@
 # android/deps/anki (Anki at ANKI_TAG with shared/patches/ applied). No device
 # needed.
 # Usage: shared/tests/run.sh [pytest args]
-# Env: PYTHON (default python3.14), PROTOC (default: on PATH)
+# Env: PYTHON (default python$PYTHON_VERSION from shared/versions.env, Anki's),
+#      PROTOC (default: on PATH)
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 source "$ROOT/shared/versions.env"
 ANKI_SRC=$ROOT/android/deps/anki
 WORK=$ROOT/build/host-tests
 VENV=$WORK/venv
-PYTHON=${PYTHON:-python3.14}
+PYTHON=${PYTHON:-python$PYTHON_VERSION}
 
 "$ROOT/shared/tools/anki_source.sh" "$ANKI_SRC"
 
-if [ ! -x "$VENV/bin/python" ]; then
+venv_python=$("$VENV/bin/python" -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null || true)
+if [ "$venv_python" != "$("$PYTHON" -c 'import sys; print("%d.%d" % sys.version_info[:2])')" ]; then
     mkdir -p "$WORK"
-    "$PYTHON" -m venv "$VENV"
+    "$PYTHON" -m venv --clear "$VENV"
 fi
-if [ "$("$VENV/bin/python" -c 'import importlib.metadata as m; print(m.version("aqt"))' 2>/dev/null)" != "$ANKI_PY_VERSION" ]; then
-    "$VENV/bin/pip" install -q "anki==$ANKI_PY_VERSION" "aqt==$ANKI_PY_VERSION" PyQt6 pytest
+# aqt[qt]: PyQt6 and Qt at the versions the Anki release pins
+installed=$("$VENV/bin/python" -c 'import importlib.metadata as m; print(m.version("aqt"), m.version("pyqt6-qt6"))' 2>/dev/null || true)
+if [ "$installed" != "$ANKI_PY_VERSION $QT_VERSION" ]; then
+    "$VENV/bin/pip" install -q --resume-retries 10 "anki==$ANKI_PY_VERSION" "aqt[qt]==$ANKI_PY_VERSION" pytest
 fi
 
 # rsbridge refuses to load unless its build hash matches the Python package's

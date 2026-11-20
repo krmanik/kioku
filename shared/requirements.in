@@ -1,5 +1,7 @@
 # Anki's Python dependencies for the iOS and native Android builds (aqt/anki 26.9.4).
-# Pin with: uv pip compile -p 3.14 shared/requirements.in -o shared/requirements.txt
+# Pinned at Anki's uv.lock versions (add-ons expect desktop Anki's packages):
+#   shared/tools/anki_pins.py constraints android/deps/anki > c.txt
+#   uv pip compile -p 3.13 -c c.txt shared/requirements.in -o shared/requirements.txt
 decorator
 markdown
 orjson==3.12.0

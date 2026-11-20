@@ -1,8 +1,10 @@
 # Checks daily for a new Anki release and opens a pull request that moves all
 # three variants to it, then starts their builds on the PR branch.
 #
-# - iOS and native Android: shared/versions.env (ANKI_TAG, ANKI_PY_VERSION)
-#   and the pinned dependencies in shared/requirements.txt.
+# - iOS and native Android: shared/versions.env (ANKI_TAG, ANKI_PY_VERSION, and
+#   Python, Qt, PyQt6, sip, packages at the versions the release pins:
+#   shared/tools/anki_pins.py) and shared/requirements.txt, compiled with
+#   Anki's uv.lock as constraints.
 # - Termux: the default versionName. Its build downloads the anki .deb from the
 #   krmanik/termux-packages release anki-<ANKI_TAG>; the PR says when that
 #   release does not exist yet (run that repository's anki workflow).
@@ -65,7 +67,9 @@ jobs:
 
       - name: Update iOS and Android
         if: steps.anki.outputs.update == 'true'
+        id: update
         env:
+          GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.anki.outputs.tag }}
           PY: ${{ steps.anki.outputs.py }}
           CURRENT: ${{ steps.anki.outputs.current }}
@@ -73,7 +77,30 @@ jobs:
           old_py=$(sed -n 's/^ANKI_PY_VERSION=//p' shared/versions.env)
           sed -i "s/^ANKI_TAG=.*/ANKI_TAG=$TAG/; s/^ANKI_PY_VERSION=.*/ANKI_PY_VERSION=$PY/" shared/versions.env
           sed -i "1s/(aqt\/anki $old_py)/(aqt\/anki $PY)/" shared/requirements.in
-          uv pip compile -q -p 3.14 shared/requirements.in -o shared/requirements.txt
+          # Python, Qt, PyQt6, sip and the packages at the release's pins
+          git clone -q --filter=blob:none --no-checkout https://github.com/ankitects/anki "$RUNNER_TEMP/anki"
+          git -C "$RUNNER_TEMP/anki" fetch -q origin tag "$CURRENT" tag "$TAG"
+          old_python=$(sed -n 's/^PYTHON_FULL_VERSION=//p' shared/versions.env)
+          python3 -I shared/tools/anki_pins.py update "$RUNNER_TEMP/anki" "$TAG"
+          python=$(sed -n 's/^PYTHON_FULL_VERSION=//p' shared/versions.env)
+          if [ "$python" != "$old_python" ]; then
+            # BeeWare's iOS support package with that Python, if out yet
+            minor=${python%.*}
+            apple=$(gh api "repos/beeware/Python-Apple-support/releases?per_page=100" \
+              --jq "[.[] | select(.tag_name | startswith(\"$minor-b\")) | select(.body | test(\"Python $python\\\\b\"))][0].tag_name // empty")
+            if [ -n "$apple" ]; then
+              sed -i "s/^PYTHON_APPLE_SUPPORT_TAG=.*/PYTHON_APPLE_SUPPORT_TAG=$apple/" shared/versions.env
+            fi
+          fi
+          python3 -I shared/tools/anki_pins.py constraints "$RUNNER_TEMP/anki" "$TAG" > "$RUNNER_TEMP/anki-constraints.txt"
+          uv pip compile -q -p "${python%.*}" -c "$RUNNER_TEMP/anki-constraints.txt" \
+            --custom-compile-command "shared/tools/anki_pins.py constraints android/deps/anki > c.txt; uv pip compile -p ${python%.*} -c c.txt shared/requirements.in -o shared/requirements.txt" \
+            shared/requirements.in -o shared/requirements.txt
+          {
+            echo "python=$python"
+            echo "old_python=$old_python"
+            echo "apple=$(sed -n 's/^PYTHON_APPLE_SUPPORT_TAG=//p' shared/versions.env)"
+          } >> "$GITHUB_OUTPUT"
           # aqt's and anki's declared dependencies, for the PR description
           {
             echo "### Dependencies declared by aqt/anki $PY"
@@ -92,8 +119,7 @@ jobs:
           TAG: ${{ steps.anki.outputs.tag }}
           CURRENT: ${{ steps.anki.outputs.current }}
         run: |
-          git clone -q --filter=blob:none --no-checkout https://github.com/ankitects/anki "$RUNNER_TEMP/anki"
-          git -C "$RUNNER_TEMP/anki" fetch -q origin tag "$CURRENT" tag "$TAG"
+          # cloned by the update step
           if python3 -I shared/tools/anki_drift.py "$RUNNER_TEMP/anki" "$CURRENT" "$TAG" > "$RUNNER_TEMP/drift.md"; then
             echo "clean=true" >> "$GITHUB_OUTPUT"
           else
@@ -135,6 +161,9 @@ jobs:
           DEB: ${{ steps.termux.outputs.deb }}
           NUMBER: ${{ steps.pr.outputs.pull-request-number }}
           DRIFT_CLEAN: ${{ steps.drift.outputs.clean }}
+          PYTHON: ${{ steps.update.outputs.python }}
+          OLD_PYTHON: ${{ steps.update.outputs.old_python }}
+          APPLE: ${{ steps.update.outputs.apple }}
         run: |
           if [ "$DEB" = found ]; then
             termux="- [x] Termux: release [anki-$TAG](https://github.com/krmanik/termux-packages/releases/tag/anki-$TAG) exists"
@@ -145,6 +174,9 @@ jobs:
             echo "Anki [$TAG](https://github.com/ankitects/anki/releases/tag/$TAG) is out (was $CURRENT)."
             echo
             echo "- [x] iOS and native Android: \`shared/versions.env\`, \`shared/requirements.txt\`"
+            if [ "$PYTHON" != "$OLD_PYTHON" ]; then
+              echo "- [ ] Python $OLD_PYTHON → $PYTHON (Anki's \`.python-version\`): iOS uses BeeWare's $APPLE (check it has $PYTHON), Android and web build it from source, Termux needs it in krmanik/termux-packages"
+            fi
             echo "$termux"
             echo "- [ ] Builds: Android APK, iOS IPA and Termux APK were started on this branch (Actions tab)"
             echo "- [ ] Compare the dependencies below with \`shared/requirements.in\` and \`termux/tools/python-requirements.in\`"

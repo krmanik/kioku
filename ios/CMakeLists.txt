@@ -59,6 +59,7 @@ set_source_files_properties(${KIOKU_ASSETS} ${KIOKU_PRIVACY}
 
 qt_add_executable(Kioku MACOSX_BUNDLE src/main.mm ${KIOKU_ASSETS} ${KIOKU_PRIVACY})
 target_include_directories(Kioku PRIVATE ${KIOKU_PYTHON_INCLUDE})
+target_compile_definitions(Kioku PRIVATE KIOKU_PYTHON_VERSION="${PYTHON_VERSION}")
 target_link_libraries(Kioku PRIVATE
     pyqt6_QtCore pyqt6_QtGui pyqt6_QtWidgets pyqt6_QtNetwork pyqt6_QtSvg
     pyqt6_sip

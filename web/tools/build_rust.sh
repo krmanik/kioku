@@ -29,7 +29,7 @@ export PROTOC=$(command -v protoc)
 export CFLAGS_wasm32_unknown_emscripten="-pthread" CXXFLAGS_wasm32_unknown_emscripten="-pthread"
 export CARGO_TARGET_DIR=$ROOT/build/rust-target
 export RUSTFLAGS="-C panic=abort -C target-feature=+atomics,+bulk-memory,+mutable-globals --cfg tokio_unstable --cfg mio_unsupported_force_poll_poll --cfg mio_unsupported_force_waker_pipe"
-PYO3_CONFIG_FILE=$KIOKU_REPO/shared/tools/pyo3/abi3.cfg cargo +nightly rustc -Zbuild-std=std,panic_abort \
+PYO3_CONFIG_FILE=$("$KIOKU_REPO/shared/tools/pyo3/config.sh" "$KIOKU_REPO/shared/tools/pyo3/abi3.cfg") cargo +nightly rustc -Zbuild-std=std,panic_abort \
     --config "patch.crates-io.mio.path=\"$D/patched/mio-1.0.4\"" \
     --config "patch.crates-io.tokio.path=\"$D/patched/tokio-1.47.1\"" \
     --config "patch.crates-io.socket2.path=\"$D/patched/socket2-0.6.0\"" \

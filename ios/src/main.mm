@@ -97,7 +97,7 @@ int main(int argc, char *argv[]) {
         PyMem_RawFree(whome);
         if (PyStatus_Exception(status)) fail("home", status);
 
-        NSString *stdlib = [home stringByAppendingPathComponent:@"lib/python3.14"];
+        NSString *stdlib = [home stringByAppendingPathComponent:@"lib/python" KIOKU_PYTHON_VERSION];  // from CMake
         config.module_search_paths_set = 1;
         append_path(&config, [res stringByAppendingPathComponent:@"app"]);
         append_path(&config, [res stringByAppendingPathComponent:@"app_packages"]);

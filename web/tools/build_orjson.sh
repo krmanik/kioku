@@ -16,5 +16,5 @@ export CFLAGS_wasm32_unknown_emscripten="-pthread"
 export CARGO_TARGET_DIR=$ROOT/build/rust-target-orjson
 export RUSTFLAGS="-C panic=abort -C target-feature=+atomics,+bulk-memory,+mutable-globals"
 cd "$SRC"
-PYO3_CONFIG_FILE=$ROOT/tools/pyo3/cp314-wasm32.cfg cargo +nightly rustc -Zbuild-std=std,panic_abort \
+PYO3_CONFIG_FILE=$("$KIOKU_REPO/shared/tools/pyo3/config.sh" "$ROOT/tools/pyo3/cpython-wasm32.cfg") cargo +nightly rustc -Zbuild-std=std,panic_abort \
     --lib --release --target wasm32-unknown-emscripten --crate-type staticlib

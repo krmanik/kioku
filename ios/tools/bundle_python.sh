@@ -18,6 +18,7 @@ SIGN_ID=${EXPANDED_CODE_SIGN_IDENTITY:-}
 # test-only modules and stubs; the extra files for add-ons are downloaded
 # (shared/tools/packs.py, kioku/packs.py)
 EXCLUDES=$ROOT/../shared/tools/bundle_excludes.txt
+source "$ROOT/../shared/versions.env"
 PACK_EXCLUDES=$(mktemp)
 trap 'rm -f "$PACK_EXCLUDES"' EXIT
 python3 "$ROOT/../shared/tools/packs.py" excludes > "$PACK_EXCLUDES"
@@ -70,8 +71,8 @@ install_so() {
     fi
 }
 
-find "$APP/python/lib/python3.14/lib-dynload" -name '*.so' | while read -r so; do
-    install_so "$so" python/lib/python3.14/lib-dynload
+find "$APP/python/lib/python$PYTHON_VERSION/lib-dynload" -name '*.so' | while read -r so; do
+    install_so "$so" "python/lib/python$PYTHON_VERSION/lib-dynload"
 done
 find "$APP/app_packages" -name '*.so' | while read -r so; do
     install_so "$so" app_packages
