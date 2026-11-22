@@ -1100,6 +1100,22 @@ return [a.getBoundingClientRect().height * scale,
 })()""" % json.dumps(DECK))
 
 
+HEATMAP_LIKE_JS = """(() => {
+const box = document.createElement('div');
+box.id = 'kioku-test-chart';
+box.innerHTML = '<div style="display:inline-block"><div><div style="float:right"><span id="kioku-test-chart-btn" style="padding:2px 8px">B</span></div><div style="clear:both"></div></div>'
+  + '<svg width="636" height="109"><rect width="636" height="109" fill="#ccc"/></svg></div>';
+document.body.appendChild(box);
+window.__kioku_chart = () => {
+  const svg = box.querySelector('svg').getBoundingClientRect();
+  const btn = document.getElementById('kioku-test-chart-btn').getBoundingClientRect();
+  return {svg: svg.right, button: btn.right, room: document.documentElement.clientWidth,
+          scroll: document.documentElement.scrollWidth - window.innerWidth};
+};
+return true;
+})()"""
+
+
 def t_page_zoom():
     # TestFlight (iPad): View › Zoom In moved the page right, the text
     # stayed the same size (WKWebView pageZoom; kioku_platform.webview)
@@ -1117,13 +1133,24 @@ def t_page_zoom():
         ratio = zoomed[0] / before[0]
         check(ratio > 1.2, f"Zoom In x3 (130%) made the text {ratio:.2f}x as tall")
         check(zoomed[1] <= 1, f"zoomed page is {zoomed[1]} px wider than the window")
+        # TestFlight (iPhone, 0.2.9 zoomed): Review Heatmap's chart and its
+        # buttons ran off the right side. A chart like it: a 636px SVG in an
+        # inline-block with a button floated right (kioku.webscripts fitCharts)
+        chart = yield Js(mw.web, HEATMAP_LIKE_JS)
+        yield 1
+        chart = yield Js(mw.web, "window.__kioku_chart()")
+        check(bool(chart), "chart not on the deck list")
+        check(chart["svg"] <= chart["room"] + 1 and chart["button"] <= chart["room"] + 1,
+              f"chart ends at {chart['svg']} px, its button at {chart['button']} px, window {chart['room']} px")
+        check(chart["scroll"] <= 1, f"zoomed page with the chart is {chart['scroll']} px wider than the window")
     finally:
+        mw.web.eval("document.getElementById('kioku-test-chart') && document.getElementById('kioku-test-chart').remove()")
         mw.form.actionResetZoom.trigger()
     yield 1.5
     reset = yield _deck_name_size()
     back = reset[0] / before[0]
     check(0.95 < back < 1.05, f"Reset Zoom left the text {back:.2f}x as tall")
-    return f"130%: text {ratio:.2f}x, no sideways scroll; reset restores"
+    return f"130%: text {ratio:.2f}x, no sideways scroll, a wide chart fits; reset restores"
 
 
 def t_stats():
