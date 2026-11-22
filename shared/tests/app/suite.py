@@ -1061,6 +1061,45 @@ def t_deck_browser():
     return "deck list shows the deck"
 
 
+def _deck_name_size() -> Js:
+    """[on-screen height of the test deck's name, page width beyond the
+    window]: CSS px times the pinch scale times device pixels, so text that
+    only gets smaller CSS px while the scale grows doesn't count as zoomed."""
+    return Js(mw.web, """(() => {
+const a = [...document.querySelectorAll('a.deck')].find(a => a.innerText.includes(%s));
+if (!a) return null;
+const scale = (window.visualViewport ? visualViewport.scale : 1) * devicePixelRatio;
+return [a.getBoundingClientRect().height * scale,
+        document.documentElement.scrollWidth - window.innerWidth];
+})()""" % json.dumps(DECK))
+
+
+def t_page_zoom():
+    # TestFlight (iPad): View › Zoom In moved the page right, the text
+    # stayed the same size (WKWebView pageZoom; kioku_platform.webview)
+    mw.moveToState("deckBrowser")
+    yield Until(lambda: mw.state == "deckBrowser", 10, "deck list")
+    yield 1
+    before = yield _deck_name_size()
+    check(bool(before), "test deck not on the deck list")
+    try:
+        for _ in range(3):
+            mw.form.actionZoomIn.trigger()
+        yield 1.5
+        zoomed = yield _deck_name_size()
+        check(bool(zoomed), "test deck gone after Zoom In")
+        ratio = zoomed[0] / before[0]
+        check(ratio > 1.2, f"Zoom In x3 (130%) made the text {ratio:.2f}x as tall")
+        check(zoomed[1] <= 1, f"zoomed page is {zoomed[1]} px wider than the window")
+    finally:
+        mw.form.actionResetZoom.trigger()
+    yield 1.5
+    reset = yield _deck_name_size()
+    back = reset[0] / before[0]
+    check(0.95 < back < 1.05, f"Reset Zoom left the text {back:.2f}x as tall")
+    return f"130%: text {ratio:.2f}x, no sideways scroll; reset restores"
+
+
 def t_stats():
     mw.onStats()
     yield Until(lambda: windows_of("NewDeckStats") or windows_of("DeckStats"), 15, "Statistics")
@@ -1380,6 +1419,7 @@ TESTS = [
     ("editor-formatting", t_editor_formatting),
     ("editor-caret", t_editor_caret),
     ("deck-list", t_deck_browser),
+    ("page-zoom", t_page_zoom),
     ("browse", t_browse),
     ("browse-columns", t_browse_columns),
     ("numpad-done", t_numpad_done),

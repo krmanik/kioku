@@ -71,6 +71,55 @@ def _js_value(value: Any) -> Any:
     if isinstance(value, dict):
         return {k: _js_value(v) for k, v in value.items()}
     return value
+
+
+# Page zoom (View › Zoom In/Out, Preferences › User interface size).
+# WKWebView's pageZoom doesn't zoom on iOS: the page keeps its layout width
+# and WebKit shrinks the text by as much as it scales, so the text stayed the
+# same size and the page only moved right (TestFlight, iPad). The viewport's
+# initial scale is a real page zoom: the page is laid out for a narrower
+# window and drawn larger. Anki's pages ask for width=device-width, which
+# would keep the full width (the page then scrolls sideways), so it is
+# dropped while zoomed; any minimum/maximum scale is scaled along, so pinch
+# zooming keeps working. The page's own viewport comes back at 100%.
+# window.__kiokuZoom tells page scripts the base scale (kioku.fullscreen).
+ZOOM_JS = """(function (z) {
+    window.__kiokuZoom = z;
+    var m = document.querySelector('meta[name="viewport"]');
+    if (!m) {
+        if (z === 1 || !document.head) return;
+        m = document.createElement("meta");
+        m.name = "viewport";
+        m.setAttribute("data-kioku-viewport", "");
+        document.head.appendChild(m);
+    }
+    var own = m.getAttribute("data-kioku-viewport");
+    if (own === null) {
+        own = m.content || "";
+        m.setAttribute("data-kioku-viewport", own);
+    }
+    if (z === 1) {
+        if (own) m.content = own; else m.remove();
+        return;
+    }
+    var parts = ["initial-scale=" + z];
+    own.split(/[,;]/).forEach(function (part) {
+        var kv = part.split("="), key = kv[0].trim().toLowerCase();
+        var value = (kv[1] || "").trim();
+        if (!key || key === "width" || key === "initial-scale") return;
+        if ((key === "minimum-scale" || key === "maximum-scale") && parseFloat(value)) {
+            value = String(parseFloat(value) * z);
+        }
+        parts.push(key + "=" + value);
+    });
+    m.content = parts.join(", ");
+})(%s);"""
+
+
+def zoom_js(factor: float) -> str:
+    return ZOOM_JS % json.dumps(factor)
+
+
 NO_INSET_ADJUSTMENT = 2  # UIScrollViewContentInsetAdjustmentNever
 A4 = (595.2, 841.8)  # points
 PDF_MARGIN = 36.0
@@ -375,13 +424,18 @@ class WebView:
             webview.setInspectable_(True)  # Safari Web Inspector
         self.webview = webview
         self._pending: set[Any] = set()
+        self._scripts: list[tuple[str, int, bool]] = []
+        self._zoom = 1.0
         _views[webview.ptr.value] = self
 
     # Scripts ---------------------------------------------------------------
 
     def set_user_scripts(self, scripts: list[tuple[str, int, bool]]) -> None:
         """scripts: (source, injection time, main frame only)"""
+        self._scripts = list(scripts)
         self.controller.removeAllUserScripts()
+        if self._zoom != 1.0:
+            scripts = [*scripts, (zoom_js(self._zoom), AT_DOCUMENT_END, True)]
         for source, when, main_only in scripts:
             script = WKUserScript.alloc().initWithSource_injectionTime_forMainFrameOnly_(
                 at(source), when, main_only
@@ -515,8 +569,14 @@ class WebView:
             self.webview.setUnderPageBackgroundColor_(color)
 
     def set_zoom(self, factor: float) -> None:
-        if self.webview.respondsToSelector_(SEL("setPageZoom:")):
-            self.webview.setPageZoom_(factor)
+        """Zoom by the viewport's initial scale (see ZOOM_JS): this page now,
+        later pages from a user script."""
+        factor = round(factor, 3)
+        if factor <= 0 or factor == self._zoom:
+            return
+        self._zoom = factor
+        self.set_user_scripts(self._scripts)
+        self.evaluate(zoom_js(factor), None)
 
     # Hosting ---------------------------------------------------------------
 

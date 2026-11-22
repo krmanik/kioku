@@ -43,7 +43,9 @@ SWIPE_RIGHT = r"""
         return false;
     }
     function zoomed() {
-        return window.visualViewport && window.visualViewport.scale > 1.01;
+        // pinched beyond the page's zoom (iOS zooms by the viewport scale)
+        return window.visualViewport
+            && window.visualViewport.scale > (window.__kiokuZoom || 1) * 1.01;
     }
     document.addEventListener("touchstart", function (e) {
         var t = e.touches[0];

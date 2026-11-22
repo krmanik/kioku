@@ -63,6 +63,7 @@ removes it at the end:
 | editor-formatting | Add window: on a selection in a field, bold, italic, underline, superscript, subscript (on and off again), text colour, highlight, remove formatting, MathJax inline, cloze (Cloze note); underline at the caret, then a typed letter is underlined |
 | editor-caret | Add window: a field that gets the focus back without a tap (after the next field had it) keeps its caret, and a backward selection |
 | deck-list | the deck list shows the deck |
+| page-zoom | View › Zoom In three times (130%) makes the deck list's text 1.2x+ as tall on screen (CSS px × pinch scale × device pixels) with no sideways scroll; Reset Zoom restores it |
 | browse | search, row count, the editor page shows the selected note, Add over Browse is the active window |
 | study, review, undo | overview, the picture card's question with its picture drawn, the answer, Good (review logged, next card), undo |
 | gamepad | the default controls through kioku.gamepad into Anki's shortcuts: Down highlights the test deck, A opens it, A studies, B on the question does nothing, A shows the answer, B answers Again (review logged), L1 undoes it, View and B go back |

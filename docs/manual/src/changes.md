@@ -4,6 +4,10 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
 
 ## Next release
 
+- iPhone, iPad: **View › Zoom In** and **Zoom Out** make pages bigger
+  and smaller again, as do add-ons that zoom. Before, the text stayed the
+  same size and the page only moved to the right.
+  **Preferences › User interface size** now also zooms the pages.
 - Termux app: Anki starts again inside the desktop. 0.2.9 left out a file
   Preferences › Advanced needs, so the desktop came up without Anki
   ([issue #13](https://github.com/krmanik/kioku/issues/13)). The Termux
