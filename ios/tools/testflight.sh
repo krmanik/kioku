@@ -66,6 +66,21 @@ if [ "${1:-}" != --upload-only ]; then
         grep -E 'error:|^ld: |Undefined' "$ROOT/build/xcode-archive.log" | sort -u | head -40
         exit 1
     }
+    # The archive's dSYMs folder came out empty (the CMake project writes the
+    # dSYM next to the app in xcode-dist), and the next archive replaced that
+    # one: TestFlight crash reports of older builds could not be symbolicated.
+    # Put it into the archive (Organizer keeps it, the upload sends it to App
+    # Store Connect) and keep a copy per build.
+    DSYM="$ROOT/build/xcode-dist/Release-iphoneos/Kioku.app.dSYM"
+    BIN="$OUT/Kioku.xcarchive/Products/Applications/Kioku.app/Kioku"
+    uuid() { dwarfdump --uuid "$1" | awk '/arm64/ {print $2; exit}'; }
+    if [ ! -d "$DSYM" ] || [ "$(uuid "$DSYM")" != "$(uuid "$BIN")" ]; then
+        echo "no dSYM matching the archived Kioku binary ($DSYM)"; exit 1
+    fi
+    mkdir -p "$OUT/Kioku.xcarchive/dSYMs" "$ROOT/build/dsyms/$VERSION-$BUILD_NUMBER"
+    rsync -a "$DSYM" "$OUT/Kioku.xcarchive/dSYMs/"
+    rsync -a "$DSYM" "$ROOT/build/dsyms/$VERSION-$BUILD_NUMBER/"
+    echo "dSYM $(uuid "$DSYM") in the archive and build/dsyms/$VERSION-$BUILD_NUMBER"
 fi
 if [ "${1:-}" = --archive-only ]; then
     echo "Archived $OUT/Kioku.xcarchive"
