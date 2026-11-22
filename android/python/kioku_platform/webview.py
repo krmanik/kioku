@@ -19,6 +19,8 @@ from PyQt6.QtCore import QEvent, QObject, QPoint, QRect, QTimer
 from PyQt6.QtGui import QWindow
 from PyQt6.QtWidgets import QWidget
 
+from kioku.webscripts import AT_DOCUMENT_END, zoom_js
+
 from . import bridge
 
 logger = logging.getLogger("kioku.webview")
@@ -177,12 +179,17 @@ class WebView:
         self._callbacks: dict[int, Callable[[Any], None] | None] = {}
         self._container: QWidget | None = None
         self._host: QWidget | None = None
+        self._scripts: list[tuple[str, int, bool]] = []
+        self._zoom = 1.0
         bridge.call("webview.create", id=self.id)
         _views[self.id] = self
 
     # Scripts ---------------------------------------------------------------
 
     def set_user_scripts(self, scripts: list[tuple[str, int, bool]]) -> None:
+        self._scripts = list(scripts)
+        if self._zoom != 1.0:
+            scripts = [*scripts, (zoom_js(self._zoom), AT_DOCUMENT_END, True)]
         bridge.call(
             "webview.scripts",
             id=self.id,
@@ -256,7 +263,15 @@ class WebView:
         bridge.call("webview.background", id=self.id, argb=argb)
 
     def set_zoom(self, factor: float) -> None:
-        bridge.call("webview.zoom", id=self.id, factor=factor)
+        """Zoom by the viewport's initial scale (kioku.webscripts.ZOOM_JS):
+        this page now, later pages from a user script. WebSettings' text zoom
+        grew only the text."""
+        factor = round(factor, 3)
+        if factor <= 0 or factor == self._zoom:
+            return
+        self._zoom = factor
+        self.set_user_scripts(self._scripts)
+        self.evaluate(zoom_js(factor), None)
 
     # Hosting ---------------------------------------------------------------
 

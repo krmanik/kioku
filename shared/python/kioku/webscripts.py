@@ -243,6 +243,40 @@ SHADOW_SELECTION = r"""
 })();
 """
 
+# Custom elements that execCommand("insertHTML") inserts. Chromium with scoped
+# custom element registries (Android System WebView 157) gives them no
+# registry (element.customElementRegistry null), so they are never upgraded:
+# Anki's editor inserts MathJax as <anki-mathjax>, which stayed plain text and
+# broke the editor ("t.undecorate is not a function"). After an insert
+# command, give such elements the page's registry and upgrade them. Browsers
+# without customElements.initialize (WebKit, older Chromium) upgrade them
+# themselves; the script does nothing there.
+CUSTOM_ELEMENTS = r"""
+(function () {
+    var registry = window.customElements;
+    if (!registry || typeof registry.initialize !== "function") return;
+    var exec = Document.prototype.execCommand;
+    function adopt(root) {
+        var all = root.querySelectorAll("*");
+        for (var i = 0; i < all.length; i++) {
+            var el = all[i];
+            if (el.customElementRegistry === null && registry.get(el.localName)) {
+                registry.initialize(el);
+                registry.upgrade(el);
+            }
+            if (el.shadowRoot) adopt(el.shadowRoot);
+        }
+    }
+    Document.prototype.execCommand = function (command) {
+        var result = exec.apply(this, arguments);
+        if (/^insert/i.test(String(command))) {
+            try { adopt(this); } catch (e) { console.error(e); }
+        }
+        return result;
+    };
+})();
+"""
+
 VIEWPORT_META ='<meta name="viewport" content="width=device-width, initial-scale=1">'
 
 PHONE_CSS_ID = "kioku-phone"
@@ -469,3 +503,52 @@ VIEWPORT = VIEWPORT.replace("__PHONE_CSS_ID__", PHONE_CSS_ID).replace(
 # Injection times understood by every backend
 AT_DOCUMENT_START = 0
 AT_DOCUMENT_END = 1
+
+
+# Page zoom (View › Zoom In/Out, Preferences › User interface size), for the
+# iOS and Android web views (kioku_platform.webview.set_zoom).
+# WKWebView's pageZoom doesn't zoom on iOS: the page keeps its layout width
+# and WebKit shrinks the text by as much as it scales, so the text stayed the
+# same size and the page only moved right (TestFlight, iPad). Android's text
+# zoom grows only the text, not the page (1.16x for 130%). The viewport's
+# initial scale is a real page zoom: the page is laid out for a narrower
+# window and drawn larger. Anki's pages ask for width=device-width, which
+# would keep the full width (the page then scrolls sideways), so it is
+# dropped while zoomed; any minimum/maximum scale is scaled along, so pinch
+# zooming keeps working. The page's own viewport comes back at 100%.
+# window.__kiokuZoom tells page scripts the base scale (kioku.fullscreen).
+ZOOM_JS = """(function (z) {
+    window.__kiokuZoom = z;
+    var m = document.querySelector('meta[name="viewport"]');
+    if (!m) {
+        if (z === 1 || !document.head) return;
+        m = document.createElement("meta");
+        m.name = "viewport";
+        m.setAttribute("data-kioku-viewport", "");
+        document.head.appendChild(m);
+    }
+    var own = m.getAttribute("data-kioku-viewport");
+    if (own === null) {
+        own = m.content || "";
+        m.setAttribute("data-kioku-viewport", own);
+    }
+    if (z === 1) {
+        if (own) m.content = own; else m.remove();
+        return;
+    }
+    var parts = ["initial-scale=" + z];
+    own.split(/[,;]/).forEach(function (part) {
+        var kv = part.split("="), key = kv[0].trim().toLowerCase();
+        var value = (kv[1] || "").trim();
+        if (!key || key === "width" || key === "initial-scale") return;
+        if ((key === "minimum-scale" || key === "maximum-scale") && parseFloat(value)) {
+            value = String(parseFloat(value) * z);
+        }
+        parts.push(key + "=" + value);
+    });
+    m.content = parts.join(", ");
+})(%s);"""
+
+
+def zoom_js(factor: float) -> str:
+    return ZOOM_JS % json.dumps(factor)

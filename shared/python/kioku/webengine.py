@@ -643,6 +643,7 @@ class QWebEnginePage(QObject, _Lenient):
             (platform.WebView.BRIDGE, start, True),
             (webscripts.PRELUDE, start, True),
             (webscripts.SHADOW_SELECTION, start, True),
+            (webscripts.CUSTOM_ELEMENTS, start, True),
             (webscripts.VIEWPORT, end, True),
         ]
         headers = self._profile._headers_for(_media_server_url(), api=True)

@@ -346,9 +346,6 @@ public class KiokuBridge {
             case "webview.background":
                 page(a).view.setBackgroundColor((int) a.getLong("argb"));
                 break;
-            case "webview.zoom":
-                page(a).view.getSettings().setTextZoom((int) Math.round(a.getDouble("factor") * 100));
-                break;
             case "webview.touchable":
                 pagesTouchable = a.getBoolean("on");
                 break;

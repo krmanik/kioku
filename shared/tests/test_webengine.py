@@ -597,3 +597,61 @@ def test_android_routes_keyboard_keys_through_qt() -> None:
     with open(os.path.join(root, "android", "python", "kioku_platform", "webview.py"),
               encoding="utf-8") as f:
         assert '"keys.toPage"' in f.read()
+
+
+# Chromium with scoped custom element registries: execCommand("insertHTML")
+# makes elements without a registry, never upgraded (<anki-mathjax> in the
+# editor, Android System WebView 157)
+CUSTOM_ELEMENTS_PAGE = r"""
+global.window = global;
+const upgraded = [];
+const registry = {
+  get(name) { return name === "anki-mathjax" ? class {} : undefined; },
+  upgrade(el) { if (el.customElementRegistry === registry) upgraded.push(el.localName); },
+  %s
+};
+window.customElements = registry;
+class El {
+  constructor(name, reg, kids = []) { this.localName = name; this.customElementRegistry = reg; this.kids = kids; this.shadowRoot = null; }
+  querySelectorAll() { return this.kids; }
+}
+function Document() { this.kids = []; }
+Document.prototype.querySelectorAll = function () { return this.kids; };
+const field = new El("anki-editable", registry);
+const host = new El("div", registry);
+host.shadowRoot = field;
+Document.prototype.execCommand = function (command) {
+  if (command === "insertHTML") field.kids.push(new El("anki-mathjax", null), new El("b", null));
+  return true;
+};
+const doc = new Document();
+doc.kids.push(host);
+%s
+doc.execCommand("bold");
+doc.execCommand("insertHTML", false, "<anki-mathjax>x</anki-mathjax><b>y</b>");
+console.log(JSON.stringify({upgraded, registered: field.kids.map(e => e.customElementRegistry === registry)}));
+"""
+
+
+def run_custom_elements_page(with_initialize: bool) -> dict:
+    initialize = "initialize(el) { if (el.customElementRegistry === null) el.customElementRegistry = registry; },"
+    js = CUSTOM_ELEMENTS_PAGE % (initialize if with_initialize else "", webscripts.CUSTOM_ELEMENTS)
+    return json.loads(subprocess.run(["node", "-e", js], capture_output=True, text=True, check=True).stdout)
+
+
+def test_custom_elements_inserted_into_a_shadow_root_are_upgraded() -> None:
+    # only defined elements: <b> keeps no registry, as without the script
+    assert run_custom_elements_page(True) == {"upgraded": ["anki-mathjax"], "registered": [True, False]}
+
+
+def test_custom_elements_script_is_off_without_scoped_registries() -> None:
+    # WebKit and older Chromium upgrade inserted elements themselves
+    assert run_custom_elements_page(False) == {"upgraded": [], "registered": [False, False]}
+
+
+def test_custom_elements_script_is_installed(platform) -> None:
+    page = webengine.QWebEnginePage()
+    installed: list[tuple] = []
+    page._web.set_user_scripts = installed.extend
+    page.setHtml("<p>x</p>")
+    assert (webscripts.CUSTOM_ELEMENTS, webscripts.AT_DOCUMENT_START, True) in installed
