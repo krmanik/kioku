@@ -51,10 +51,9 @@ Things to know:
 
 ## Step by step: syncing a computer or tablet with the phone
 
-Based on a tutorial by
-[L-M-Sherlock](https://github.com/L-M-Sherlock), tested with an iPhone
-running Kioku and a Mac
-([issue #25](https://github.com/krmanik/kioku/issues/25)).
+Based on a tutorial shared in
+[issue #25](https://github.com/krmanik/kioku/issues/25), tested with an
+iPhone running Kioku and a Mac.
 
 **Before you start:** make a backup, and pick the one device whose
 collection is the newest. If several devices have changes that haven't

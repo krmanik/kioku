@@ -2,13 +2,27 @@
 
 All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
 
-## Next release
+## 0.2.10
 
 - Manual: step-by-step guide for syncing a computer or tablet with the
   phone's sync server over Wi-Fi, the phone's hotspot or Tailscale, based
-  on a tutorial by L-M-Sherlock
-  ([issue #25](https://github.com/krmanik/kioku/issues/25)). See
+  on a tutorial shared in
+  [issue #25](https://github.com/krmanik/kioku/issues/25). See
   [Sync server on the phone](features/sync-server.md).
+- iOS, Android, Termux app: no "Preferences Corrupt" message after Kioku
+  was closed during its first start, for example on the language
+  question. Anki saves its settings only later, so the next start found
+  an empty settings file. Kioku now starts as on a first run instead.
+- iOS, Android, web: Kioku runs on the Python and Qt versions desktop
+  Anki uses (Python 3.13, Qt 6.11). Before, it used Python 3.14, and some
+  add-ons failed to load there, such as AnkiHub.
+- Android: after answering a card, the next card has the keyboard focus
+  again, so a `{{type:}}` box and add-ons that listen for keys get the
+  typing ([issue #24](https://github.com/krmanik/kioku/issues/24)).
+- Android: with a hardware keyboard, Anki's shortcuts (Space, Enter,
+  1–4 in the reviewer, and the others) work after you tap a page. Before,
+  the page kept every key. Keys still reach text fields and cards that
+  listen for them.
 - Phones and tablets: the buttons under the deck list (Get Shared,
   Create Deck, Import File) and under a deck's overview are bigger and
   easier to tap.
@@ -16,6 +30,11 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
   and smaller again, as do add-ons that zoom. Before, the text stayed the
   same size and the page only moved to the right.
   **Preferences › User interface size** now also zooms the pages.
+- Android: **View › Zoom In** and **Zoom Out**, add-ons that zoom and
+  **Preferences › User interface size** zoom the whole page. Before, only
+  the text got bigger.
+- Android: the editor's MathJax buttons (Equations menu) work with recent
+  versions of Android System WebView. The equation stayed plain text.
 - Termux app: Anki starts again inside the desktop. 0.2.9 left out a file
   Preferences › Advanced needs, so the desktop came up without Anki
   ([issue #13](https://github.com/krmanik/kioku/issues/13)). The Termux
