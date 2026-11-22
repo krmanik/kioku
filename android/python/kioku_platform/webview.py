@@ -207,6 +207,12 @@ class WebView:
         tap on the page would (tests)."""
         bridge.call("webview.focus", id=self.id, force=force)
 
+    @staticmethod
+    def key_to_page(text: str) -> None:
+        """No shortcut took the hardware key Qt got while a page had
+        Android's focus (KiokuKeys): that page gets it."""
+        bridge.call("keys.toPage", text=text)
+
     def reload(self) -> None:
         bridge.call("webview.reload", id=self.id)
 

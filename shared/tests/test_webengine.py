@@ -555,3 +555,45 @@ def test_every_platform_web_view_can_take_the_focus() -> None:
         assert 'case "webview.focus":' in f.read()
     with open(os.path.join(root, "web", "shell", "kioku-web.js"), encoding="utf-8") as f:
         assert "focus(id) {" in f.read()
+
+
+def test_a_key_no_shortcut_took_goes_back_to_the_page(platform, monkeypatch) -> None:
+    """Android sends a hardware key pressed in a page to Qt's shortcuts
+    first (KiokuKeys); one that reaches the web view widget goes back to the
+    page (a card's keydown listener)."""
+    from PyQt6.QtCore import QEvent, Qt
+    from PyQt6.QtGui import QKeyEvent
+
+    sent: list[str] = []
+    monkeypatch.setattr(platform.WebView, "key_to_page", staticmethod(sent.append), raising=False)
+    view = webengine.QWebEngineView()
+    evt = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_J, Qt.KeyboardModifier.NoModifier, "j")
+    evt.ignore()
+    view.keyPressEvent(evt)
+    assert sent == ["j"]
+    assert evt.isAccepted()
+
+
+def test_without_key_routing_a_key_stays_unhandled(platform) -> None:
+    """iOS and the web have no key_to_page (iOS routes in keys.py)."""
+    from PyQt6.QtCore import QEvent, Qt
+    from PyQt6.QtGui import QKeyEvent
+
+    assert getattr(platform.WebView, "key_to_page", None) is None
+    view = webengine.QWebEngineView()
+    evt = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_J, Qt.KeyboardModifier.NoModifier, "j")
+    view.keyPressEvent(evt)
+    assert not evt.isAccepted()
+
+
+def test_android_routes_keyboard_keys_through_qt() -> None:
+    root = os.path.join(os.path.dirname(__file__), "..", "..")
+    src = os.path.join(root, "android", "package", "src", "io", "ankidesk", "kioku")
+    with open(os.path.join(src, "KiokuActivity.java"), encoding="utf-8") as f:
+        assert "KiokuKeys.onKey(event)" in f.read()
+    with open(os.path.join(src, "KiokuBridge.java"), encoding="utf-8") as f:
+        bridge = f.read()
+    assert 'case "keys.toPage":' in bridge and "public void editing(boolean on)" in bridge
+    with open(os.path.join(root, "android", "python", "kioku_platform", "webview.py"),
+              encoding="utf-8") as f:
+        assert '"keys.toPage"' in f.read()

@@ -761,6 +761,94 @@ def t_review_focus():
     return "the next card's typing box has the keyboard focus"
 
 
+def t_review_keys():
+    """A hardware keyboard in the reviewer on Android: after a page was
+    tapped, Space and 1-4 reach Anki's shortcuts, a key no shortcut takes
+    reaches the card's keydown listener, and the {{type:}} box keeps every
+    key (KiokuKeys)."""
+    if sys.platform != "android":
+        raise Skip("Android's key routing (iOS: kioku_platform.keys)")
+    from aqt import dialogs
+    from kioku_platform import bridge
+
+    SPACE, KEY_3, KEY_E, KEY_J = 62, 10, 33, 38
+
+    def press(code: int) -> None:
+        bridge.call("keys.test", code=code, down=True)
+        bridge.call("keys.test", code=code, down=False)
+
+    def editing():
+        return bridge.call("keys.editing")
+
+    def editors() -> list:
+        return [d[1] for name, d in dialogs._dialogs.items()
+                if name in ("EditCurrent", "NewEditCurrent") and d[1] is not None]
+
+    sub = col().decks.id(f"{DECK}::Keys")
+    model = col().models.by_name("Basic (type in the answer)")
+    nids = []
+    for i in (1, 2):
+        note = col().new_note(model)
+        note["Front"], note["Back"] = f"kioku keys {i}", f"answer {i}"
+        note.tags = [TAG]
+        col().add_note(note, sub)
+        nids.append(note.id)
+    try:
+        col().decks.select(sub)
+        mw.moveToState("overview")
+        yield Until(lambda: mw.state == "overview", 10, "overview")
+        yield 1
+        mw.web.page()._web.focus(True)  # as a tap on Study Now
+        yield 0.5
+        mw.moveToState("review")
+        yield Until(lambda: mw.state == "review" and mw.reviewer.card is not None
+                    and mw.reviewer.card.nid in nids, 15, "a type-in card")
+        first = mw.reviewer.card.id
+        yield Until(lambda: editing() is True, 10, "the typing box focused")
+        # the typing box keeps every key: "e" is typed, the editor stays shut
+        press(KEY_E)
+        typed = ""
+        for _ in range(20):
+            typed = yield Js(mw.web, "document.getElementById('typeans').value")
+            if typed == "e":
+                break
+            yield 0.25
+        check(typed == "e", f"typing box holds {typed!r}")
+        check(not editors(), "'e' opened the editor")
+        # outside a text field a key no shortcut takes reaches the card
+        yield Js(mw.web, "window.__kiokuKeys=[];document.addEventListener('keydown',"
+                         "function(e){window.__kiokuKeys.push(e.key);});"
+                         "document.activeElement.blur();")
+        yield Until(lambda: editing() is False, 10, "the typing box left")
+        press(KEY_J)
+        keys: list = []
+        for _ in range(20):
+            keys = json.loads((yield Js(mw.web, "JSON.stringify(window.__kiokuKeys)")) or "[]")
+            if "j" in keys:
+                break
+            yield 0.25
+        check("j" in keys, f"the card's keydown listener got {keys}")
+        # Anki's shortcuts after a tap on the bottom bar
+        mw.bottomWeb.page()._web.focus(True)
+        yield 0.5
+        press(SPACE)
+        yield Until(lambda: mw.reviewer.state == "answer", 10, "Space showing the answer")
+        keys = json.loads((yield Js(mw.web, "JSON.stringify(window.__kiokuKeys)")) or "[]")
+        check(" " not in keys, f"the page got Space as well: {keys}")
+        mw.bottomWeb.page()._web.focus(True)
+        yield 0.5
+        press(KEY_3)
+        yield Until(lambda: mw.reviewer.card is not None and mw.reviewer.card.id != first
+                    and mw.reviewer.state == "question", 10, "3 answering Good")
+    finally:
+        for editor in editors():
+            editor.close()
+        mw.moveToState("deckBrowser")
+        col().remove_notes(nids)
+        col().decks.remove([sub])
+    return "Space and 3 answer, j reaches the card, the typing box keeps e"
+
+
 class _PadRecorder:
     """Records what the platform reports to kioku.gamepad, instead of
     running actions."""
@@ -1299,6 +1387,7 @@ TESTS = [
     ("review", t_review),
     ("undo", t_undo),
     ("review-focus", t_review_focus),
+    ("review-keys", t_review_keys),
     ("gamepad", t_gamepad),
     ("gamepad-native", t_gamepad_native),
     ("media-server", t_review_picture),

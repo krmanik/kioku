@@ -218,6 +218,14 @@ public class KiokuBridge {
             // the in-app tests (shared/tests/app/suite.py): a controller's events
             case "gamepad.test":
                 return onUiThread(() -> KiokuGamepad.test(a));
+            // ... and a hardware keyboard's
+            case "keys.test":
+                return onUiThread(() -> KiokuKeys.test(a));
+            case "keys.editing":
+                return onUiThread(() -> {
+                    Page p = pageOf(activity.getCurrentFocus());
+                    return p == null ? null : p.editing;
+                });
             // PDFs for PyQt6.QtPdf, from Python's worker threads
             case "pdf.open":
                 return pdfOpen(a.getString("path"));
@@ -244,6 +252,18 @@ public class KiokuBridge {
                 Log.e(TAG, "call " + method + " failed", e);
             }
         });
+        return null;
+    }
+
+    /** The page whose WebView is view, or null. */
+    static Page pageOf(View view) {
+        if (view instanceof WebView) {
+            for (Page p : pages.values()) {
+                if (p.view == view) {
+                    return p;
+                }
+            }
+        }
         return null;
     }
 
@@ -350,6 +370,9 @@ public class KiokuBridge {
                 }
                 break;
             }
+            case "keys.toPage":
+                KiokuKeys.toPage(a.optString("text"));
+                break;
             case "webview.reload":
                 page(a).generation++;
                 page(a).view.reload();
@@ -880,6 +903,22 @@ public class KiokuBridge {
         private int nextConfirm = 1;
         /** Whether the WebView sees the on-screen keyboard's insets. */
         volatile boolean keyboardInsets = true;
+        /** Whether a text field in the page has the focus: it keeps every key (KiokuKeys). */
+        volatile boolean editing;
+        /** Tells editing() when the focus moves into or out of a text field
+         * (also one in a shadow root, as the editor's fields). A frame's
+         * text field doesn't count: the keys go to Qt first there. */
+        private static final String EDITING = "(function(){if(window.top!==window||window.__kiokuEditing)return;"
+                + "window.__kiokuEditing=1;"
+                + "var plain=/^(button|checkbox|radio|range|submit|reset|file|image|color|hidden)$/i,last=null;"
+                + "function editing(){var e=document.activeElement;"
+                + "while(e&&e.shadowRoot&&e.shadowRoot.activeElement){e=e.shadowRoot.activeElement;}"
+                + "if(!e){return false;}if(e.isContentEditable){return true;}"
+                + "var n=e.tagName;return n==='TEXTAREA'||n==='SELECT'||(n==='INPUT'&&!plain.test(e.type));}"
+                + "function report(){var v=editing();if(v!==last){last=v;kiokuAndroid.editing(v);}}"
+                + "function later(){setTimeout(report,0);}"
+                + "document.addEventListener('focusin',later,true);"
+                + "document.addEventListener('focusout',later,true);later();})();";
         /** URLs Python allowed in acceptNavigationRequest(), loaded once without asking again. */
         private final List<String> approved = Collections.synchronizedList(new ArrayList<>());
 
@@ -901,6 +940,10 @@ public class KiokuBridge {
             view.addJavascriptInterface(new JsInterface(), "kiokuAndroid");
             view.setWebViewClient(new Client());
             view.setWebChromeClient(new Chrome());
+            if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                // kept by setScripts(), which replaces only Python's scripts
+                WebViewCompat.addDocumentStartJavaScript(view, EDITING, Collections.singleton("*"));
+            }
             view.setOnTouchListener((v, e) -> {
                 if (pagesTouchable) {
                     return false;
@@ -998,6 +1041,11 @@ public class KiokuBridge {
             }
 
             @JavascriptInterface
+            public void editing(boolean on) {
+                editing = on;
+            }
+
+            @JavascriptInterface
             public void documentReady() {
                 ui.post(Page.this::documentReady);
             }
@@ -1033,6 +1081,10 @@ public class KiokuBridge {
 
             @Override
             public void onPageStarted(WebView v, String url, Bitmap favicon) {
+                editing = false;
+                if (!WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                    v.evaluateJavascript(EDITING, null);
+                }
                 for (String s : fallbackStart) {
                     v.evaluateJavascript(s, null);
                 }

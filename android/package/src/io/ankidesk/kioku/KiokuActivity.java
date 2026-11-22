@@ -122,10 +122,18 @@ public class KiokuActivity extends QtActivity {
         f.delete();
     }
 
-    // gamepads go to kioku.gamepad (KiokuGamepad), not to Qt or a web view
+    // gamepads go to kioku.gamepad (KiokuGamepad), not to Qt or a web view;
+    // a keyboard's keys in a page go to Qt's shortcuts first (KiokuKeys)
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
-        return KiokuGamepad.onKey(event) || super.dispatchKeyEvent(event);
+        return KiokuGamepad.onKey(event) || KiokuKeys.onKey(event) || super.dispatchKeyEvent(event);
+    }
+
+    /** A key for Qt, as if Qt's view had Android's focus (KiokuKeys). */
+    boolean qtKey(KeyEvent event) {
+        return event.getAction() == KeyEvent.ACTION_DOWN
+                ? super.onKeyDown(event.getKeyCode(), event)
+                : super.onKeyUp(event.getKeyCode(), event);
     }
 
     @Override

@@ -28,7 +28,7 @@ from PyQt6.QtCore import (
     Qt,
     pyqtSignal,
 )
-from PyQt6.QtGui import QAction, QColor, QCursor, QGuiApplication, QIcon, QWindow
+from PyQt6.QtGui import QAction, QColor, QCursor, QGuiApplication, QIcon, QKeyEvent, QWindow
 from PyQt6.QtNetwork import QNetworkCookie
 from PyQt6.QtWidgets import QApplication, QWidget
 
@@ -1197,6 +1197,21 @@ class QWebEngineView(QWidget, _Lenient):
             self._page._web.focus()
         except Exception:
             logger.exception("focusing web view")
+
+    def keyPressEvent(self, evt: QKeyEvent | None) -> None:
+        """A key no shortcut took. On Android a hardware key pressed in a
+        page goes to Qt first (KiokuKeys), as with desktop Anki's web views:
+        hand it back to the page (a card's keydown listener, arrows
+        scrolling)."""
+        to_page = getattr(platform.WebView, "key_to_page", None)
+        if evt is not None and to_page is not None:
+            try:
+                to_page(evt.text())
+            except Exception:
+                logger.exception("key to page")
+            evt.accept()
+            return
+        super().keyPressEvent(evt)
 
     # Convenience wrappers around the page ----------------------------------
 
