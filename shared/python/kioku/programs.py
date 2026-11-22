@@ -142,6 +142,8 @@ def install(base_dir: str) -> None:
             with open(path, "w") as f:
                 f.write("#!/bin/sh\n# bundled with Kioku\n")
             os.chmod(path, 0o755)
+        elif not os.path.islink(path) and not os.stat(path).st_mode & 0o111:
+            os.chmod(path, 0o755)  # left by an older version without the mode
     data = _data_dir()
     if data:
         os.environ.setdefault("TESSDATA_PREFIX", os.path.join(data, "tessdata"))
@@ -150,6 +152,31 @@ def install(base_dir: str) -> None:
         [_bin_dir] + [p for p in os.environ.get("PATH", "").split(os.pathsep) if p and p != _bin_dir]
     )
     subprocess.Popen = Popen
+    if sys.platform == "ios":
+        shutil.which = _which_bundled
+
+
+_shutil_which = shutil.which
+
+
+def _which_bundled(cmd, mode=os.F_OK | os.X_OK, path=None):  # type: ignore[no-untyped-def]
+    """shutil.which() that finds the bundled programs on an iPhone or iPad.
+    The sandbox answers access(X_OK) with no for every file in the app's
+    data folder, whatever its mode, so shutil.which() found none of them
+    there (the simulator allows it): add-ons looking for ffmpeg or mecab
+    reported them missing."""
+    found = _shutil_which(cmd, mode, path)
+    if found is not None or not _bin_dir or os.path.dirname(os.fsdecode(cmd)):
+        return found
+    name = os.fsdecode(cmd)
+    if not bundled(program_name(name)):
+        return None
+    dirs = (path if path is not None else os.environ.get("PATH", os.defpath))
+    dirs = os.fsdecode(dirs).split(os.pathsep)
+    candidate = os.path.join(_bin_dir, name)
+    if _bin_dir in dirs and os.path.isfile(candidate):
+        return candidate if isinstance(cmd, str) else os.fsencode(candidate)
+    return None
 
 
 # the programs in libkiokuprog.so (shared/programs/kioku_prog.c)
