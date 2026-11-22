@@ -338,6 +338,18 @@ public class KiokuBridge {
                 p.view.requestApplyInsets();
                 break;
             }
+            case "webview.focus": {
+                // From one page to another only: taking the focus from Qt's
+                // own view makes Qt deactivate its window, and it activated
+                // the main window under the Add window when the editor's
+                // page took the focus.
+                WebView view = page(a).view;
+                View current = activity.getCurrentFocus();
+                if (view != current && (a.optBoolean("force") || current instanceof WebView)) {
+                    view.requestFocus();
+                }
+                break;
+            }
             case "webview.reload":
                 page(a).generation++;
                 page(a).view.reload();

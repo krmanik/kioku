@@ -140,6 +140,9 @@ class WebView:
         self.load_url(f"{http.origin}{http.PREFIX}html/{key}")
         self._url = base_url or "about:blank"
 
+    def focus(self, force: bool = False) -> None:
+        web.js("focus", self.id)
+
     def reload(self) -> None:
         web.js("reload", self.id)
 

@@ -700,6 +700,67 @@ def t_undo():
     return "the review was undone, the card is shown again"
 
 
+def t_review_focus():
+    """Issue #24: after a card is answered from the bottom bar, the next
+    card's page has the keyboard focus, so its {{type:}} box takes typing."""
+    sub = col().decks.id(f"{DECK}::Focus")
+    model = col().models.by_name("Basic (type in the answer)")
+    nids = []
+    for i in (1, 2):
+        note = col().new_note(model)
+        note["Front"], note["Back"] = f"kioku focus {i}", f"answer {i}"
+        note.tags = [TAG]
+        col().add_note(note, sub)
+        nids.append(note.id)
+    focus_js = ("JSON.stringify([document.hasFocus(),"
+                " document.activeElement ? document.activeElement.id : ''])")
+    try:
+        col().decks.select(sub)
+        mw.moveToState("overview")
+        yield Until(lambda: mw.state == "overview", 10, "overview")
+        yield 1
+        # as a tap on Study Now: the page has the keyboard focus
+        mw.web.page()._web.focus(True)
+        yield 0.5
+        mw.moveToState("review")
+        yield Until(lambda: mw.state == "review" and mw.reviewer.card is not None
+                    and mw.reviewer.card.nid in nids, 15, "a type-in card")
+        first = mw.reviewer.card.id
+        main = None
+        for _ in range(20):
+            main = json.loads((yield Js(mw.web, focus_js)) or "null")
+            if main == [True, "typeans"]:
+                break
+            yield 0.5
+        check(main == [True, "typeans"], f"first card [hasFocus, activeElement] = {main}")
+        # a tap on the bottom bar's buttons leaves the keyboard focus there
+        mw.bottomWeb.page()._web.focus(True)
+        yield 0.5
+        mw.reviewer._showAnswer()
+        yield Until(lambda: mw.reviewer.state == "answer", 10, "answer shown")
+        yield 0.5
+        mw.bottomWeb.page()._web.focus(True)
+        yield 0.5
+        mw.reviewer._answerCard(3)
+        yield Until(lambda: mw.reviewer.card is not None and mw.reviewer.card.id != first
+                    and mw.reviewer.state == "question", 10, "the next card")
+        main = bottom = None
+        for _ in range(20):
+            main = json.loads((yield Js(mw.web, focus_js)) or "null")
+            bottom = json.loads((yield Js(mw.bottomWeb, focus_js)) or "null")
+            if main == [True, "typeans"] and bottom and not bottom[0]:
+                break
+            yield 0.5
+        check(main == [True, "typeans"],
+              f"card page [hasFocus, activeElement] = {main}, bottom bar = {bottom}")
+        check(bool(bottom) and not bottom[0], f"the bottom bar kept the focus: {bottom}")
+    finally:
+        mw.moveToState("deckBrowser")
+        col().remove_notes(nids)
+        col().decks.remove([sub])
+    return "the next card's typing box has the keyboard focus"
+
+
 class _PadRecorder:
     """Records what the platform reports to kioku.gamepad, instead of
     running actions."""
@@ -1237,6 +1298,7 @@ TESTS = [
     ("study", t_study),
     ("review", t_review),
     ("undo", t_undo),
+    ("review-focus", t_review_focus),
     ("gamepad", t_gamepad),
     ("gamepad-native", t_gamepad_native),
     ("media-server", t_review_picture),

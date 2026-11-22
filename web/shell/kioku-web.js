@@ -206,6 +206,12 @@
       frame.src = url;
     },
 
+    // the frame takes the keyboard focus (QWebEngineView.setFocus)
+    focus(id) {
+      const frame = frames.get(id);
+      if (frame && frame.contentWindow) frame.contentWindow.focus();
+    },
+
     reload(id) {
       const frame = frames.get(id);
       if (frame) frame.contentWindow.location.reload();

@@ -29,7 +29,7 @@ from rubicon.objc import (
     py_from_ns,
 )
 from rubicon.objc.api import ObjCBoundMethod
-from rubicon.objc.runtime import load_library, objc_id
+from rubicon.objc.runtime import load_library, objc_id, send_message
 
 load_library("WebKit")
 load_library("UIKit")
@@ -408,6 +408,13 @@ class WebView:
     def load_html(self, html: str, base_url: str | None) -> None:
         base = NSURL.URLWithString_(at(base_url)) if base_url else None
         self.webview.loadHTMLString_baseURL_(at(html), base)
+
+    def focus(self, force: bool = False) -> None:
+        """Make the page UIKit's first responder (it takes the keys; a key
+        outside a text field still reaches Qt's shortcuts, see keys.py)."""
+        if prop(self.webview, "window") is None:
+            return
+        send_message(self.webview, "becomeFirstResponder", restype=c_bool, argtypes=[])
 
     def reload(self) -> None:
         self.webview.reload()

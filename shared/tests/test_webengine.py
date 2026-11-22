@@ -497,3 +497,61 @@ def test_shadow_selection_script_is_installed(platform) -> None:
     page._web.set_user_scripts = installed.extend
     page.setHtml("<p>x</p>")
     assert (webscripts.SHADOW_SELECTION, webscripts.AT_DOCUMENT_START, True) in installed
+
+
+def _activate(widget) -> None:  # type: ignore[no-untyped-def]
+    widget.show()
+    widget.activateWindow()
+    for _ in range(20):
+        app.processEvents()
+        if QApplication.activeWindow() is widget.window():
+            return
+    raise AssertionError("window not activated")
+
+
+def test_set_focus_focuses_the_platform_view(platform) -> None:
+    """Issue #24: Anki's mw.web.setFocus() after each card side must reach
+    the native web view, or the bottom bar's page keeps the keys."""
+    view = webengine.QWebEngineView()
+    _activate(view)
+    web = view.page()._web
+    web.calls.clear()
+    view.setFocus()
+    assert "focus" in web.calls
+    view.hide()
+    web.calls.clear()
+    view.setFocus()
+    assert "focus" not in web.calls  # hidden: nothing to focus
+
+
+def test_set_focus_in_a_background_window_leaves_the_native_focus(platform) -> None:
+    """Anki refocuses the main window's view after each page load
+    (AnkiWebView.setHtml): with the Add window in front, the native focus
+    must stay there."""
+    from PyQt6.QtWidgets import QWidget
+
+    view = webengine.QWebEngineView()
+    view.show()
+    front = QWidget()
+    _activate(front)
+    try:
+        web = view.page()._web
+        web.calls.clear()
+        view.setFocus()
+        assert "focus" not in web.calls
+    finally:
+        front.close()
+        view.hide()
+
+
+def test_every_platform_web_view_can_take_the_focus() -> None:
+    root = os.path.join(os.path.dirname(__file__), "..", "..")
+    for backend in ("ios", "android", "web"):
+        path = os.path.join(root, backend, "python", "kioku_platform", "webview.py")
+        with open(path, encoding="utf-8") as f:
+            assert "    def focus(self, force: bool = False) -> None:" in f.read(), backend
+    with open(os.path.join(root, "android", "package", "src", "io", "ankidesk", "kioku",
+                           "KiokuBridge.java"), encoding="utf-8") as f:
+        assert 'case "webview.focus":' in f.read()
+    with open(os.path.join(root, "web", "shell", "kioku-web.js"), encoding="utf-8") as f:
+        assert "focus(id) {" in f.read()

@@ -200,6 +200,13 @@ class WebView:
     def load_html(self, html: str, base_url: str | None) -> None:
         bridge.call("webview.html", id=self.id, html=html, base=base_url)
 
+    def focus(self, force: bool = False) -> None:
+        """Move Android's focus (the keys) to the page from another page
+        that has it, as after a tap on the bottom bar's buttons. Qt's own
+        view keeps it (see KiokuBridge); force takes it from there too, as a
+        tap on the page would (tests)."""
+        bridge.call("webview.focus", id=self.id, force=force)
+
     def reload(self) -> None:
         bridge.call("webview.reload", id=self.id)
 
