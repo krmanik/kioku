@@ -5,7 +5,7 @@
 # which needs a compiler on the phone. Build it here instead and ship it as an
 # overlay for tools/build_rootfs.py (--extra).
 #
-#   tools/build_pyqt6_sip.sh build/rootfs-repo/usr 3.14 build/pyqt6-sip-overlay
+#   tools/build_pyqt6_sip.sh build/rootfs-repo/usr 3.13 build/pyqt6-sip-overlay
 #
 # The sip module must implement the sip ABI the prefix's PyQt6 was built for
 # (sip-abi-version in PyQt6/bindings/QtCore/QtCore.toml), or every PyQt6 import
@@ -17,7 +17,7 @@
 set -eu
 
 PREFIX_TREE="${1:?prefix tree containing include/pythonX.Y and lib/libpythonX.Y.so}"
-PYVER="${2:?python version, e.g. 3.14}"
+PYVER="${2:?python version, e.g. 3.13}"
 OUT="${3:?output overlay dir}"
 API="${ANDROID_API:-24}"
 NDK="${ANDROID_NDK:-$HOME/Library/Android/sdk/ndk/30.0.14904198}"

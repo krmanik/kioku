@@ -72,7 +72,6 @@ def apply() -> None:
     _patch_update_check()
     _patch_page_html()
     _patch_editor_media()
-    _python_313_compat()
     _addon_platform()
 
 
@@ -852,32 +851,6 @@ def _patch_audio() -> None:
         aqt.sound.av_player.players.append(platform.tts_player(taskman))
 
     aqt.sound.setup_audio = setup_audio
-
-
-def _python_313_compat() -> None:
-    """Desktop Anki runs Python 3.13; the apps run 3.14, which dropped
-    pkgutil.find_loader() and get_loader(). Add-ons' bundled libraries still
-    call them (pytesseract in AnkiOCR)."""
-    import importlib.util
-    import pkgutil
-
-    def find_loader(fullname):  # type: ignore[no-untyped-def]
-        try:
-            spec = importlib.util.find_spec(fullname)
-        except (ImportError, ValueError):
-            return None
-        return spec.loader if spec else None
-
-    def get_loader(module_or_name):  # type: ignore[no-untyped-def]
-        if isinstance(module_or_name, types.ModuleType):
-            spec = getattr(module_or_name, "__spec__", None)
-            return spec.loader if spec else None
-        return find_loader(module_or_name)
-
-    if not hasattr(pkgutil, "find_loader"):
-        pkgutil.find_loader = find_loader
-    if not hasattr(pkgutil, "get_loader"):
-        pkgutil.get_loader = get_loader
 
 
 def _addon_platform() -> None:

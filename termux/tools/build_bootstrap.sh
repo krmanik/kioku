@@ -5,9 +5,11 @@
 #
 # APP_ID and ROOTFS_DIR default to ankideskApplicationId and ankideskRootfsDir
 # from gradle.properties. Packages come from the official Termux repositories,
-# plus the .debs of the krmanik/termux-packages release anki-<ANKI_TAG> (anki,
-# python-markupsafe, python-orjson; tools/fetch_anki_debs.py) and any .debs in
-# local-debs/, which take precedence in that order. For packages rebuilt for
+# plus the .debs of the krmanik/termux-packages release anki-<ANKI_TAG> (anki and
+# the Python packages built for the Python Anki pins: python, python-pip, pyqt6,
+# python-pyqt6-webengine, python-rpds-py, python-markupsafe, python-orjson;
+# tools/fetch_anki_debs.py) and any .debs in local-debs/, which take precedence
+# in that order. For packages rebuilt for
 # APP_ID by tools/build-termux-packages.sh, put them in local-debs/ and run
 # with SOURCE_PACKAGE=APP_ID and ROOTFS_DIR=files.
 set -eu
@@ -15,7 +17,9 @@ set -eu
 cd "$(dirname "$0")/.."
 APP_ID="${1:-$(sed -n 's/^ankideskApplicationId=//p' gradle.properties)}"
 ROOTFS_DIR="${2:-$(sed -n 's/^ankideskRootfsDir=//p' gradle.properties)}"
-PYVER="${PYVER:-3.14}"
+# The Python Anki pins (shared/versions.env), which the anki-<ANKI_TAG> release
+# is built for; Termux's own is newer
+PYVER="${PYVER:-$(sed -n 's/^PYTHON_VERSION=//p' ../shared/versions.env)}"
 export SSL_CERT_FILE="${SSL_CERT_FILE:-/etc/ssl/cert.pem}"
 
 # xorg-server-xvfb, x11vnc: the remote desktop (ankidesk_remote.py), about 8 MB
@@ -29,9 +33,13 @@ python3 -I tools/fetch_debs.py --roots "$ROOTS" --local build/anki-debs --local 
 	--out build/debs --list build/debs-closure.tsv
 # Package name the .debs were built for (com.termux for the official repos).
 python3 -I tools/debs_to_prefix.py --package "${SOURCE_PACKAGE:-com.termux}" --debs build/debs --out build/rootfs-repo
+# Python and PyQt6 as Anki pins them, not a Termux repository build (#23)
+python3 -I tools/check_runtime_pins.py build/rootfs-repo/usr
 
 echo "== PyQt6.sip, PyQt6.QtPdf and pure-Python dependencies"
-tools/build_pyqt6_sip.sh build/rootfs-repo/usr "$PYVER" build/pyqt6-sip-overlay
+# the PyQt6-sip Anki pins; fails if PyQt6 was built for a newer sip ABI
+PYQT6_SIP_VERSION="$(sed -n 's/^PYQT6_SIP_VERSION=//p' ../shared/versions.env)" \
+	tools/build_pyqt6_sip.sh build/rootfs-repo/usr "$PYVER" build/pyqt6-sip-overlay
 tools/build_pyqt6_pdf.sh build/rootfs-repo/usr "$PYVER" build/pyqt6-pdf-overlay
 tools/fetch_python_deps.sh "$PYVER" build/python-deps
 

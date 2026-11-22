@@ -7,11 +7,11 @@
 # Qt headers of the prefix tree, compile them here and ship them as an overlay
 # for tools/build_rootfs.py (--extra).
 #
-#   tools/build_pyqt6_pdf.sh build/rootfs-repo/usr 3.14 build/pyqt6-pdf-overlay
+#   tools/build_pyqt6_pdf.sh build/rootfs-repo/usr 3.13 build/pyqt6-pdf-overlay
 set -eu
 
 PREFIX_TREE="$(cd "${1:?prefix tree with include/qt6 and the PyQt6 bindings}" && pwd)"
-PYVER="${2:?python version, e.g. 3.14}"
+PYVER="${2:?python version, e.g. 3.13}"
 OUT="${3:?output overlay dir}"
 API="${ANDROID_API:-24}"
 NDK="${ANDROID_NDK:-$HOME/Library/Android/sdk/ndk/30.0.14904198}"
@@ -87,6 +87,9 @@ EOF
 
 (cd "$PROJ" && "$WORK/venv/bin/sip-build" --no-make --qmake "$WORK/qmake" --build-dir "$WORK/gen" >/dev/null)
 
+# Start empty: modules left from a build for another Python would be
+# shipped too (they need its libpython)
+rm -rf "$OUT"
 SITE="$OUT/lib/python$PYVER/site-packages"
 mkdir -p "$SITE/PyQt6"
 QTINC="$PREFIX_TREE/include/qt6"

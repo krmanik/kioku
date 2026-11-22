@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Download the .debs of the krmanik/termux-packages release anki-<version>.
 
-That release holds the packages that are not in the Termux repositories yet:
-anki, python-markupsafe and python-orjson, built by the repository's anki
-workflow. The version defaults to ANKI_TAG in shared/versions.env.
+That release holds the packages the Termux repositories don't have, built by
+the repository's anki workflow: anki, and the Python packages built for the
+Python Anki pins (python, python-pip, pyqt6, python-pyqt6-webengine,
+python-rpds-py, python-markupsafe, python-orjson), which take the place of
+the repositories' builds for their newer Python. The version defaults to ANKI_TAG in shared/versions.env.
 
   tools/fetch_anki_debs.py --out build/anki-debs [--version 26.09.3]
 

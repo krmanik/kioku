@@ -31,7 +31,7 @@ for its own; packages by `import`.
 | Programs | ffmpeg, ffprobe (FFmpeg 9.0.2: lame, vorbis, opus, webp, x264, vpx, aom), lame, mecab, kakasi, tesseract (eng, jpn, jpn_vert, chi_sim, chi_tra, kor), espeak-ng / espeak, cwebp, dwebp | [shared/tools/build_programs.sh](../shared/tools/build_programs.sh), [shared/programs](../shared/programs), [kioku/programs.py](../shared/python/kioku/programs.py). Android: one executable; iOS: run inside the app on a thread of their own (iOS apps can't start processes) |
 | Native packages | numpy, Pillow (JPEG, PNG, WebP, FreeType), cryptography with cffi and pyOpenSSL | [shared/tools/build_wheels.sh](../shared/tools/build_wheels.sh): iOS from BeeWare's and PyPI's iOS wheels, Android built with cibuildwheel |
 | Pure Python | pygments, qtpy, tqdm, jieba | `shared/requirements.in`, `build_wheels.sh` (jieba) |
-| Compatibility | `platform.system()` answers "Linux" (Android) / "Darwin" (iOS) to add-ons, as before Python 3.13; `pkgutil.find_loader()` is back (removed in 3.14, which the apps run; desktop Anki runs 3.13); `chmod` on iOS | [kioku/patches.py](../shared/python/kioku/patches.py), `programs.py` |
+| Compatibility | `platform.system()` answers "Linux" (Android) / "Darwin" (iOS) to add-ons, as before Python 3.13; `chmod` on iOS. Python, Qt and PyQt6 are the versions the Anki release pins, so add-ons see desktop Anki's (Termux: Qt is still the Termux repositories' 6.12) | [kioku/patches.py](../shared/python/kioku/patches.py), `programs.py` |
 
 Not bundled, and why:
 

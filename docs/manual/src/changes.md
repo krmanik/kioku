@@ -16,6 +16,11 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
   ([issue #13](https://github.com/krmanik/kioku/issues/13)). The Termux
   app no longer shows the Gamepad settings: its desktop gets no
   controller input.
+- Termux app: Anki runs on the Python and PyQt versions desktop Anki
+  uses (Python 3.13, PyQt 6.11), like the iPhone, iPad and Android apps.
+  Before, it used Termux's Python 3.14, and add-ons that don't work there
+  failed to load, such as AnkiBrain
+  ([issue #23](https://github.com/krmanik/kioku/issues/23)).
 - iOS: add-ons that other apps connect to, such as AnkiConnect, can keep
   answering after you leave Kioku. Turn on **Preferences › Advanced ›
   Background › Keep running in the background** (off by default). iOS
