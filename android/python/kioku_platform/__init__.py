@@ -5,6 +5,7 @@ KiokuBridge.java."""
 from __future__ import annotations
 
 import os
+import shutil
 from typing import Any, Callable
 
 from .files import pick_files, save_path
@@ -48,11 +49,33 @@ CA_DIRS = ("/apex/com.android.conscrypt/cacerts", "/system/etc/security/cacerts"
 def prepare() -> None:
     """Runs before Anki is imported."""
     _ca_bundle()
+    _no_shader_disk_cache()
     # Qt turns QMenuBar into the activity's options menu, which has no
     # button without an action bar; draw Anki's menu bar as a widget instead
     from PyQt6.QtCore import QCoreApplication, Qt
 
     QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_DontUseNativeMenuBar)
+
+
+SHADER_CACHE_PREFIX = "qtshadercache-"
+
+
+def _no_shader_disk_cache() -> None:
+    """Qt keeps compiled shader programs in the cache folder and reads each
+    whole at every start. A GPU driver can hand back a program binary of any
+    size: the emulator's (SwiftShader) gave one of 1.8 GB, and Kioku then
+    took 3 GB of memory and stopped responding at every start. Qt draws only
+    a few shaders here, so compiling them each time costs little. Turn the
+    cache off and remove one written before."""
+    os.environ.setdefault("QT_DISABLE_SHADER_DISK_CACHE", "1")
+    folder = cache_dir()
+    try:
+        names = os.listdir(folder)
+    except OSError:
+        return
+    for name in names:
+        if name.startswith(SHADER_CACHE_PREFIX):
+            shutil.rmtree(os.path.join(folder, name), ignore_errors=True)
 
 
 def _ca_bundle() -> None:
