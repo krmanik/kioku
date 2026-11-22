@@ -509,6 +509,32 @@ def t_editor_caret():
     return "caret and a backward selection kept"
 
 
+def t_bottom_buttons():
+    """TestFlight (iPhone SE): the deck list's bottom bar buttons (Get
+    Shared, Create Deck, Import File) were desktop-sized, 32px tall with
+    11px text: on a touch screen they are at least 44px tall and the bar
+    shows them whole (webscripts.PHONE_CSS)."""
+    mw.moveToState("deckBrowser")
+    yield Until(lambda: mw.state == "deckBrowser", 10, "deck list")
+    js = ("JSON.stringify({coarse: matchMedia('(pointer: coarse)').matches,"
+          " body: document.body.scrollHeight, buttons: [...document.querySelectorAll("
+          "'#outer > #header button')].map(b => [b.textContent,"
+          " Math.round(b.getBoundingClientRect().height), parseFloat(getComputedStyle(b).fontSize)])})")
+    info = None
+    for _ in range(20):
+        info = json.loads((yield Js(mw.bottomWeb, js)) or "null")
+        if info and info["buttons"]:
+            break
+        yield 0.5
+    check(bool(info and info["buttons"]), f"no bottom bar buttons: {info}")
+    if not info["coarse"]:
+        raise Skip("no touch screen")
+    small = [b for b in info["buttons"] if b[1] < 44 or b[2] < 14]
+    check(not small, f"buttons too small [text, height, font px]: {small}")
+    yield Until(lambda: mw.bottomWeb.height() >= info["body"], 5, "bottom bar shows the buttons whole")
+    return f"{len(info['buttons'])} buttons, {info['buttons'][0][1]}px tall"
+
+
 def t_browse():
     browser = aqt.dialogs.open("Browser", mw)
     yield Until(lambda: windows_of("Browser"), 15, "Browse window")
@@ -1420,6 +1446,7 @@ TESTS = [
     ("editor-caret", t_editor_caret),
     ("deck-list", t_deck_browser),
     ("page-zoom", t_page_zoom),
+    ("bottom-buttons", t_bottom_buttons),
     ("browse", t_browse),
     ("browse-columns", t_browse_columns),
     ("numpad-done", t_numpad_done),

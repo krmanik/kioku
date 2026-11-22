@@ -321,6 +321,13 @@ PHONE_CSS = "".join(_rule(r) for r in (
     "@media (hover: none) {",
     "  .header .hitem:hover { border-color: transparent; }",
     "}",
+    # the deck list's and overview's bottom bar (Get Shared, Create Deck,
+    # Import File; Options, Custom Study) had desktop buttons, 11px text and 32px tall:
+    # too small to hit on a phone (iPhone SE). Touch-sized, as Apple's 44pt
+    "@media (pointer: coarse) {",
+    "  #outer > #header button {"
+    " font-size: 15px; min-height: 44px; box-sizing: border-box; padding: 8px 16px; margin: 4px; }",
+    "}",
 ))
 
 

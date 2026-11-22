@@ -4,6 +4,9 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
 
 ## Next release
 
+- Phones and tablets: the buttons under the deck list (Get Shared,
+  Create Deck, Import File) and under a deck's overview are bigger and
+  easier to tap.
 - iPhone, iPad: **View › Zoom In** and **Zoom Out** make pages bigger
   and smaller again, as do add-ons that zoom. Before, the text stayed the
   same size and the page only moved to the right.
