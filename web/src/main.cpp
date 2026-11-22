@@ -194,7 +194,7 @@ int main(int argc, char *argv[]) {
     config.module_search_paths_set = 1;
     append_path(&config, L"/app");
     append_path(&config, L"/site");
-    append_path(&config, L"/python/lib/python3.14");
+    append_path(&config, L"/python/lib/python" KIOKU_PYTHON_VERSION);  // from CMake
 
     // --kioku only picks the entry point; Anki would take it for a file to import
     status = PyConfig_SetBytesArgv(&config, argc > 1 && strcmp(argv[1], "--kioku") == 0 ? 1 : argc, argv);

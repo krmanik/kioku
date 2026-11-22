@@ -339,3 +339,16 @@ never put more than 8 MB into one save.
 | After the fix: killed right after the first media transaction (media database not saved) | ✅ next start: nothing missing, no `removed` on the server |
 | After the fix: killed right after the media database's transaction | ✅ same |
 | After the fix: IndexedDB reads fail during loading | ✅ "Kioku couldn't load your saved collection…" note, Anki not started, all 117 saved entries kept; a normal reload starts with everything |
+
+### 2026-11-22: Anki's Python 3.13.18 and Qt 6.11.2 (Chrome, headless)
+
+The web build moved from Python 3.14.0, Qt 6.11.0 and PyQt6-sip 13.13 to
+the versions Anki 26.09.4 pins (Kioku's `shared/versions.env`; AnkiHub
+failed on 3.14 on the iPhone). `fixes.md` › Building: CPython.
+
+| Test | Result |
+| --- | --- |
+| First build: `Fatal Python error: Failed to import encodings module` (`fcntl` turned on); node harness with `-sSYSCALL_DEBUG` found `ioctl(FIOCLEX)` → EINVAL | ❌, then fixed (3.13's `config.site` as it is) |
+| Node harness (`tools/link_core.sh`): Python 3.13.18, ssl, hashlib, decimal, ctypes, `Collection` opens | ✅ |
+| `selftest.py chrome`: `Python 3.13.18`, `Starting Anki 26.09.4` | ✅ 35/35 |
+| AnkiHub 2026-11-18.1 from AnkiWeb (devexec `download_addons`, over the relay), then two more page loads with the saved profile: loads at start (137 modules, its whole setup logged), `NoteInfo` round trip, no error dialog | ✅ |

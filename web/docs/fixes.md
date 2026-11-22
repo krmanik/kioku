@@ -35,6 +35,10 @@ is unchanged.
 
 ## Building: CPython
 
+The 3.14 rows (`patches/cpython-3.14.0-emsdk-4.0.7.patch`) are history:
+the web build runs the Python Anki pins, 3.13, which has none of that
+wasm-gc or JSPI code and needs no patch (last rows).
+
 | Problem | Cause | Fix |
 | --- | --- | --- |
 | `configure: --enable-wasm-dynamic-linking only applies to Emscripten` | `Tools/wasm/emscripten build -- args` also passes the args to the native build Python | steps run one by one (`tools/build_python.sh`) |
@@ -46,6 +50,8 @@ is unchanged.
 | ctypes: `Unable to grow wasm table` | CPython's own link sets it, ours didn't | `-sALLOW_TABLE_GROWTH` |
 | Stale objects kept the trampoline after reconfiguring | CFLAGS changes don't trigger rebuilds | `make clean` before `make-host` |
 | Onigiri add-on: `import ctypes` failed (`OSError: dynamic linking not enabled`), also `import ctypes.util` | CPython is linked statically: no `dlopen()`, but `ctypes` opens the main program (`PyDLL(None)`) when imported and `ctypes.util` does too (`CDLL(None)`, for `dl_iterate_phdr`) | `Lib/ctypes` in `patches/cpython-3.14.0-emsdk-4.0.7.patch`: `pythonapi` is `None` on emscripten if that fails; `ctypes.util` skips the library listing on emscripten. Loading a library still raises `OSError`, which add-ons expect off their platform. The stdlib is packed at link time and isn't a link dependency: `rm build/cmake/kioku.js` before `tools/build.sh` |
+| Add-ons expect desktop Anki's Python (AnkiHub's mashumaro broke on 3.14 on iOS); Anki 26.09.4 pins 3.13.18 | the web build ran 3.14.0 and Qt 6.11.0, sip 13.13 | `tools/build_python.sh` builds `PYTHON_FULL_VERSION` (Kioku's `shared/versions.env`); 3.13 has no `Tools/wasm/emscripten`, so the script runs its steps itself (build Python, libffi 3.4.6, mpdecimal 4.0.1, OpenSSL, then `emconfigure`), still without `PY_CALL_TRAMPOLINE`. 3.13's `ctypes` already sets `pythonapi = None` when `PyDLL(None)` fails and its `ctypes.util` has no `dl_iterate_phdr` listing: no CPython patch. Qt, PyQt6 and PyQt6-sip (`--abi-version` from its `sip.h`) come from `versions.env` too |
+| 3.13 with `fcntl` (its `config.site` line saying there's no `sys/ioctl.h` dropped, as 3.14 did): `Fatal Python error: Failed to import encodings module`, `OSError: [Errno 28] Invalid argument` | every `open()` sets close-on-exec with `ioctl(FIOCLEX)`, which Emscripten answers with EINVAL; 3.14 has its own syscall overrides that answer ENOTTY (falls back to `fcntl()`), 3.13 doesn't | 3.13's `config.site` as it is: no `fcntl` module on the web (Kioku and its packages don't import it). Found with the node harness (`tools/link_core.sh … -sSYSCALL_DEBUG`) |
 
 ## Building: PyQt6 and the app
 

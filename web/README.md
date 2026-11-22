@@ -1,7 +1,7 @@
 # Kioku for the web
 
 Unmodified Anki desktop (aqt 26.09.3) running in a browser tab: CPython
-3.14, PyQt6, Qt 6.11 and Anki's Rust core compiled to WebAssembly and
+3.13, PyQt6, Qt 6.11 and Anki's Rust core compiled to WebAssembly and
 linked into one static `kioku.wasm`, the same design as
 [Kioku](https://github.com/krmanik/kioku)'s iOS and Android apps. This is an
 early port: studying works and the collection is kept in the browser, but
@@ -80,12 +80,12 @@ Runs from `web/` and uses the rest of the Kioku repository (`..`, or set
 `KIOKU_REPO`), with its iOS dependencies fetched and built
 (`ios/tools/fetch_deps.sh`, `ios/tools/build.sh` or at least its site-packages
 and PyQt6 sdists), plus nightly Rust with `rust-src`, `protoc`, `uvx`,
-Python 3.14, Ninja and Chrome.
+Python 3, Ninja and Chrome.
 
 ```sh
 cd web
-tools/fetch_deps.sh      # Emscripten 4.0.7, Qt 6.11 for WebAssembly, fonts
-tools/build_python.sh    # CPython 3.14 for Emscripten (patched; builds OpenSSL first)
+tools/fetch_deps.sh      # Emscripten 4.0.7, Qt for WebAssembly, fonts
+tools/build_python.sh    # Anki's CPython for Emscripten (libffi, mpdecimal, OpenSSL first)
 tools/build_rust.sh      # Anki's Rust core for wasm32-unknown-emscripten
 tools/build_rpds.sh      # rpds-py (jsonschema, add-on manifests)
 tools/build_orjson.sh    # orjson (faster JSON for Anki's core)

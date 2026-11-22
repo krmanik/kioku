@@ -1427,7 +1427,7 @@ Settings" status, the Info.plist key.
 Not run: an add-on written to undo the guard (it can: same process;
 documented), battery use, iPad, longer than 7 minutes, App Review.
 
-## Anki's Python and Qt: AnkiHub on iOS and Android (2026-11-20)
+## Anki's Python and Qt: AnkiHub on iOS, Android and the web (2026-11-20)
 
 TestFlight feedback (iPhone18,2, iOS 27.2.1, 26.09.4 build): "Add-on Startup
 Failed: AnkiHub", `UnserializableField: Field "tags" of type
@@ -1446,3 +1446,4 @@ with Python 3.14 and AnkiHub's bundled mashumaro 3.15; Python 3.13 (Anki
 | Objects freed on the main thread (the 3.14 stack-bounds trashcan leak): 300 of 300, Simulator and iPhone | ✅ |
 | Android emulator (Kioku_API33, SwiftShader): in-app suite + crash sweep, `version` = Anki 26.09.4, Qt 6.11.2, PyQt 6.11.0, Python 3.13.18 (built from source) | ✅ 53 passed, `numpad-done` and `microphone` skipped |
 | AnkiHub 2026-11-18.1 installed from AnkiWeb in the app (Android emulator): loads after a restart (120 modules), `NoteInfo` round trip, no startup failure | ✅ |
+| Web (headless Chrome): `selftest.py chrome` 35/35 on Python 3.13.18, Qt 6.11.2; AnkiHub from AnkiWeb loads (137 modules), `NoteInfo` round trip ([web/docs/testing.md](../web/docs/testing.md)) | ✅ |

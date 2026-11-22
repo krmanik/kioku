@@ -6,9 +6,11 @@
 set -euo pipefail
 source "$(dirname "$0")/env.sh"
 source "$ROOT/deps/emsdk/emsdk_env.sh" >/dev/null 2>&1
-if [ ! -f "$ROOT/build/cmake/build.ninja" ]; then
-    "$ROOT/deps/qt/6.11.0/wasm_multithread/bin/qt-cmake" -S "$ROOT" -B "$ROOT/build/cmake" -G Ninja \
-        -DCMAKE_BUILD_TYPE=Release -DQT_HOST_PATH="$ROOT/deps/qt/6.11.0/macos" \
+QT=$ROOT/deps/qt/$QT_VERSION
+"$KIOKU_REPO/shared/tools/cmake_fresh.sh" "$ROOT/build/cmake" "$QT/wasm_multithread"
+if [ ! -f "$ROOT/build/cmake/CMakeCache.txt" ]; then
+    "$QT/wasm_multithread/bin/qt-cmake" -S "$ROOT" -B "$ROOT/build/cmake" -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release -DQT_HOST_PATH="$QT/macos" \
         -DKIOKU_REPO="$KIOKU_REPO" -DKIOKU_ASYNCIFY=ON
 fi
 ninja -C "$ROOT/build/cmake"
