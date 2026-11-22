@@ -179,8 +179,10 @@ import ankidesk_mobile  # noqa: E402
 # Preferences > Advanced, shared with the native apps (shared/python/kioku in
 # the repository, with kioku_platform.py from here): the phone as a sync
 # server, AnkiDroid's media folder
-from kioku import advanced, ankidroid, syncserver  # noqa: E402
+from kioku import advanced, ankidroid, prefs, syncserver  # noqa: E402
 
+# a prefs21.db left by a first start killed before Anki saved it
+prefs.install()
 advanced.install()
 ankidroid.install()
 syncserver.install()

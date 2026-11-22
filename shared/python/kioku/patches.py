@@ -56,6 +56,9 @@ def apply() -> None:
     aqt.utils._kioku_fit_tooltip = _fit_tooltip
     aqt.utils.tooltip.__code__ = _tooltip.__code__
 
+    from . import prefs
+
+    prefs.install()
     _patch_app()
     _patch_audio()
     _patch_profile_saving()
