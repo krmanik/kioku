@@ -38,6 +38,10 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
   Tesseract, eSpeak NG and the others) when they look for them with
   `shutil.which()`. On a device it found none of them, so such add-ons
   said the program was missing; running them worked.
+- Android: Kioku no longer keeps Qt's shader cache. With some graphics
+  drivers one cache file grew to almost 2 GB; Kioku read it at every
+  start, used 3 GB of memory and stopped responding (seen on the Android
+  emulator at a tablet's size).
 - Android: the editor's MathJax buttons (Equations menu) work with recent
   versions of Android System WebView. The equation stayed plain text.
 - Termux app: Anki starts again inside the desktop. 0.2.9 left out a file
