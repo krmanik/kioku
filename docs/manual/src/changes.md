@@ -4,6 +4,11 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
 
 ## Next release
 
+- Manual: step-by-step guide for syncing a computer or tablet with the
+  phone's sync server over Wi-Fi, the phone's hotspot or Tailscale, based
+  on a tutorial by L-M-Sherlock
+  ([issue #25](https://github.com/krmanik/kioku/issues/25)). See
+  [Sync server on the phone](features/sync-server.md).
 - Phones and tablets: the buttons under the deck list (Get Shared,
   Create Deck, Import File) and under a deck's overview are bigger and
   easier to tap.
