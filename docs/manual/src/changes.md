@@ -28,11 +28,16 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
   easier to tap.
 - iPhone, iPad: **View › Zoom In** and **Zoom Out** make pages bigger
   and smaller again, as do add-ons that zoom. Before, the text stayed the
-  same size and the page only moved to the right.
+  same size and the page only moved to the right, which also pushed
+  add-ons' charts such as Review Heatmap off the screen.
   **Preferences › User interface size** now also zooms the pages.
 - Android: **View › Zoom In** and **Zoom Out**, add-ons that zoom and
   **Preferences › User interface size** zoom the whole page. Before, only
   the text got bigger.
+- iPhone, iPad: add-ons find the bundled programs (FFmpeg, MeCab,
+  Tesseract, eSpeak NG and the others) when they look for them with
+  `shutil.which()`. On a device it found none of them, so such add-ons
+  said the program was missing; running them worked.
 - Android: the editor's MathJax buttons (Equations menu) work with recent
   versions of Android System WebView. The equation stayed plain text.
 - Termux app: Anki starts again inside the desktop. 0.2.9 left out a file
