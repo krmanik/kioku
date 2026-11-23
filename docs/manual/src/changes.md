@@ -20,6 +20,10 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
   to AnkiWeb, or when a sync ends at once. On a busy or slow phone the
   sync's notification was taken away before Android had shown it, and
   Android then closed the app.
+- iPhone, iPad: fixed three crashes from TestFlight reports: after a tap
+  on a menu item or button while a text field had the focus, when a
+  dialog closed while scrolling with a trackpad or mouse, and when an
+  add-on opened the list of a combo box that wasn't on screen.
 
 ## 0.2.10
 

@@ -1,0 +1,15 @@
+diff --git a/src/plugins/platforms/ios/quiview.mm b/src/plugins/platforms/ios/quiview.mm
+index 2d22362..4ac5182 100644
+--- a/src/plugins/platforms/ios/quiview.mm
++++ b/src/plugins/platforms/ios/quiview.mm
+@@ -762,7 +762,9 @@ inline ulong getTimeStamp(UIEvent *event)
+ #if QT_CONFIG(wheelevent)
+ - (void)handleScroll:(UIPanGestureRecognizer *)recognizer
+ {
+-    if (!self.platformWindow->window())
++    // ~QIOSWindow clears the platform window before removing the view, which
++    // cancels a scroll in progress and calls this once more
++    if (!self.platformWindow || !self.platformWindow->window())
+         return;
+ 
+     if (!self.canBecomeFirstResponder)

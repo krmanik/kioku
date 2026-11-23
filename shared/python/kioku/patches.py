@@ -75,6 +75,7 @@ def apply() -> None:
     _patch_update_check()
     _patch_page_html()
     _patch_editor_media()
+    _patch_combo_popup()
     _addon_platform()
 
 
@@ -854,6 +855,23 @@ def _patch_audio() -> None:
         aqt.sound.av_player.players.append(platform.tts_player(taskman))
 
     aqt.sound.setup_audio = setup_audio
+
+
+def _patch_combo_popup() -> None:
+    """Qt shows a combo box's list as a native menu here, placed relative to
+    the combo box's window. A combo box whose window has no native window
+    yet (never shown) makes it dereference null: an add-on calling
+    showPopup() on one crashed the app. Do nothing there instead."""
+    from aqt.qt import QComboBox
+
+    original = QComboBox.showPopup
+
+    def show_popup(self) -> None:  # type: ignore[no-untyped-def]
+        if self.window().windowHandle() is None:
+            return
+        original(self)
+
+    QComboBox.showPopup = show_popup  # type: ignore[method-assign]
 
 
 def _addon_platform() -> None:

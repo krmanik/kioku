@@ -1449,3 +1449,32 @@ with Python 3.14 and AnkiHub's bundled mashumaro 3.15; Python 3.13 (Anki
 | Android emulator (Kioku_API33, SwiftShader): in-app suite + crash sweep, `version` = Anki 26.09.4, Qt 6.11.2, PyQt 6.11.0, Python 3.13.18 (built from source) | ✅ 53 passed, `numpad-done` and `microphone` skipped |
 | AnkiHub 2026-11-18.1 installed from AnkiWeb in the app (Android emulator): loads after a restart (120 modules), `NoteInfo` round trip, no startup failure | ✅ |
 | Web (headless Chrome): `selftest.py chrome` 35/35 on Python 3.13.18, Qt 6.11.2; AnkiHub from AnkiWeb loads (137 modules), `NoteInfo` round trip ([web/docs/testing.md](../web/docs/testing.md)) | ✅ |
+
+## TestFlight crashes in 0.2.9 (2026-11-23)
+
+14 crash reports for 0.2.9 (234) in Xcode's Organizer (Nov 22–23). That
+build's dSYM was gone, so build 234's commit was rebuilt in a worktree with
+its own dependencies (Qt 6.11.0, Python 3.14): same code layout (`__TEXT`
+size equal to the reports'; every return address follows a call into the
+next frame's function). Five causes: three fixed below
+([fixes.md](fixes.md#runtime-platform)); the Rust core running out of
+memory on an iPad 7 (a full upload and an .apkg import of a large
+collection, five reports) and one crash inside a `ctypes` call (no Python
+stack) are not.
+
+iPhone 15 Pro Max, iOS 27, dev build (`tools/run_device.sh`), each crash
+path driven through `tools/devcmd.sh` with rubicon:
+
+| Test | Result |
+| --- | --- |
+| `QComboBox` never shown, `showPopup()` (the add-on's call) | ✅ returns, no crash; its window has no native window |
+| Combo box in a shown dialog, `showPopup()` | ✅ its picker opens (input panel visible, 264 pt) |
+| Qt window shown, its `QUIMetalView` retained, `QWidget.destroy()`, then `handleScroll:` with the view's pan recognizer | ✅ returns, no crash; old binary calls `platformWindow->window()` without a check |
+| Line edit focused in a dialog, `QIOSTapRecognizer` sent `touchesEnded:` with a fake touch (cursor unchanged, so Qt queues the edit menu), dialog's native window destroyed in the same call | ✅ no crash |
+| Same, window kept (control: the queued code runs) | ✅ the line edit's context menu opens |
+| Crash reports on the phone afterwards | none |
+| Host tests (`shared/tests/run.sh`) | ✅ 248 passed |
+
+Not run: a real trackpad scroll while a dialog closes (iPad), the add-on
+from the reports (unknown), Android (same combo box guard; Qt for Android
+has no `qios` plugin).

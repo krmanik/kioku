@@ -1,0 +1,15 @@
+diff --git a/src/plugins/platforms/ios/qiostextinputoverlay.mm b/src/plugins/platforms/ios/qiostextinputoverlay.mm
+index b843ed0..4f64dad 100644
+--- a/src/plugins/platforms/ios/qiostextinputoverlay.mm
++++ b/src/plugins/platforms/ios/qiostextinputoverlay.mm
+@@ -984,7 +984,9 @@ void showEditMenu(UIView *focusView, QPoint touchPos)
+             _menuShouldBeVisible = true;
+             self.state = UIGestureRecognizerStateFailed;
+             dispatch_async(dispatch_get_main_queue(), ^{
+-                if (_menuShouldBeVisible)
++                // The window can be gone by now, e.g. when the same tap chose
++                // a menu item that closed it or opened a dialog
++                if (_menuShouldBeVisible && _focusView && quiview_cast(_focusView).platformWindow)
+                     showEditMenu(_focusView, touchPos.toPoint());
+                 else
+                     QIOSTextInputOverlay::s_editMenu.visible = false;
