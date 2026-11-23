@@ -80,6 +80,10 @@
     </array>
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>With “Keep running in the background” on, location updates keep Kioku running so add-ons such as AnkiConnect keep answering other apps. Kioku asks for the lowest accuracy and doesn’t use or store your location.</string>
+    <!-- Kioku asks only for When In Use, but the binary references the
+         Always API (App Store Connect warning ITMS-90683 without it) -->
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>With “Keep running in the background” on, location updates keep Kioku running so add-ons such as AnkiConnect keep answering other apps. Kioku asks for the lowest accuracy and doesn’t use or store your location.</string>
     <!-- approximate location unless the user turns Precise on: the
          permission is the whole app's, add-ons included -->
     <key>NSLocationDefaultAccuracyReduced</key>
