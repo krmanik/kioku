@@ -2,6 +2,21 @@
 
 All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
 
+## Next release
+
+- Sync server on the phone: collections over 300 MB sync normally.
+  Before, the server asked for a full sync on every sync and then
+  refused the upload with "collection exceeds size limit"
+  ([issue #28](https://github.com/krmanik/kioku/issues/28)). The limit is
+  now 3 GB.
+- Android: no lag with accessibility services that aren't screen
+  readers, such as password managers and the phone maker's own
+  services. Qt's accessibility support now turns on only for TalkBack
+  and other screen readers
+  ([issue #22](https://github.com/krmanik/kioku/issues/22)).
+- iPhone, iPad: the app declares the location purpose string App Store
+  Connect asks for.
+
 ## 0.2.10
 
 - Manual: step-by-step guide for syncing a computer or tablet with the
