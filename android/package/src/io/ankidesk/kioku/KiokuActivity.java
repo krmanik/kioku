@@ -1,5 +1,6 @@
 package io.ankidesk.kioku;
 
+import android.accessibilityservice.AccessibilityServiceInfo;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.net.Uri;
@@ -11,6 +12,7 @@ import android.util.Log;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.WindowInsets;
+import android.view.accessibility.AccessibilityManager;
 
 import org.qtproject.qt.android.bindings.QtActivity;
 
@@ -47,6 +49,9 @@ public class KiokuActivity extends QtActivity {
             if (getIntent() != null && getIntent().getBooleanExtra("dev", false)) {
                 Os.setenv("KIOKU_DEV", "1", true);
             }
+            if (!screenReaderOn(this)) {
+                Os.setenv("QT_ANDROID_DISABLE_ACCESSIBILITY", "1", true);
+            }
         } catch (IOException | ErrnoException e) {
             Log.e(TAG, "preparing the Python runtime failed", e);
         }
@@ -59,6 +64,29 @@ public class KiokuActivity extends QtActivity {
             setIntent(linkIntent(getIntent()));
         }
         super.onCreate(savedInstanceState);
+    }
+
+    /**
+     * Whether TalkBack or another screen reader is on. Qt turns its
+     * accessibility bridge on for any accessibility service (password
+     * managers, Xiaomi's and Samsung's system services), and each of their
+     * queries then waits for the Qt main thread: the UI lags and logs "Failed
+     * to acquire deadlock protector for 'QtAndroidAccessibility::
+     * runInObjectContext()'" (issue #22). Kioku keeps the bridge only for
+     * screen readers; the web views (decks, reviewer, editor) keep Android's
+     * own accessibility either way. Checked at start.
+     */
+    static boolean screenReaderOn(android.content.Context context) {
+        AccessibilityManager am = context.getSystemService(AccessibilityManager.class);
+        if (am == null || !am.isEnabled()) {
+            return false;
+        }
+        if (am.isTouchExplorationEnabled()) {
+            return true;
+        }
+        int feedback = AccessibilityServiceInfo.FEEDBACK_SPOKEN
+                | AccessibilityServiceInfo.FEEDBACK_BRAILLE;
+        return !am.getEnabledAccessibilityServiceList(feedback).isEmpty();
     }
 
     @Override

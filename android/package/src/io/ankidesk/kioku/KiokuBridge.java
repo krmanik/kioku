@@ -205,6 +205,12 @@ public class KiokuBridge {
             case "tts.voices":
                 // starts the engine, waiting for the UI thread: not from it
                 return ttsVoices();
+            case "accessibility": {
+                android.view.accessibility.AccessibilityManager am = activity.getSystemService(
+                        android.view.accessibility.AccessibilityManager.class);
+                return obj("enabled", am != null && am.isEnabled(),
+                        "screenReader", KiokuActivity.screenReaderOn(activity));
+            }
             case "storage.allFiles":
                 return allFilesAccess();
             case "apps.versions":

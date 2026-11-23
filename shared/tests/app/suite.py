@@ -1383,6 +1383,29 @@ def t_programs():
     return ", ".join(results)
 
 
+def t_accessibility():
+    """Issue #22: with an accessibility service on that is not a screen
+    reader (password managers, Xiaomi's and Samsung's system services), Qt's
+    accessibility bridge made each of the service's queries wait for the Qt
+    main thread and the app lagged. Kioku keeps the bridge only for screen
+    readers (KiokuActivity.screenReaderOn). Meaningful with a service on:
+    apptest on the emulator with Accessibility Menu or TalkBack."""
+    if sys.platform != "android":
+        raise Skip(sys.platform)
+    from kioku_platform import bridge
+
+    # Qt's QtAccessibilityDelegate reads it when a service turns on (this
+    # PyQt6 has no QAccessible to ask Qt directly)
+    state = bridge.call("accessibility")
+    yield 0
+    disabled = os.environ.get("QT_ANDROID_DISABLE_ACCESSIBILITY") == "1"
+    if state["screenReader"]:
+        check(not disabled, f"screen reader on but Qt accessibility off: {state}")
+        return "screen reader: Qt accessibility on"
+    check(disabled, f"no screen reader but Qt accessibility allowed: {state}")
+    return "service, no screen reader: Qt accessibility off" if state["enabled"] else "no service"
+
+
 def t_microphone():
     """Issue #19: an add-on recording through AVAudioRecorder (rubicon-objc)
     needs NSMicrophoneUsageDescription, else iOS ends the app. Records a
@@ -1499,6 +1522,7 @@ TESTS = [
     ("python-packages", t_python_packages),
     ("programs", t_programs),
     ("microphone", t_microphone),
+    ("accessibility", t_accessibility),
     ("https", t_https),
     ("cleanup", t_cleanup),
 ]
