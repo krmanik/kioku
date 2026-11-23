@@ -16,6 +16,10 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
   ([issue #22](https://github.com/krmanik/kioku/issues/22)).
 - iPhone, iPad: the app declares the location purpose string App Store
   Connect asks for.
+- Android 11 and older: Kioku no longer closes right after logging in
+  to AnkiWeb, or when a sync ends at once. On a busy or slow phone the
+  sync's notification was taken away before Android had shown it, and
+  Android then closed the app.
 
 ## 0.2.10
 

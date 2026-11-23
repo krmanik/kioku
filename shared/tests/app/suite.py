@@ -1406,6 +1406,38 @@ def t_accessibility():
     return "service, no screen reader: Qt accessibility off" if state["enabled"] else "no service"
 
 
+def t_ankiweb_service():
+    """A sync that ends at once stopped KiokuAnkiWebService before Android's
+    UI thread had run its startForeground(); Android 11 and older then
+    closed the app ("Context.startForegroundService() did not then call
+    Service.startForeground()", a Realme 5 Pro after logging in). Starts it
+    twice (sync, then a title change) and stops it in the same breath: the
+    app has to survive and the service has to be gone afterwards. Only
+    Android 11 and older crashed without the fix (M30s, API 30 emulator)."""
+    if sys.platform != "android":
+        raise Skip(sys.platform)
+    from kioku import ankiwebsync
+    from kioku_platform import bridge
+
+    # a logged-in profile syncs at start
+    yield Until(lambda: not ankiwebsync._service_running, 120, "sync at start to end")
+    # posted to Android's UI thread, run back to back as after a blocked one
+    bridge.call("ankiWebService", running=True, title="")
+    bridge.call("ankiWebService", running=True, title="Kioku test")
+    bridge.call("ankiWebService", running=False, title="")
+    # the state is read on this thread at once, maybe before the posted calls
+    # ran: give them, and a crash without the fix (within about a second),
+    # 3 s first
+    begun = time.monotonic()
+    stopped = {"running": False, "pending": False}
+    yield Until(lambda: time.monotonic() - begun > 3
+                and bridge.call("ankiWebService.state") == stopped, 15, "service stopped")
+    import platform
+
+    api = platform.android_ver().api_level
+    return f"start, start, stop at once: app alive, service stopped (API {api})"
+
+
 def t_microphone():
     """Issue #19: an add-on recording through AVAudioRecorder (rubicon-objc)
     needs NSMicrophoneUsageDescription, else iOS ends the app. Records a
@@ -1523,6 +1555,7 @@ TESTS = [
     ("programs", t_programs),
     ("microphone", t_microphone),
     ("accessibility", t_accessibility),
+    ("ankiweb-service", t_ankiweb_service),
     ("https", t_https),
     ("cleanup", t_cleanup),
 ]

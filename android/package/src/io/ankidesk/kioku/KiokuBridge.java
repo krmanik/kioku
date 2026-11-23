@@ -211,6 +211,10 @@ public class KiokuBridge {
                 return obj("enabled", am != null && am.isEnabled(),
                         "screenReader", KiokuActivity.screenReaderOn(activity));
             }
+            case "ankiWebService.state": {
+                boolean[] s = KiokuAnkiWebService.state();
+                return obj("running", s[0], "pending", s[1]);
+            }
             case "storage.allFiles":
                 return allFilesAccess();
             case "apps.versions":

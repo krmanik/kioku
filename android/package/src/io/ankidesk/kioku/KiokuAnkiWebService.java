@@ -9,7 +9,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ServiceInfo;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.util.Log;
 
 /**
@@ -26,22 +28,98 @@ public class KiokuAnkiWebService extends Service {
 
     private static final String EXTRA_TITLE = "title";
 
+    // Every startForegroundService() must be answered by startForeground() in
+    // onStartCommand(). KiokuBridge posts update() to the UI thread, and
+    // ankiwebsync stops the service STOP_DELAY_MS after a sync that ended at
+    // once; when the UI thread is blocked longer (a slow phone, the
+    // accessibility lag of issue #22) the start and the stop run back to
+    // back, before Android delivers onStartCommand(). Android 11 and older
+    // then kill the app: "Context.startForegroundService() did not then call
+    // Service.startForeground()" (a Realme 5 Pro closed right after logging
+    // in). A stop while starts are pending is remembered and done by the
+    // last onStartCommand(), as KiokuSyncService does. A count, not a flag:
+    // starting again to change the title can overlap.
+    private static int pendingStarts;
+    private static boolean stopWhenStarted;
+    // Android gives a service 10 s to call startForeground(). A deferred stop
+    // still waiting after this is done anyway, so a start whose
+    // onStartCommand() never came (a stopSelf() from onTimeout() dropped it)
+    // can't keep the notification up for good. Each deferred stop gets its
+    // own number: an older one's fallback leaves a newer stop alone.
+    private static final long STOP_FALLBACK_MS = 15_000;
+    private static int stopNumber;
+
     /** From KiokuBridge: show (running) or remove the service; an empty title
      * means a sync. Starting it again while it runs updates the notification. */
-    static void update(Context context, boolean running, String title) {
+    static synchronized void update(Context context, boolean running, String title) {
         Intent intent = new Intent(context, KiokuAnkiWebService.class);
         if (running) {
             intent.putExtra(EXTRA_TITLE, title);
             try {
                 context.startForegroundService(intent);
+                pendingStarts++;
+                stopWhenStarted = false;
             } catch (RuntimeException e) {
                 // Android 12+ refuses while the app is in the background; the
                 // sync still runs, but only until Android cuts the network
                 Log.w(TAG, "cannot start the AnkiWeb sync service", e);
             }
+        } else if (pendingStarts > 0) {
+            Log.i(TAG, "AnkiWeb sync service: stopping once started");
+            stopWhenStarted = true;
+            int number = ++stopNumber;
+            Context app = context.getApplicationContext();
+            new Handler(Looper.getMainLooper()).postDelayed(
+                    () -> stopIfStillWaiting(app, number), STOP_FALLBACK_MS);
         } else {
             context.stopService(intent);
         }
+    }
+
+    /** The fallback of a deferred stop: no onStartCommand() came for it. */
+    private static synchronized void stopIfStillWaiting(Context context, int number) {
+        if (number != stopNumber || !stopWhenStarted) {
+            return;
+        }
+        Log.w(TAG, "AnkiWeb sync service: start never arrived, stopping");
+        pendingStarts = 0;
+        stopWhenStarted = false;
+        context.stopService(new Intent(context, KiokuAnkiWebService.class));
+    }
+
+    private static boolean created;
+
+    /** For the in-app test ankiweb-service: {running, pendingStarts}. */
+    static synchronized boolean[] state() {
+        return new boolean[] {created, pendingStarts > 0};
+    }
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        synchronized (KiokuAnkiWebService.class) {
+            created = true;
+        }
+    }
+
+    @Override
+    public void onDestroy() {
+        synchronized (KiokuAnkiWebService.class) {
+            created = false;
+        }
+        super.onDestroy();
+    }
+
+    /** Called once startForeground() ran: whether to stop now. */
+    private static synchronized boolean started() {
+        if (pendingStarts > 0) {
+            pendingStarts--;
+        }
+        if (pendingStarts > 0 || !stopWhenStarted) {
+            return false;
+        }
+        stopWhenStarted = false;
+        return true;
     }
 
     @Override
@@ -53,6 +131,10 @@ public class KiokuAnkiWebService extends Service {
             startForeground(NOTIFICATION, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
         } else {
             startForeground(NOTIFICATION, notification);
+        }
+        if (started()) {
+            stopForeground(STOP_FOREGROUND_REMOVE);
+            stopSelf();
         }
         // after the process dies the sync is gone too: don't restart empty
         return START_NOT_STICKY;
