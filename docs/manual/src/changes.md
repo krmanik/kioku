@@ -2,7 +2,7 @@
 
 All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
 
-## Next release
+## 0.2.11
 
 - Sync server on the phone: collections over 300 MB sync normally.
   Before, the server asked for a full sync on every sync and then
