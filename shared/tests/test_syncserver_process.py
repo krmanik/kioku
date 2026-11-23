@@ -74,3 +74,39 @@ def test_round_trip(platform, tmp_path) -> None:
     finally:
         a.close()
         b.close()
+
+
+def test_collection_size_limit_is_raised() -> None:
+    # issue #28: upstream's 100 (a 300 MB collection) put big collections in
+    # a full-sync loop
+    assert int(syncserver.MAX_SYNC_PAYLOAD_MEGS) >= 1024
+
+
+@pytest.mark.parametrize("megs", ["1", "2"])
+def test_collection_size_limit(platform, tmp_path, monkeypatch, megs) -> None:
+    # issue #28 scaled down: the limit is 3 x MAX_SYNC_PAYLOAD_MEGS of
+    # collection. A child process reads it fresh, so each limit can be tried
+    monkeypatch.setenv("MAX_SYNC_PAYLOAD_MEGS", "unset")
+    monkeypatch.delenv("MAX_SYNC_PAYLOAD_MEGS")
+    monkeypatch.setattr(syncserver, "MAX_SYNC_PAYLOAD_MEGS", megs)
+    s = settings()
+    st = syncserver.start(s)
+    col = new_col(tmp_path / "a" / "collection.anki2")
+    try:
+        # 4 MB of collection that compresses well: over a 3 MB limit, under 6
+        add_note(col, "big", "x" * (4 * 1024 * 1024))
+        auth = login(col, s, url(st))
+        if megs == "1":
+            with pytest.raises(Exception, match="exceeds size limit"):
+                sync(col, auth, upload=True, media=False)
+        else:
+            sync(col, auth, upload=True, media=False)
+            # then normal syncs, not a full sync forced on every sync
+            add_note(col, "after")
+            assert sync(col, auth, media=False) in NORMAL
+            assert sync(col, auth, media=False) in NORMAL
+    finally:
+        if col.db is None:
+            # the backend reopened it after the refused upload
+            col.reopen(after_full_sync=True)
+        col.close()

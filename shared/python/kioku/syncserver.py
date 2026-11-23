@@ -53,6 +53,15 @@ THIS_PHONE = "This phone (AnkiDroid, Kioku)" if sys.platform == "android" else "
 TAILSCALE_NET = ipaddress.ip_network("100.64.0.0/10")
 TAILSCALE_PROBE = "100.100.100.100"
 
+# Anki's server limits a sync request to MAX_SYNC_PAYLOAD_MEGS (default 100)
+# and a collection to 3 times that uncompressed. A collection over 300 MB was
+# forced into a full sync on every sync, whose upload the server then refused
+# ("collection exceeds size limit", issue #28). Self-hosting is how big
+# collections get synced, so the limit is raised to 3 GB. Read once per
+# process: start() sets it before the profile's first sync. In-process clients
+# use it only to check uploads to AnkiWeb early, which AnkiWeb checks again.
+MAX_SYNC_PAYLOAD_MEGS = "1024"
+
 
 @dataclass
 class Settings:
@@ -223,6 +232,7 @@ def start(settings: Settings) -> Status:
                 del os.environ[key]
             os.environ["SYNC_USER1"] = f"{settings.username}:{settings.password}"
             os.environ.setdefault("RUST_LOG", "anki=info")
+            os.environ.setdefault("MAX_SYNC_PAYLOAD_MEGS", MAX_SYNC_PAYLOAD_MEGS)
             try:
                 bridge = _rsbridge()
                 if hasattr(bridge, "syncserver_start"):
