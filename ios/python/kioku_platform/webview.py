@@ -385,6 +385,10 @@ _ui_delegate = KiokuUIDelegate.alloc().init()
 class WebView:
     """Owns one WKWebView. Callbacks are overridden by kioku.webengine."""
 
+    # a key no Qt shortcut took reaches the page as script-made events
+    # (kioku.webengine QWebEngineView._key_as_script, keys.py)
+    KEYS_AS_SCRIPT = True
+
     # defines window.__kiokuNative for kioku.webscripts.PRELUDE
     BRIDGE = (
         "window.__kiokuNative = {"

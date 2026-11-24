@@ -13,6 +13,10 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
   ([issue #24](https://github.com/krmanik/kioku/issues/24)). Before, the
   box looked focused but typing went nowhere and a card's own key
   handlers got no keys until you tapped the card.
+- iPhone, iPad with a keyboard: a card's own key handlers get the keys
+  that no Anki shortcut uses, also when nothing on the card has focus,
+  as on Anki desktop
+  ([issue #31](https://github.com/krmanik/kioku/issues/31)).
 
 ## 0.2.11
 

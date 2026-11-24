@@ -586,6 +586,91 @@ def test_without_key_routing_a_key_stays_unhandled(platform) -> None:
     assert not evt.isAccepted()
 
 
+def test_ios_hands_a_key_no_shortcut_took_to_the_page_as_events(platform, monkeypatch) -> None:
+    """Issue #31: on iOS a key pressed outside a text field goes to Qt
+    first (keys.py) and WebKit no longer takes keys; one no shortcut took
+    reaches the page as KeyboardEvents (a card's keydown listener)."""
+    from PyQt6.QtCore import QEvent, Qt
+    from PyQt6.QtGui import QKeyEvent
+
+    monkeypatch.setattr(platform.WebView, "KEYS_AS_SCRIPT", True, raising=False)
+    view = webengine.QWebEngineView()
+    scripts: list[str] = []
+    view.page()._web.evaluate = lambda js, cb: scripts.append(js)
+    none = Qt.KeyboardModifier.NoModifier
+    press = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_J, none, "j")
+    press.ignore()
+    view.keyPressEvent(press)
+    assert press.isAccepted()
+    assert '["keydown", "keypress"]' in scripts[-1] and '"key": "j"' in scripts[-1]
+    release = QKeyEvent(QEvent.Type.KeyRelease, Qt.Key.Key_J, none, "j")
+    release.ignore()
+    view.keyReleaseEvent(release)
+    assert release.isAccepted() and '["keyup"]' in scripts[-1]
+    # a modifier alone means nothing to a page
+    shift = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Shift, Qt.KeyboardModifier.ShiftModifier)
+    view.keyPressEvent(shift)
+    assert not shift.isAccepted() and len(scripts) == 2
+
+
+KEY_PAGE = r"""
+global.window = global;
+const seen = [];
+class KeyboardEvent {
+  constructor(type, init) { Object.assign(this, init); this.type = type; this.defaultPrevented = false; }
+  preventDefault() { this.defaultPrevented = true; }
+}
+global.KeyboardEvent = KeyboardEvent;
+global.document = {activeElement: null, documentElement: null, body: {
+  dispatchEvent(e) {
+    seen.push([e.type, e.key, e.code, e.keyCode, e.which, e.charCode, e.shiftKey, e.metaKey, e.repeat]);
+    if (%s && e.type === "keydown") e.preventDefault();
+    return !e.defaultPrevented;
+  }}};
+%s
+console.log(JSON.stringify(seen));
+"""
+
+
+def run_key_page(script: str | None, prevent: bool = False) -> list:
+    assert script is not None
+    out = subprocess.run(["node", "-e", KEY_PAGE % ("true" if prevent else "false", script)],
+                         capture_output=True, text=True, check=True).stdout
+    return json.loads(out)
+
+
+def test_key_event_script_makes_desktop_like_events() -> None:
+    from PyQt6.QtCore import Qt
+
+    def js(key, text="", down=True, prevent=False, **mods):  # type: ignore[no-untyped-def]
+        flags = {m: mods.get(m, False) for m in ("shift", "ctrl", "alt", "meta")}
+        return run_key_page(webscripts.key_event_js(int(key), text, down=down, **flags), prevent)
+
+    assert js(Qt.Key.Key_J, "j") == [
+        ["keydown", "j", "KeyJ", 74, 74, 0, False, False, False],
+        ["keypress", "j", "KeyJ", 74, 74, 106, False, False, False],
+    ]
+    assert js(Qt.Key.Key_J, "J", shift=True)[0][:4] == ["keydown", "J", "KeyJ", 74]
+    assert js(Qt.Key.Key_J, "j", down=False) == [["keyup", "j", "KeyJ", 74, 74, 0, False, False, False]]
+    assert js(Qt.Key.Key_Left) == [["keydown", "ArrowLeft", "ArrowLeft", 37, 37, 0, False, False, False]]
+    assert js(Qt.Key.Key_3, "3")[0][:4] == ["keydown", "3", "Digit3", 51]
+    assert js(Qt.Key.Key_Space, " ")[0][:4] == ["keydown", " ", "Space", 32]
+    assert js(Qt.Key.Key_Return, "\r")[0][:4] == ["keydown", "Enter", "Enter", 13]
+    assert js(Qt.Key.Key_F5)[0][:4] == ["keydown", "F5", "F5", 116]
+    # Command+J: keydown only, metaKey set
+    assert js(Qt.Key.Key_J, "j", meta=True) == [["keydown", "j", "KeyJ", 74, 74, 0, False, True, False]]
+    # a listener's preventDefault() on keydown cancels keypress, as in browsers
+    assert len(js(Qt.Key.Key_J, "j", prevent=True)) == 1
+    assert webscripts.key_event_js(int(Qt.Key.Key_Shift), "", False, False, False, False, True) is None
+
+
+def test_ios_web_view_hands_keys_to_the_page() -> None:
+    root = os.path.join(os.path.dirname(__file__), "..", "..")
+    with open(os.path.join(root, "ios", "python", "kioku_platform", "webview.py"),
+              encoding="utf-8") as f:
+        assert "    KEYS_AS_SCRIPT = True" in f.read()
+
+
 def test_android_routes_keyboard_keys_through_qt() -> None:
     root = os.path.join(os.path.dirname(__file__), "..", "..")
     src = os.path.join(root, "android", "package", "src", "io", "ankidesk", "kioku")

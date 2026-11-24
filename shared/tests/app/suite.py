@@ -888,6 +888,56 @@ def t_review_keys():
     return "Space and 3 answer, j reaches the card, the typing box keeps e"
 
 
+def t_card_keys():
+    """Issue #31, iOS: a key pressed outside a text field goes to Qt first
+    (kioku_platform.keys) and WebKit takes no keys then; one that no
+    shortcut took reaches the card's keydown listener with no element
+    focused, as on desktop Anki."""
+    import kioku_platform
+    from PyQt6.QtCore import QEvent, Qt
+    from PyQt6.QtGui import QKeyEvent
+    from PyQt6.QtWidgets import QApplication
+
+    if not getattr(kioku_platform.WebView, "KEYS_AS_SCRIPT", False):
+        raise Skip("keys reach the page natively (Android: review-keys)")
+    sub = col().decks.id(f"{DECK}::CardKeys")
+    note = col().new_note(col().models.by_name("Basic"))
+    note["Front"], note["Back"] = "kioku card keys", "answer"
+    note.tags = [TAG]
+    col().add_note(note, sub)
+    try:
+        col().decks.select(sub)
+        mw.moveToState("review")
+        yield Until(lambda: mw.state == "review" and mw.reviewer.card is not None
+                    and mw.reviewer.card.nid == note.id, 15, "the card")
+        yield 1
+        yield Js(mw.web, "window.__kiokuKeys=[];['keydown','keypress','keyup'].forEach("
+                         "function(t){document.addEventListener(t,function(e){"
+                         "window.__kiokuKeys.push(t+':'+e.key+':'+e.keyCode);});});"
+                         "if(document.activeElement)document.activeElement.blur();")
+        mw.web.setFocus()
+        none = Qt.KeyboardModifier.NoModifier
+        for key, text in ((Qt.Key.Key_J, "j"), (Qt.Key.Key_Left, "")):
+            for kind in (QEvent.Type.KeyPress, QEvent.Type.KeyRelease):
+                QApplication.sendEvent(mw.web, QKeyEvent(kind, key, none, text))
+        want = ["keydown:j:74", "keypress:j:74", "keyup:j:74",
+                "keydown:ArrowLeft:37", "keyup:ArrowLeft:37"]
+        got = None
+        for _ in range(20):
+            got = json.loads((yield Js(mw.web, "JSON.stringify(window.__kiokuKeys)")) or "null")
+            if got == want:
+                break
+            yield 0.25
+        check(got == want, f"the card's listener got {got}")
+        check(mw.reviewer.card.nid == note.id and mw.reviewer.state == "question",
+              "a key handed to the page also acted in Anki")
+    finally:
+        mw.moveToState("deckBrowser")
+        col().remove_notes([note.id])
+        col().decks.remove([sub])
+    return "a key no shortcut took reached the card's keydown listener"
+
+
 class _PadRecorder:
     """Records what the platform reports to kioku.gamepad, instead of
     running actions."""
@@ -1549,6 +1599,7 @@ TESTS = [
     ("review", t_review),
     ("undo", t_undo),
     ("review-focus", t_review_focus),
+    ("card-keys", t_card_keys),
     ("review-keys", t_review_keys),
     ("gamepad", t_gamepad),
     ("gamepad-native", t_gamepad_native),

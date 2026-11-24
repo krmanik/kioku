@@ -14,6 +14,7 @@ import enum
 import inspect
 import json
 import logging
+import sys
 from typing import Any, Callable
 
 from PyQt6.QtCore import (
@@ -1212,7 +1213,45 @@ class QWebEngineView(QWidget, _Lenient):
                 logger.exception("key to page")
             evt.accept()
             return
+        if evt is not None and self._key_as_script(evt, True):
+            return
         super().keyPressEvent(evt)
+
+    def keyReleaseEvent(self, evt: QKeyEvent | None) -> None:
+        if evt is not None and self._key_as_script(evt, False):
+            return
+        super().keyReleaseEvent(evt)
+
+    def _key_as_script(self, evt: QKeyEvent, down: bool) -> bool:
+        """iOS: a hardware key pressed outside a text field goes to Qt
+        first (kioku_platform.keys), and WebKit takes keys only while its
+        own view is UIKit's first responder, which it no longer is. So a
+        key no shortcut took reaches the page as script-made
+        KeyboardEvents: a card's keydown listener works with no element
+        focused, as on desktop Anki (issue #31)."""
+        if not getattr(platform.WebView, "KEYS_AS_SCRIPT", False) or self._page is None:
+            return False
+        mods = evt.modifiers()
+        ctrl = bool(mods & Qt.KeyboardModifier.ControlModifier)
+        meta = bool(mods & Qt.KeyboardModifier.MetaModifier)
+        if sys.platform in ("ios", "darwin"):
+            # Qt names Command Control on Apple platforms; pages see metaKey
+            ctrl, meta = meta, ctrl
+        js = webscripts.key_event_js(
+            evt.key(), evt.text(),
+            shift=bool(mods & Qt.KeyboardModifier.ShiftModifier), ctrl=ctrl,
+            alt=bool(mods & Qt.KeyboardModifier.AltModifier), meta=meta,
+            down=down, repeat=evt.isAutoRepeat(),
+        )
+        if js is None:
+            return False
+        try:
+            self._page.runJavaScript(js)
+        except Exception:
+            logger.exception("key to page")
+            return False
+        evt.accept()
+        return True
 
     # Convenience wrappers around the page ----------------------------------
 
