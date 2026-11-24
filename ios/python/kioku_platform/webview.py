@@ -511,6 +511,13 @@ class WebView:
             send_message(content, "isFocusingElement", restype=c_bool, argtypes=[])
         )
 
+    def type_text(self, text: str) -> None:
+        """Type text as the on-screen keyboard does (UIKeyInput
+        insertText:); for tests."""
+        content = _content_view(self.webview)
+        if content is not None:
+            content.insertText_(at(text))
+
     def reload(self) -> None:
         self.webview.reload()
 

@@ -793,6 +793,17 @@ def t_review_focus():
                 yield 0.5
             check(ok, "the next card's typing box has the page's focus, but WebKit"
                   " started no input session (no keyboard, keys go elsewhere)")
+            # type as the on-screen keyboard does (its Return is a key
+            # event, not text: not emulated here)
+            web = mw.web.page()._web
+            web.type_text("kioku")
+            typed = ""
+            for _ in range(20):
+                typed = yield Js(mw.web, "document.getElementById('typeans').value")
+                if typed == "kioku":
+                    break
+                yield 0.25
+            check(typed == "kioku", f"typing reached the box: {typed!r}")
     finally:
         mw.moveToState("deckBrowser")
         col().remove_notes(nids)
