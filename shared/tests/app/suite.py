@@ -1480,6 +1480,51 @@ def t_main_window_keyboard():
     return f"normal, {geo.width()}x{geo.height()}"
 
 
+def t_keyboard_window_size():
+    """Issue #4: on Android 11 to 14 the keyboard's adjustResize resized the
+    app's window, and for a few frames Android showed the main window (drawn
+    on its own surface below) in place of the Browse, Add or Edit window.
+    KiokuActivity.onWindowAttributesChanged makes it adjustPan there: the
+    window keeps its size (Qt's available geometry stays) and Qt still gets
+    the keyboard's place (keyboardRectangle, which adjustNothing lost)."""
+    if sys.platform != "android":
+        raise Skip(sys.platform)
+    import platform
+
+    level = platform.android_ver().api_level
+    if not 30 <= level <= 34:
+        raise Skip(f"Android API {level}")
+    from aqt.qt import QGuiApplication, QRect
+
+    im = QGuiApplication.inputMethod()
+    screen = QGuiApplication.primaryScreen()
+    before = screen.availableGeometry()
+    heights = [before.height()]
+
+    def changed(rect: QRect) -> None:
+        heights.append(rect.height())
+
+    screen.availableGeometryChanged.connect(changed)
+    browser = aqt.dialogs.open("Browser", mw)
+    try:
+        yield Until(lambda: windows_of("Browser"), 15, "Browse window")
+        browser.form.searchEdit.lineEdit().setFocus()
+        yield 0.3
+        im.show()
+        yield Until(lambda: im.isVisible() and not im.keyboardRectangle().isEmpty(), 10,
+                    "keyboard and its rectangle")
+        yield 1
+        kbd = im.keyboardRectangle()
+    finally:
+        im.hide()
+        screen.availableGeometryChanged.disconnect(changed)
+        close_window(browser)
+    yield Until(lambda: not im.isVisible(), 10, "keyboard closed")
+    check(min(heights) == before.height(),
+          f"available height {before.height()} went down to {min(heights)} with the keyboard")
+    return f"window kept {before.width()}x{before.height()}, keyboard at y {kbd.y():.0f}"
+
+
 def t_symbol_glyphs():
     """Symbols in Anki's Qt windows come from a font that has them. On
     Android, Qt falls back only to the fonts QT_ANDROID_FONTS names, and the
@@ -1676,6 +1721,7 @@ TESTS = [
     ("programs", t_programs),
     ("microphone", t_microphone),
     ("main-window-keyboard", t_main_window_keyboard),
+    ("keyboard-window-size", t_keyboard_window_size),
     ("symbol-glyphs", t_symbol_glyphs),
     ("accessibility", t_accessibility),
     ("ankiweb-service", t_ankiweb_service),

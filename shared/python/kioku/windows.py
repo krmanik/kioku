@@ -360,9 +360,10 @@ def _card_size(w: QWidget, avail: QRect) -> QSize:
     return QSize(width, min(height, avail.height() - 2 * CARD_MARGIN))
 
 
-# Android before 15: the activity's adjustResize shrinks Qt's available
+# Android 9 and 10: the activity's adjustResize shrinks Qt's available
 # geometry to the part above the on-screen keyboard while it is open (Android
-# 15 draws edge to edge and leaves it alone). Following it resized the
+# 11 to 14 use adjustPan, KiokuActivity.onWindowAttributesChanged; Android 15
+# draws edge to edge: both leave it alone). Following it resized the
 # windows, and a window's Android surface shows black until Qt draws its next
 # frame: the Add and Edit windows flashed black beside their editor (whose
 # web view Android draws itself) each time the keyboard opened or closed

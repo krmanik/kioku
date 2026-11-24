@@ -12,6 +12,7 @@ import android.util.Log;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.WindowInsets;
+import android.view.WindowManager;
 import android.view.accessibility.AccessibilityManager;
 
 import org.qtproject.qt.android.bindings.QtActivity;
@@ -64,6 +65,35 @@ public class KiokuActivity extends QtActivity {
             setIntent(linkIntent(getIntent()));
         }
         super.onCreate(savedInstanceState);
+    }
+
+    /**
+     * Android 11 to 14: the on-screen keyboard doesn't resize the app's
+     * window. Qt draws its first window (the main window) on a surface of its
+     * own below the app's window and the others (Browse, Add, Edit) in it;
+     * for a few frames after each resize the app's window had nothing drawn,
+     * and the main window showed through in place of the one in front
+     * (GitHub issue #4). adjustResize (the manifest's, which Qt sets again
+     * each time it shows the keyboard) becomes adjustPan: from Android 11 on
+     * only adjustResize resizes the window, and adjustPan, unlike
+     * adjustNothing, keeps the keyboard in the visible frame Qt reads its
+     * keyboard rectangle from (kioku.windows keeps windows' contents above
+     * it). The pages get the keyboard from its insets (KiokuBridge
+     * keyboardInsets), as on Android 15, which draws edge to edge. Android 9
+     * and 10 have no keyboard insets for pages: they keep adjustResize.
+     * (Setting the window's fitInsetsTypes instead crashed Android 11 with
+     * "bad array lengths".)
+     */
+    @Override
+    public void onWindowAttributesChanged(WindowManager.LayoutParams params) {
+        int adjust = params.softInputMode & WindowManager.LayoutParams.SOFT_INPUT_MASK_ADJUST;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+                && Build.VERSION.SDK_INT <= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
+                && adjust == WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE) {
+            params.softInputMode = (params.softInputMode & ~WindowManager.LayoutParams.SOFT_INPUT_MASK_ADJUST)
+                    | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN;
+        }
+        super.onWindowAttributesChanged(params);
     }
 
     /**
