@@ -1457,6 +1457,29 @@ def t_programs():
     return ", ".join(results)
 
 
+def t_symbol_glyphs():
+    """Symbols in Anki's Qt windows come from a font that has them. On
+    Android, Qt falls back only to the fonts QT_ANDROID_FONTS names, and the
+    system's Noto Sans Symbols file it kept for the family was the small
+    one: the Add window showed "History" with a box for Anki's down arrow
+    (kioku_platform._symbol_fonts, install_fonts)."""
+    from PyQt6.QtGui import QTextLayout
+    from aqt.utils import downArrow
+
+    yield 0
+    missing = []
+    for char in downArrow() + "\u25bc\u25b6\u2605\u2713":
+        layout = QTextLayout(char, QApplication.font())
+        layout.beginLayout()
+        layout.createLine()
+        layout.endLayout()
+        runs = layout.glyphRuns()
+        if not any(run.rawFont().supportsCharacter(ord(char)) for run in runs):
+            missing.append(f"U+{ord(char):04X}")
+    check(not missing, f"no font has {missing}")
+    return "all drawn"
+
+
 def t_accessibility():
     """Issue #22: with an accessibility service on that is not a screen
     reader (password managers, Xiaomi's and Samsung's system services), Qt's
@@ -1629,6 +1652,7 @@ TESTS = [
     ("python-packages", t_python_packages),
     ("programs", t_programs),
     ("microphone", t_microphone),
+    ("symbol-glyphs", t_symbol_glyphs),
     ("accessibility", t_accessibility),
     ("ankiweb-service", t_ankiweb_service),
     ("https", t_https),

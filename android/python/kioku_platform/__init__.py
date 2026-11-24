@@ -50,6 +50,7 @@ def prepare() -> None:
     """Runs before Anki is imported."""
     _ca_bundle()
     _no_shader_disk_cache()
+    _symbol_fonts()
     # Qt turns QMenuBar into the activity's options menu, which has no
     # button without an action bar; draw Anki's menu bar as a widget instead
     from PyQt6.QtCore import QCoreApplication, Qt
@@ -76,6 +77,50 @@ def _no_shader_disk_cache() -> None:
     for name in names:
         if name.startswith(SHADER_CACHE_PREFIX):
             shutil.rmtree(os.path.join(folder, name), ignore_errors=True)
+
+
+# fonts Qt falls back to after its own list (QT_ANDROID_FONTS): the system's
+# symbol fonts (Android 11 has Noto Sans Symbols; later ones add more)
+SYMBOL_FONTS = ("Noto Sans Symbols", "Noto Sans Symbols 2", "Noto Sans Math")
+SYSTEM_FONTS = "/system/fonts"
+SYMBOLS_FILE_PREFIX = "NotoSansSymbols-Regular-Subsetted"
+
+
+def _symbol_fonts() -> None:
+    """Qt for Android looks for a character missing from Roboto only in the
+    fonts QT_ANDROID_FONTS names (QtLoader: Roboto, Droid Sans, Droid Sans
+    Fallback; the last is gone since Android 7), so symbols such as Anki's
+    down arrow (the Add window's "History ▾") showed as a box. Add the
+    system's symbol fonts to the list. Qt reads it each time it falls back."""
+    names = [n for n in os.environ.get("QT_ANDROID_FONTS", "").split(";") if n]
+    names += [n for n in SYMBOL_FONTS if n not in names]
+    os.environ["QT_ANDROID_FONTS"] = ";".join(names)
+
+
+def symbols_file(names: list[str], size: Callable[[str], int]) -> str | None:
+    """The fullest of the system's Noto Sans Symbols files. Android splits
+    the font into several files with the same family name (Subsetted: 4600
+    characters, Subsetted2: 124), and Qt keeps the last one it read for the
+    family, which on Android 11 is the small one, without the arrows."""
+    files = [n for n in names if n.startswith(SYMBOLS_FILE_PREFIX)]
+    return max(files, key=size, default=None)
+
+
+def install_fonts() -> None:
+    """Register the fullest Noto Sans Symbols file again, after the system's
+    fonts, so the family stands for it (see symbols_file)."""
+    from PyQt6.QtGui import QFontDatabase
+
+    # Qt reads the system's fonts on first use: read them now, or they come
+    # after this one and the small file wins again
+    QFontDatabase.families()
+    try:
+        names = os.listdir(SYSTEM_FONTS)
+    except OSError:
+        return
+    name = symbols_file(names, lambda n: os.path.getsize(os.path.join(SYSTEM_FONTS, n)))
+    if name is not None:
+        QFontDatabase.addApplicationFont(os.path.join(SYSTEM_FONTS, name))
 
 
 def _ca_bundle() -> None:

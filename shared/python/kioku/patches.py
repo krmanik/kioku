@@ -181,6 +181,7 @@ def _patch_app() -> None:
     def init(self, argv):  # type: ignore[no-untyped-def]
         original_init(self, argv)
         _fix_highlighted_text(self)
+        _install_fonts()
         windows.install(self)
         _install_done_bar(self)
         mediaserver.install()
@@ -188,6 +189,15 @@ def _patch_app() -> None:
         devtools.install()
 
     aqt.AnkiApp.__init__ = init
+
+
+def _install_fonts() -> None:
+    """Android: fonts Qt needs registered once the app exists."""
+    import kioku_platform as platform
+
+    install = getattr(platform, "install_fonts", None)
+    if install is not None:
+        install()
 
 
 def _install_done_bar(app) -> None:  # type: ignore[no-untyped-def]
