@@ -2,6 +2,12 @@
 
 All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
 
+## 0.2.12
+
+- Web: menus and the reviewer's buttons (Edit, More) work again. Each
+  showed an error (`'WebView' has no attribute 'set_touchable'`). A tap
+  on a page now closes an open menu, as in the apps.
+
 ## 0.2.11
 
 - Sync server on the phone: collections over 300 MB sync normally.

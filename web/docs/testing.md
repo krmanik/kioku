@@ -352,3 +352,17 @@ failed on 3.14 on the iPhone). `fixes.md` › Building: CPython.
 | Node harness (`tools/link_core.sh`): Python 3.13.18, ssl, hashlib, decimal, ctypes, `Collection` opens | ✅ |
 | `selftest.py chrome`: `Python 3.13.18`, `Starting Anki 26.09.4` | ✅ 35/35 |
 | AnkiHub 2026-11-18.1 from AnkiWeb (devexec `download_addons`, over the relay), then two more page loads with the saved profile: loads at start (137 modules, its whole setup logged), `NoteInfo` round trip, no error dialog | ✅ |
+
+### 2026-11-24: menus over pages (Chrome, headless, `boot.mjs`)
+
+Kioku Web on Anki 26.09.4 showed an `AttributeError` for `set_touchable`
+on every menu. `fixes.md` › Runtime.
+
+| Test | Result |
+| --- | --- |
+| About: Python 3.13.18, Qt 6.11.2, PyQt6 6.11.0, Anki 26.09.4 | ✅ |
+| `QMenu.popup()` over the deck list: iframes get `pointer-events: none`, a tap on the page closes the menu | ✅ |
+| Same, then a tap on Create Deck: the page takes taps again, the dialog opens | ✅ |
+| Reviewer: More opens its menu, a tap on the card closes it, Edit opens Edit Current; no error | ✅ |
+| Before the holder reported taps: with only the iframes' `pointer-events: none` (and the holder's, and the foreign window's), the tap went to the foreign window and the menu stayed open; a tap on the menu bar closed it | ❌, then fixed (`popupTap`) |
+

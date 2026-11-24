@@ -9,6 +9,8 @@
   const frames = new Map();
   const holders = new Map();
   let parked = null;
+  // false while a Qt popup (a menu) is open (WebView.set_touchable)
+  let touchable = true;
 
   function parking() {
     if (!parked) {
@@ -166,6 +168,7 @@
       frame.dataset.gen = "0";
       frame.setAttribute("allow", "autoplay; clipboard-read; clipboard-write; fullscreen");
       frame.style.cssText = "border: 0; display: block; width: 100%; height: 100%; background: white;";
+      if (!touchable) frame.style.pointerEvents = "none";
       frame.addEventListener("load", () => {
         web.post({ type: "load", view: id, gen: Number(frame.dataset.gen), url: href(frame) });
       });
@@ -177,6 +180,12 @@
       holder.removeChild = function (child) {
         return child.parentNode === this ? Node.prototype.removeChild.call(this, child) : child;
       };
+      // while a Qt popup is open the iframe takes no taps and the holder
+      // gets them; Qt hands a tap on a foreign window to that window only,
+      // so the popup wouldn't close: Python closes it (popupTap)
+      holder.addEventListener("pointerdown", () => {
+        if (!touchable) web.post({ type: "popupTap" });
+      });
       parking().appendChild(frame);
       frames.set(id, frame);
       holders.set(id, holder);
@@ -253,6 +262,13 @@
       try {
         frame.contentWindow.__kiokuResolve(call, ok, value);
       } catch (e) {}
+    },
+
+    // Off while a Qt popup (a menu) is open: a tap on a page then goes to
+    // the holder, which reports it (popupTap) and Python closes the popup
+    touchable(on) {
+      touchable = on;
+      for (const frame of frames.values()) frame.style.pointerEvents = on ? "" : "none";
     },
 
     // Qt sizes a foreign window's element in width only

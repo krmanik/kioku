@@ -18,7 +18,7 @@ from typing import Any, Callable
 import _kioku_web
 from PyQt6.QtCore import QEvent, QObject, QTimer
 from PyQt6.QtGui import QWindow
-from PyQt6.QtWidgets import QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QApplication, QVBoxLayout, QWidget
 
 from . import http, web
 
@@ -40,6 +40,16 @@ _callback_ids = itertools.count(1)
 
 for _type in ("load", "message", "channel", "navigate", "eval"):
     web.listen(_type, _route)
+
+
+def _close_popups(event: dict) -> None:
+    """A tap on a page while a Qt popup was open (WebView.set_touchable)."""
+    popup = QApplication.activePopupWidget()
+    while popup is not None and popup.close():
+        popup = QApplication.activePopupWidget()
+
+
+web.listen("popupTap", _close_popups)
 
 
 def set_cookie(url: str, header: str) -> None:
@@ -204,6 +214,12 @@ class WebView:
         self._container = container
         self._host = widget
         QTimer.singleShot(0, lambda: web.js("adopt", self.id))
+
+    @staticmethod
+    def set_touchable(on: bool) -> None:
+        """Off while a Qt popup (a menu) is open: Qt doesn't see taps on the
+        pages, so the page reports them (popupTap) and the popup closes."""
+        web.js("touchable", on)
 
     def detach(self) -> None:
         if self._container is not None:
