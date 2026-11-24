@@ -780,6 +780,19 @@ def t_review_focus():
         check(main == [True, "typeans"],
               f"card page [hasFocus, activeElement] = {main}, bottom bar = {bottom}")
         check(bool(bottom) and not bottom[0], f"the bottom bar kept the focus: {bottom}")
+        # iOS: WebKit takes typing (shows the keyboard) only once it started
+        # its input session; a script's focus() alone left the box focused
+        # in the page, yet the keys went elsewhere
+        typing = getattr(mw.web.page()._web, "typing_focus", None)
+        if typing is not None:
+            ok = False
+            for _ in range(20):
+                ok = typing()
+                if ok:
+                    break
+                yield 0.5
+            check(ok, "the next card's typing box has the page's focus, but WebKit"
+                  " started no input session (no keyboard, keys go elsewhere)")
     finally:
         mw.moveToState("deckBrowser")
         col().remove_notes(nids)

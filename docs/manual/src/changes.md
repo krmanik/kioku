@@ -7,6 +7,12 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
 - Web: menus and the reviewer's buttons (Edit, More) work again. Each
   showed an error (`'WebView' has no attribute 'set_touchable'`). A tap
   on a page now closes an open menu, as in the apps.
+- iPhone, iPad: after you answer from the bottom buttons, the next
+  card's typing box takes the keyboard again, and the on-screen keyboard
+  comes up for it
+  ([issue #24](https://github.com/krmanik/kioku/issues/24)). Before, the
+  box looked focused but typing went nowhere and a card's own key
+  handlers got no keys until you tapped the card.
 
 ## 0.2.11
 

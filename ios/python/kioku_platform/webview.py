@@ -7,6 +7,7 @@ only speaks Objective-C and plain Python values.
 
 from __future__ import annotations
 
+import ctypes
 import json
 import logging
 import os
@@ -154,6 +155,14 @@ def _owner(webview: Any) -> WebView | None:
     if webview is None:
         return None
     return _views.get(webview.ptr.value)
+
+
+def _content_view(webview: Any) -> Any:
+    """WebKit's WKContentView inside the web view's scroll view."""
+    for view in prop(prop(webview, "scrollView"), "subviews"):
+        if view.objc_class.name == "WKContentView":
+            return view
+    return None
 
 
 def _view_for_controller(controller: Any) -> WebView | None:
@@ -306,6 +315,68 @@ class KiokuUIDelegate(NSObject):
         return None
 
 
+class KiokuInputDelegate(NSObject):
+    pass
+
+
+# _WKFocusStartsInputSessionPolicy
+FOCUS_POLICY_AUTO = 0
+FOCUS_POLICY_ALLOW = 1
+# WKInputType: ContentEditable (1) to NumberPad (10) type text; the rest
+# (select, date, color...) open pickers, and stay with WebKit's choice
+TEXT_INPUT_TYPES = range(1, 11)
+_FOCUS_POLICY = ctypes.CFUNCTYPE(c_long, c_void_p, c_void_p, c_void_p, c_void_p)
+
+
+def _focus_policy(delegate: int, cmd: int, webview: int, info: int) -> int:
+    """A script's focus() on a text field (Anki's reviewer focusing the
+    {{type:}} box) starts WebKit's input session, the keyboard included,
+    when the app gave the page the focus (QWebEngineView.setFocus). Left
+    to WebKit, only a tap or an attached hardware keyboard did: after an
+    answer from the bottom bar, the next card's box was focused in the page
+    yet took no typing, and keydown listeners got no keys (issue #24)."""
+    try:
+        if send_message(ObjCInstance(c_void_p(info)), "type", restype=c_long, argtypes=[]) \
+                not in TEXT_INPUT_TYPES:
+            return FOCUS_POLICY_AUTO
+        # the content view is the responder: WKWebView's own says NO
+        content = _content_view(ObjCInstance(c_void_p(webview)))
+        if content is not None and send_message(
+            content, "isFirstResponder", restype=c_bool, argtypes=[]
+        ):
+            return FOCUS_POLICY_ALLOW
+    except Exception:
+        logger.exception("focus policy")
+    return FOCUS_POLICY_AUTO
+
+
+_input: Any = None
+
+
+def _input_delegate() -> Any:
+    """WebKit's input delegate (WKWebView._inputDelegate) with the focus
+    policy above; made with the first web view."""
+    global _input
+    if _input is not None:
+        return _input
+    objc = ctypes.CDLL("/usr/lib/libobjc.dylib")
+    objc.sel_registerName.restype = c_void_p
+    objc.sel_registerName.argtypes = [ctypes.c_char_p]
+    objc.class_addMethod.restype = c_bool
+    objc.class_addMethod.argtypes = [c_void_p, c_void_p, c_void_p, ctypes.c_char_p]
+    hook = _FOCUS_POLICY(_focus_policy)
+    _hooks.append(hook)
+    objc.class_addMethod(
+        KiokuInputDelegate.ptr,
+        objc.sel_registerName(b"_webView:decidePolicyForFocusedElement:"),
+        ctypes.cast(hook, c_void_p),
+        b"q@:@@",
+    )
+    _input = KiokuInputDelegate.alloc().init()
+    return _input
+
+
+_hooks: list[Any] = []  # the C callbacks must stay alive
 _script_handler = KiokuScriptHandler.alloc().init()
 _navigation_delegate = KiokuNavigationDelegate.alloc().init()
 _ui_delegate = KiokuUIDelegate.alloc().init()
@@ -365,6 +436,10 @@ class WebView:
         )
         webview.setNavigationDelegate_(_navigation_delegate)
         webview.setUIDelegate_(_ui_delegate)
+        # weak in WebKit: _input stays alive at module level
+        send_message(
+            webview, "_setInputDelegate:", _input_delegate(), restype=None, argtypes=[objc_id]
+        )
         webview.setAutoresizingMask_(FLEXIBLE_SIZE)
         webview.setAllowsLinkPreview_(False)
         scroll = prop(webview, "scrollView")
@@ -423,6 +498,14 @@ class WebView:
         if prop(self.webview, "window") is None:
             return
         send_message(self.webview, "becomeFirstResponder", restype=c_bool, argtypes=[])
+
+    def typing_focus(self) -> bool:
+        """Whether a text field in the page takes typing: WebKit started
+        its input session (keyboard shown), not only the page's focus."""
+        content = _content_view(self.webview)
+        return content is not None and bool(
+            send_message(content, "isFocusingElement", restype=c_bool, argtypes=[])
+        )
 
     def reload(self) -> None:
         self.webview.reload()
