@@ -1457,6 +1457,29 @@ def t_programs():
     return ", ".join(results)
 
 
+def t_main_window_keyboard():
+    """Issue #4: on Android before 15 the keyboard's adjustResize resized
+    the main window, which Qt keeps maximized, and Android showed its new
+    surface above the Add window for a few frames (menu bar and black
+    around the editor). The main window keeps the size it has without the
+    keyboard, like the other windows (windows._fill_main)."""
+    if sys.platform != "android":
+        raise Skip(sys.platform)
+    import aqt
+    from aqt.qt import Qt
+    from kioku import windows
+
+    yield 0
+    mw = aqt.mw
+    states = mw.windowHandle().windowStates()
+    check(not states & Qt.WindowState.WindowMaximized, f"main window maximized: {states}")
+    avail = windows._available()
+    geo = mw.geometry()
+    check(geo.top() == avail.top() and geo.width() == avail.width() and geo.bottom() >= avail.bottom(),
+          f"main window {geo.getRect()} doesn't cover {avail.getRect()}")
+    return f"normal, {geo.width()}x{geo.height()}"
+
+
 def t_symbol_glyphs():
     """Symbols in Anki's Qt windows come from a font that has them. On
     Android, Qt falls back only to the fonts QT_ANDROID_FONTS names, and the
@@ -1652,6 +1675,7 @@ TESTS = [
     ("python-packages", t_python_packages),
     ("programs", t_programs),
     ("microphone", t_microphone),
+    ("main-window-keyboard", t_main_window_keyboard),
     ("symbol-glyphs", t_symbol_glyphs),
     ("accessibility", t_accessibility),
     ("ankiweb-service", t_ankiweb_service),

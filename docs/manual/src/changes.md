@@ -17,6 +17,9 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
   that no Anki shortcut uses, also when nothing on the card has focus,
   as on Anki desktop
   ([issue #31](https://github.com/krmanik/kioku/issues/31)).
+- Android 14 and older: the Add window no longer flashes black around
+  its editor when the keyboard opens or closes
+  ([issue #4](https://github.com/krmanik/kioku/issues/4)).
 - Android: the Add window's History button shows its down arrow (▾)
   instead of a box, and other symbols in Anki's windows draw too.
 

@@ -457,6 +457,25 @@ def _fill(w: QWidget, avail: QRect) -> None:
     w.setGeometry(avail.adjusted(0, 0, 0, 1))
 
 
+def _fill_main() -> None:
+    """Android: the main window keeps its size while the keyboard is open,
+    as the other windows do (_rest). Qt for Android maximizes it, so the
+    keyboard's adjustResize resized it, and Android then showed its new
+    surface above the window in front for a few frames: the Add and Edit
+    windows flashed the main window's menu bar and black, with only their
+    editor left (GitHub issue #4, Android before 15). Its pages see the
+    keyboard's insets themselves (KiokuBridge keyboardInsets), as on
+    Android 15, where the keyboard never resized windows."""
+    import aqt
+
+    mw = getattr(aqt, "mw", None)
+    if sys.platform != "android" or mw is None or sip.isdeleted(mw) or not mw.isVisible():
+        return
+    if mw.isFullScreen():
+        return
+    _fill(mw, _available())
+
+
 def _center(w: QWidget, size: QSize, avail: QRect) -> None:
     area = _above_keyboard(avail)
     y = area.y() + (area.height() - size.height()) // 2
@@ -514,6 +533,7 @@ class WindowManager(QObject):
                 # the main window was hidden (a sync error while switching
                 # profiles) was left under it, unseen but blocking every tap
                 QTimer.singleShot(0, _raise_modal)
+                QTimer.singleShot(0, _fill_main)
         elif kind == QEvent.Type.Resize and obj.isWindow():
             if self._bar(obj) is not None:
                 self._layout(obj)
@@ -643,6 +663,7 @@ class WindowManager(QObject):
             self._refit_all()
 
     def _refit_all(self) -> None:
+        _fill_main()
         for w in QApplication.topLevelWidgets():
             if w.isVisible() and self._manageable(w):
                 self._adopt(w)
