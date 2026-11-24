@@ -365,4 +365,7 @@ on every menu. `fixes.md` › Runtime.
 | Same, then a tap on Create Deck: the page takes taps again, the dialog opens | ✅ |
 | Reviewer: More opens its menu, a tap on the card closes it, Edit opens Edit Current; no error | ✅ |
 | Before the holder reported taps: with only the iframes' `pointer-events: none` (and the holder's, and the foreign window's), the tap went to the foreign window and the menu stayed open; a tap on the menu bar closed it | ❌, then fixed (`popupTap`) |
+| Deploy refused: `kioku.data.br` 53.3 MiB (Cloudflare: 25 MiB a file); site-packages had picked up the native apps' add-on extras (`kioku_programs_data`, numpy, Pillow, cryptography built for iOS, jieba). `tools/prepare_site.sh` leaves them out: site 137 → 32 MB, `kioku.data` 160 → 53 MB | ❌, then fixed |
+| After that relink: Python 3.13.18, Qt 6.11.2, Anki 26.09.4; reviewer More/tap/Edit as above | ✅ |
+| `selftest.py chrome` | ✅ 35/35 |
 
