@@ -1655,6 +1655,74 @@ def t_microphone():
     return f"recorded {seconds:.1f} s, {size} bytes"
 
 
+def safe_css(web: AnkiWebView, want: str):
+    """The page's --kioku-safe-* properties, once they are want (or 5 s)."""
+    css = None
+    for _ in range(20):
+        css = yield Js(web, "(() => { const s = getComputedStyle(document.documentElement);"
+                            " return ['top','right','bottom','left'].map("
+                            "x => s.getPropertyValue('--kioku-safe-' + x).trim()).join(' '); })()")
+        if css == want:
+            break
+        yield 0.25
+    return css
+
+
+def t_addon_window():
+    """Issues #32, #33: an add-on window that asks for it has no title bar
+    and reaches the screen's edges, its page padded by --kioku-safe-*; it
+    fills the screen before it is first drawn; add-ons can hide Anki's
+    menu row."""
+    from aqt.qt import QDialog, QMargins, QVBoxLayout
+    from kioku import windows
+
+    w = QDialog(mw)
+    w.setWindowTitle("Kioku add-on window test")
+    QVBoxLayout(w).setContentsMargins(0, 0, 0, 0)
+    web = AnkiWebView(parent=w)
+    w.layout().addWidget(web)
+    web.stdHtml("<p id=kt>add-on page</p>")
+    w.setProperty("kioku_hide_titlebar", True)
+    w.setProperty("kioku_edge_to_edge", True)
+    w.resize(300, 200)
+    w.show()
+    try:
+        avail = windows._available()
+        size = w.size()
+        check(size.width() >= avail.width() and size.height() >= avail.height(),
+              f"{size.width()}x{size.height()} when shown, screen {avail.width()}x{avail.height()}")
+        yield 0.5
+        check(windows.WindowManager._bar(w) is None, "title bar added")
+        m = w.contentsMargins()
+        check((m.left(), m.top(), m.right(), m.bottom()) == (0, 0, 0, 0),
+              f"margins {(m.left(), m.top(), m.right(), m.bottom())}")
+        safe = w.windowHandle().safeAreaMargins()
+        check(windows.safe_area(w) == safe, f"safe_area {windows.safe_area(w)} != {safe}")
+        want = " ".join(f"{v}px" for v in (safe.top(), safe.right(), safe.bottom(), safe.left()))
+        css = yield from safe_css(web, want)
+        check(css == want, f"page has {css!r}, safe area {want}")
+        # given back the title bar, the window keeps out of the status bar
+        w.setProperty("kioku_hide_titlebar", False)
+        w.setProperty("kioku_edge_to_edge", False)
+        yield 0.3
+        m = w.contentsMargins()
+        check(m.top() == safe.top() + windows.BAR_HEIGHT and windows.safe_area(w) == QMargins(),
+              f"with title bar: top margin {m.top()}")
+        css = yield from safe_css(web, "0px 0px 0px 0px")
+        check(css == "0px 0px 0px 0px", f"page kept {css!r} after edge to edge was turned off")
+        # the menu row
+        bar = mw.form.menubar
+        mw.setProperty("kioku_hide_menu_row", True)
+        check(bar.maximumHeight() == 0, "menu row still shown")
+        mw.setProperty("kioku_hide_menu_row", None)
+        check(bar.maximumHeight() > 0 or mw.fullscreen or not mw.pm.meta.get("kioku_menu_row", True),
+              "menu row not given back")
+    finally:
+        mw.setProperty("kioku_hide_menu_row", None)
+        w.close()
+    return f"safe area {want}"
+
+
 def t_https():
     if not NETWORK:
         raise Skip("network tests turned off")
@@ -1725,6 +1793,7 @@ TESTS = [
     ("symbol-glyphs", t_symbol_glyphs),
     ("accessibility", t_accessibility),
     ("ankiweb-service", t_ankiweb_service),
+    ("addon-window", t_addon_window),
     ("https", t_https),
     ("cleanup", t_cleanup),
 ]

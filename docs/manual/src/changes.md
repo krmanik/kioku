@@ -22,6 +22,16 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
   ([issue #4](https://github.com/krmanik/kioku/issues/4)).
 - Android: the Add window's History button shows its down arrow (▾)
   instead of a box, and other symbols in Anki's windows draw too.
+- Add-ons can hide the title bar of their windows, let them reach the
+  screen's edges (under the status bar, the home indicator and, in
+  landscape, the notch) and hide Anki's menu row
+  ([issue #32](https://github.com/krmanik/kioku/issues/32)). See
+  [Add-ons](using/addons.md#for-add-on-developers-windows-on-a-phone).
+- Windows open at their full-screen size: they no longer show at their
+  desktop size for a moment first
+  ([issue #33](https://github.com/krmanik/kioku/issues/33)).
+- iPhone in landscape: the title bar's **‹ Back** keeps clear of the
+  notch.
 
 ## 0.2.11
 

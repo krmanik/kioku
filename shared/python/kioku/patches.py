@@ -68,6 +68,7 @@ def apply() -> None:
     _patch_browser_columns()
     _patch_full_screen()
     _patch_screen_edges()
+    _patch_menu_row_property()
     _patch_native_menu_bar()
     _patch_main_view_width()
     _patch_splitters()
@@ -489,6 +490,53 @@ def _patch_screen_edges() -> None:
 
 
 MENU_ROW_KEY = "kioku_menu_row"
+# set on aqt.mw by add-ons (GitHub issue #32)
+HIDE_MENU_ROW = "kioku_hide_menu_row"
+
+
+def _patch_menu_row_property() -> None:
+    """Add-ons can hide Anki's menu row (File, Edit, View…) while they need
+    the room: aqt.mw.setProperty("kioku_hide_menu_row", True), and False
+    (or None) to give it back. The row then has no height, as in Anki's
+    full screen, and its shortcuts still work. On an iPhone or Android
+    phone its menus are out of reach until then; on an iPad with iPadOS 26
+    or later they stay in the iPad's menu bar. Leaving full screen, or
+    View › Show Menu Row on the iPad, keeps it hidden while the property
+    is set; the iPad's View › Show Menu Row setting itself is kept."""
+    import aqt.main
+    from aqt import gui_hooks
+    from aqt.qt import QEvent, QObject
+
+    show_menubar = aqt.main.AnkiQt.show_menubar
+
+    def show_unless_hidden(self) -> None:  # type: ignore[no-untyped-def]
+        show_menubar(self)
+        if self.property(HIDE_MENU_ROW):
+            self.form.menubar.setFixedHeight(0)
+
+    aqt.main.AnkiQt.show_menubar = show_unless_hidden
+
+    class Watch(QObject):
+        def eventFilter(self, obj, event):  # type: ignore[no-untyped-def]
+            if (
+                event.type() == QEvent.Type.DynamicPropertyChange
+                and bytes(event.propertyName()).decode() == HIDE_MENU_ROW
+            ):
+                if obj.property(HIDE_MENU_ROW):
+                    obj.form.menubar.setFixedHeight(0)
+                elif not obj.fullscreen:
+                    # the iPad's wrapper keeps it hidden if Show Menu Row is off
+                    obj.show_menubar()
+            return False
+
+    def setup() -> None:
+        mw = aqt.mw
+        mw._kioku_menu_row_watch = Watch(mw)
+        mw.installEventFilter(mw._kioku_menu_row_watch)
+        if mw.property(HIDE_MENU_ROW):
+            mw.form.menubar.setFixedHeight(0)
+
+    gui_hooks.main_window_did_init.append(setup)
 
 
 def _patch_native_menu_bar() -> None:

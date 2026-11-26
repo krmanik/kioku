@@ -7,6 +7,17 @@ and popups is therefore made to fill the screen and given a title bar with a
 Close button. Message boxes and small dialogs (a login, a text prompt) keep
 their own buttons and are shown as a bordered card in the middle of the
 screen, as tall as their content.
+
+Add-ons can opt a window out of parts of this (GitHub issue #32), with
+properties set on the window, before or after it is shown:
+
+- ``kioku_hide_titlebar``: no title bar. The add-on gives its own way back.
+- ``kioku_edge_to_edge``: the window's contents reach the screen's edges,
+  under the status bar, the home indicator or gesture bar and, in
+  landscape, the notch. The add-on pads them itself: by ``safe_area(w)``,
+  or in its web views by the CSS properties ``--kioku-safe-top``,
+  ``-right``, ``-bottom`` and ``-left`` (which follow a rotation). With
+  the title bar shown, the top stays below it.
 """
 
 from __future__ import annotations
@@ -48,6 +59,15 @@ BORDER_PROPERTY = "kiokuPopupBorder"
 # gap between a card-style window and the screen edges
 CARD_MARGIN = 8
 WINDOW_TYPES = (Qt.WindowType.Window, Qt.WindowType.Dialog, Qt.WindowType.Sheet)
+# set by add-ons (see above)
+HIDE_TITLE_BAR = "kioku_hide_titlebar"
+EDGE_TO_EDGE = "kioku_edge_to_edge"
+OPTIONS = (HIDE_TITLE_BAR, EDGE_TO_EDGE)
+# a window that fills the screen: its own contents margins
+OWN_MARGINS = "kiokuMargins"
+SAFE_AREA_SCRIPT = "kioku-safe-area"
+SAFE_AREA_HOOKED = "kiokuSafeAreaHooked"
+SIDES = ("top", "right", "bottom", "left")
 
 
 class TitleBar(QWidget):
@@ -98,8 +118,10 @@ class TitleBar(QWidget):
     def update_title(self) -> None:
         self._title.setText(self._window.windowTitle())
 
-    def place(self, safe_top: int) -> None:
-        self.setGeometry(0, safe_top, self._window.width(), BAR_HEIGHT)
+    def place(self, safe: QMargins) -> None:
+        # in landscape, Back and the title keep clear of the notch
+        self.layout().setContentsMargins(8 + safe.left(), 0, 8 + safe.right(), 0)
+        self.setGeometry(0, safe.top(), self._window.width(), BAR_HEIGHT)
         self.raise_()
 
     def paintEvent(self, evt: Any) -> None:
@@ -488,6 +510,116 @@ def _center(w: QWidget, size: QSize, avail: QRect) -> None:
     )
 
 
+def _option(w: QWidget, name: str) -> bool:
+    return bool(w.property(name))
+
+
+_web_view_types: dict[type, bool] = {}
+
+
+def _is_web_view(w: QObject) -> bool:
+    kind = type(w)
+    known = _web_view_types.get(kind)
+    if known is None:
+        known = _web_view_types[kind] = any(c.__name__ == "QWebEngineView" for c in kind.__mro__)
+    return known
+
+
+def safe_area(w: QWidget) -> QMargins:
+    """For add-ons: how far the contents of window w must keep from its
+    edges to stay clear of the status bar, the notch and the home indicator
+    or gesture bar. Kioku keeps a window out of these itself (all 0) unless
+    it is edge to edge (kioku_edge_to_edge); its top is 0 then too while it
+    has a title bar. Changes with a rotation: read it again when the window
+    is resized."""
+    own = w.property(OWN_MARGINS)
+    if not _option(w, EDGE_TO_EDGE):
+        return QMargins()
+    if own is None:
+        # not shown yet: it will fill the screen, as the main window does
+        return _expected_safe_area(w)
+    safe = _safe_area(w)
+    current = w.contentsMargins()
+    kept = (
+        current.left() - own[0],
+        current.top() - own[1],
+        current.right() - own[2],
+        current.bottom() - own[3] - _overhang(w),
+    )
+    return QMargins(
+        max(0, safe.left() - kept[0]),
+        max(0, safe.top() - kept[1]),
+        max(0, safe.right() - kept[2]),
+        max(0, safe.bottom() - kept[3]),
+    )
+
+
+def _expected_safe_area(w: QWidget) -> QMargins:
+    import aqt
+
+    mw = getattr(aqt, "mw", None)
+    handle = mw.windowHandle() if mw is not None and not sip.isdeleted(mw) else None
+    if handle is None or not hasattr(handle, "safeAreaMargins"):
+        return QMargins()
+    safe = QMargins(handle.safeAreaMargins())
+    if not _option(w, HIDE_TITLE_BAR):
+        safe.setTop(0)
+    return safe
+
+
+def _safe_area_js(m: QMargins) -> str:
+    values = {"top": m.top(), "right": m.right(), "bottom": m.bottom(), "left": m.left()}
+    props = "".join(f"s.setProperty('--kioku-safe-{side}','{values[side]}px');" for side in SIDES)
+    # at document creation <html> may not exist yet, and its style
+    # attribute from the markup would replace the properties: set them
+    # again once it is parsed
+    return (
+        "(function(){function f(){var e=document.documentElement;if(!e)return;"
+        f"var s=e.style;{props}}}f();"
+        "document.addEventListener('DOMContentLoaded',f,{once:true});})();"
+    )
+
+
+def _publish_safe_area(w: QWidget, view: QWidget | None = None) -> None:
+    """Give the web views of edge-to-edge window w its safe_area as CSS
+    properties on <html>, also for pages they load later."""
+    js = _safe_area_js(safe_area(w))
+    w.setProperty(SAFE_AREA_HOOKED, True)
+    views = [view] if view is not None else [c for c in w.findChildren(QWidget) if _is_web_view(c)]
+    for v in views:
+        if sip.isdeleted(v) or v.property(SAFE_AREA_SCRIPT) == js:
+            continue
+        v.setProperty(SAFE_AREA_SCRIPT, js)
+        try:
+            from PyQt6.QtWebEngineCore import QWebEngineScript
+
+            page = v.page()
+            scripts = page.scripts()
+            for old in scripts.find(SAFE_AREA_SCRIPT):
+                scripts.remove(old)
+            script = QWebEngineScript()
+            script.setName(SAFE_AREA_SCRIPT)
+            script.setSourceCode(js)
+            script.setInjectionPoint(QWebEngineScript.InjectionPoint.DocumentCreation)
+            script.setWorldId(QWebEngineScript.ScriptWorldId.MainWorld)
+            script.setRunsOnSubFrames(False)
+            scripts.insert(script)
+            page.runJavaScript(js)
+            if not v.property(SAFE_AREA_HOOKED):
+                # a page already loading misses both: user scripts apply
+                # from the next load on, and it replaces the document
+                v.setProperty(SAFE_AREA_HOOKED, True)
+                page.loadFinished.connect(
+                    lambda _ok, v=v: None
+                    if sip.isdeleted(v)
+                    else v.page().runJavaScript(v.property(SAFE_AREA_SCRIPT))
+                )
+        except Exception:
+            import logging
+
+            logging.getLogger("kioku.windows").exception("safe area for %r", v)
+
+
 class WindowManager(QObject):
     def __init__(self, app: QApplication) -> None:
         super().__init__(app)
@@ -527,7 +659,11 @@ class WindowManager(QObject):
             import aqt
 
             if self._manageable(obj):
-                # after the window's own show logic (e.g. restoring geometry)
+                # before the window is first drawn: drawn at its desktop
+                # size first, it then jumped to fill the screen (GitHub
+                # issue #33). Again after its own show logic (e.g.
+                # restoring geometry), which can follow this event.
+                self._adopt(obj, early=True)
                 QTimer.singleShot(0, lambda w=obj: self._adopt(w))
             elif obj is aqt.mw:
                 # after loadProfile's raise_(): a message that came up while
@@ -536,15 +672,32 @@ class WindowManager(QObject):
                 QTimer.singleShot(0, _raise_modal)
                 QTimer.singleShot(0, _fill_main)
         elif kind == QEvent.Type.Resize and obj.isWindow():
-            if self._bar(obj) is not None:
+            if obj.property(OWN_MARGINS) is not None:
                 self._layout(obj)
             border = self._border(obj)
             if border is not None:
                 border.place()
+        elif kind == QEvent.Type.Show and _is_web_view(obj):
+            # a web view an edge-to-edge window shows later
+            window = obj.window()
+            if window.property(OWN_MARGINS) is not None and (
+                _option(window, EDGE_TO_EDGE) or window.property(SAFE_AREA_HOOKED)
+            ):
+                _publish_safe_area(window, obj)
         elif kind == QEvent.Type.WindowTitleChange:
             bar = self._bar(obj)
             if bar is not None:
                 bar.update_title()
+        elif kind == QEvent.Type.DynamicPropertyChange and obj.isWindow():
+            name = bytes(evt.propertyName()).decode()  # type: ignore[attr-defined]
+            if name in OPTIONS and obj.isVisible() and self._manageable(obj):
+                self._adopt(obj)
+            elif name in OPTIONS and self._manageable(obj) and (
+                _option(obj, EDGE_TO_EDGE) or obj.property(SAFE_AREA_HOOKED)
+            ):
+                # before it is shown: a page it loads now has them from its
+                # first paint
+                _publish_safe_area(obj)
         return False
 
     def _manageable(self, w: QWidget) -> bool:
@@ -563,10 +716,18 @@ class WindowManager(QObject):
     def _border(w: QWidget) -> PopupBorder | None:
         return w.findChild(PopupBorder, BORDER_PROPERTY, Qt.FindChildOption.FindDirectChildrenOnly)
 
-    def _adopt(self, w: QWidget) -> None:
+    def _adopt(self, w: QWidget, early: bool = False) -> None:
+        """Fit w to the screen. early: from its Show event, before Qt draws
+        it; only for windows that fill the screen (message boxes and cards
+        are sized by their contents, which they compute when shown)."""
         if sip.isdeleted(w) or not w.isVisible():
             return
         avail = _available()
+        opted = any(_option(w, name) for name in OPTIONS)
+        if early and w.property(OWN_MARGINS) is None and (
+            isinstance(w, QMessageBox) or (not opted and _is_small_dialog(w, avail))
+        ):
+            return
         _fit_children(w, avail)
         if isinstance(w, QMessageBox):
             self._fit_message_box(w, avail)
@@ -574,23 +735,33 @@ class WindowManager(QObject):
             return
         if type(w).__name__ == "ProgressDialog" and w.findChild(QDialogButtonBox) is None:
             _add_cancel(w)
-        if self._bar(w) is None and _is_small_dialog(w, avail):
+        if w.property(OWN_MARGINS) is None and not opted and _is_small_dialog(w, avail):
             w.setMinimumSize(0, 0)
             _center(w, _card_size(w, avail), avail)
             self._add_border(w)
             return
-        if self._bar(w) is None:
+        if w.property(OWN_MARGINS) is None:
             # we add the safe area ourselves (Qt would merge it with our
             # margins by taking the larger, hiding the title bar)
             w.setAttribute(Qt.WidgetAttribute.WA_ContentsMarginsRespectsSafeArea, False)
             # remember the window's own margins; ours are added on top
             m = w.contentsMargins()
-            w.setProperty("kiokuMargins", (m.left(), m.top(), m.right(), m.bottom()))
+            w.setProperty(OWN_MARGINS, (m.left(), m.top(), m.right(), m.bottom()))
+            handle = w.windowHandle()
+            if handle is not None and hasattr(handle, "safeAreaMarginsChanged"):
+                # a rotation can change the safe area after the resize
+                handle.safeAreaMarginsChanged.connect(
+                    lambda _m, w=w: None if sip.isdeleted(w) else self._layout(w)
+                )
+        if self._bar(w) is None and not _option(w, HIDE_TITLE_BAR):
             bar = TitleBar(w)
             bar.show()
             adapt = ADAPTERS.get(type(w).__name__)
             if adapt is not None:
                 adapt(w, bar)
+        bar = self._bar(w)
+        if bar is not None:
+            bar.setHidden(_option(w, HIDE_TITLE_BAR))
         w.setMinimumSize(0, 0)
         _fill(w, avail)
         self._layout(w)
@@ -598,26 +769,36 @@ class WindowManager(QObject):
     def _layout(self, w: QWidget) -> None:
         """Margins = safe area + the window's own + the title bar. Qt merges
         user margins with the safe area by taking the larger of the two, so
-        the safe area has to be included explicitly."""
-        bar = self._bar(w)
-        if bar is None:
+        the safe area has to be included explicitly. An edge-to-edge window
+        leaves the safe area to its contents (safe_area)."""
+        own = w.property(OWN_MARGINS)
+        if own is None:
             return
-        own = w.property("kiokuMargins") or (0, 0, 0, 0)
         safe = _safe_area(w)
+        bar = self._bar(w)
+        titled = bar is not None and not bar.isHidden()
+        edge = _option(w, EDGE_TO_EDGE)
+        keep = QMargins() if edge else QMargins(safe)
+        if titled:
+            keep.setTop(safe.top() + BAR_HEIGHT)
         margins = (
-            safe.left() + own[0],
-            safe.top() + own[1] + BAR_HEIGHT,
-            safe.right() + own[2],
-            max(safe.bottom(), keyboard_overlap(w)) + own[3] + _overhang(w),
+            keep.left() + own[0],
+            keep.top() + own[1],
+            keep.right() + own[2],
+            max(keep.bottom(), keyboard_overlap(w)) + own[3] + _overhang(w),
         )
         current = w.contentsMargins()
         if (current.left(), current.top(), current.right(), current.bottom()) != margins:
             w.setContentsMargins(*margins)
-        bar.place(safe.top())
+        if titled:
+            bar.place(safe)
+        if edge or w.property(SAFE_AREA_HOOKED):
+            # zeros once it is no longer edge to edge
+            _publish_safe_area(w)
 
     def _relayout_windows(self) -> None:
         for w in QApplication.topLevelWidgets():
-            if w.isVisible() and self._bar(w) is not None:
+            if w.isVisible() and w.property(OWN_MARGINS) is not None:
                 self._layout(w)
 
     def _add_border(self, w: QWidget) -> None:

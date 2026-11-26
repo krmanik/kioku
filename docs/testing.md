@@ -1478,3 +1478,31 @@ path driven through `tools/devcmd.sh` with rubicon:
 Not run: a real trackpad scroll while a dialog closes (iPad), the add-on
 from the reports (unknown), Android (same combo box guard; Qt for Android
 has no `qios` plugin).
+
+## Add-on windows: title bar, edge to edge, menu row (issues #32, #33) (2026-11-26)
+
+Statly opens a full-screen touch window of its own and asked to drop
+Kioku's title bar and the safe-area strips (top, bottom, and the sides in
+landscape). `kioku/windows.py` now takes the window properties
+`kioku_hide_titlebar` and `kioku_edge_to_edge`; `aqt.mw`'s
+`kioku_hide_menu_row` hides Anki's menu row. Windows are also filled from
+their Show event, before Qt draws them (issue #33).
+
+| Test | Result |
+| --- | --- |
+| Host: `test_addon_windows.py` (margins with/without title bar, portrait/landscape safe area, options set after show and before, small dialog that opts in, CSS script per web view incl. re-run on `loadFinished` and zeros after turning off, filled before the first event loop turn, message boxes wait, menu row property incl. full screen) | ✅ 18 passed; whole host suite 275 |
+| iPhone 17 Pro Max sim (iOS 26.4), in-app `addon-window` (window full size right after `show()`, no title bar, margins 0, `safe_area()` = window's safe area, page's `--kioku-safe-*` = 62/0/34/0 px, title bar back → top margin safe + 44 and page 0 px, menu row hidden and back) | ✅ |
+| Same sim, demo page padded by the properties: portrait and landscape (rotated with `requestGeometryUpdate`) | ✅ blue reaches every edge, padding follows the rotation; without the options ‹ Back keeps clear of the notch |
+| iPhone sim full suite + crash sweep | ✅ 60 passed, 6 skipped |
+| iPad Pro 13 (M5) sim, iPadOS 27.0: `addon-window` (safe area 32/0/20/0) | ✅ |
+| iPad sim: `kioku_hide_menu_row` → row height 0; system menu bar still Kioku, File, Edit, View, Tools, Window, Help | ✅ |
+| iPad sim full suite + crash sweep | ✅ 59 passed, 7 skipped |
+
+First iPad run failed: the page was still loading when the window was
+shown, so neither the user script (applies from the next load) nor the
+immediate `runJavaScript` reached it. Now the script is re-run on
+`loadFinished`, and set before the window is shown when the add-on sets
+the property first.
+
+Not run: Android (no phone connected; emulator run with the safe-mode
+build), a real iPhone or iPad.
