@@ -69,6 +69,11 @@
       return "1";
     },
 
+    // ?safe=1: start without add-ons (kioku/safemode.py)
+    safeModeRequested() {
+      return new URLSearchParams(location.search).get("safe") === "1" ? "1" : "";
+    },
+
     darkMode() {
       return matchMedia("(prefers-color-scheme: dark)").matches ? "1" : "";
     },

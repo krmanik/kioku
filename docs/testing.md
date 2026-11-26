@@ -1506,3 +1506,40 @@ the property first.
 
 Not run: Android (no phone connected; emulator run with the safe-mode
 build), a real iPhone or iPad.
+
+## Safe mode on iOS, Android and the web (issue #32) (2026-11-26)
+
+`kioku/safemode.py`; native: `ios/src/main.mm` (scene delegate),
+`ios/src/Info.plist.in` (quick action), `android/package/res/xml/shortcuts.xml`
++ `KiokuActivity.requestSafeMode`; web: `?safe=1`
+(`kioku_platform.safe_mode_requested`, `__kiokuWeb.safeModeRequested`) and a
+link on the loading page.
+
+| Test | Result |
+| --- | --- |
+| Host `test_safemode.py` (normal start, quick action request taken once, `KIOKU_SAFE_MODE`, platform request, unfinished start asks only with add-ons, Start Normally, no marker on the web, previous log kept, banner and its command, hooks in place before the profile opens, plist quick action, Android shortcut) | ✅ 13 passed |
+| iPhone 17 Pro Max sim, new build: in-app `safe-mode-request` (`windowScene:performActionForShortcutItem:completionHandler:` on Qt's scene delegate writes the request; offer to close; Cancel drops it) | ✅ |
+| Same sim: request file + relaunch → `mw.safeMode`, AnkiHub not loaded, deck list banner "Safe mode: add-ons are off. What now?" | ✅ |
+| What now? → Add-ons… → Tools › Add-ons lists AnkiHub and Review Heatmap (Toggle Enabled) | ✅ |
+| Start marker left + relaunch → "Kioku closed while starting last time" with Start Without Add-ons / Start Normally; previous log kept as `kioku-previous.log`; Start Without Add-ons → safe mode | ✅ |
+| Two normal relaunches afterwards: no question, marker cleared 5 s after the profile opened | ✅ |
+| iPhone sim full suite + crash sweep | ✅ 61 passed, 6 skipped |
+| Android 13 emulator (Kioku_API33), dev build: `dumpsys shortcut` lists `safe_mode` (Safe mode / Start in Safe Mode) | ✅ |
+| Cold start with the shortcut's intent (`am start -a io.ankidesk.kioku.SAFE_MODE`) → safe mode, banner | ✅ |
+| Shortcut while Kioku runs (`onNewIntent`) → offer; Close Kioku → process ends, no start marker left; opening Kioku from the launcher → safe mode, request used up | ✅ |
+| `safe-mode-request`, `addon-window` on the emulator | ✅ |
+| Android emulator full suite + crash sweep (rebuilt with the bottom inset fix: `addon-window` safe area 0/0/0/0 instead of 0/0/1/0, the window's pixel below the screen no longer counted) | ✅ 62 passed, 5 skipped |
+
+Found and fixed while testing: Anki 26.09.4 decides safe mode in `AnkiApp`
+from `"--safemode" in argv` (the main window copies `app.safeMode`), so a
+request adds the argument and the crash question sets `app.safeMode`; the
+banner and marker hooks were added from `main_window_did_init`, after the
+main window had opened the profile and drawn the deck list (every start
+would have asked) → added before `AnkiQt.__init__`; Anki's handler for
+Tools › Add-ons isn't `onAddons` in 26.09.4 → the menu action is
+triggered; the offer to close waited for an add-on's invisible modal box
+(AnkiHub) → shown over any window.
+
+Not run: the real long-press menu on an iPhone/iPad Home Screen (the
+Simulator has no UI here) and on a phone's launcher; the web version
+(`?safe=1`, loading page link).

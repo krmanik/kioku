@@ -197,15 +197,26 @@ To check that you're running in Kioku:
 
 ## A broken add-on
 
-If Kioku fails at start-up after installing an add-on:
+If an add-on keeps Kioku from starting, start in **safe mode**: Anki
+without add-ons (and without syncing automatically). Then turn the add-on
+off in **Tools › Add-ons** and start Kioku again.
 
-- **Termux:** use **Safe mode** on the error screen, then remove the add-on.
-- **iPhone, iPad:** delete the add-on's folder in Files › Kioku ›
-  `Anki2/addons21/` (Tools › Add-ons shows each add-on's folder name).
-- **Android, native:** if Kioku still opens, disable the add-on in Tools ›
-  Add-ons. Otherwise open an issue on
-  [GitHub](https://github.com/krmanik/kioku/issues): reinstalling keeps the
-  add-on.
+- **iPhone, iPad, Android (native):** touch and hold Kioku's icon and
+  choose **Start in Safe Mode**. If Kioku closed while starting the last
+  time, it also asks on the next start: **Start Without Add-ons** or
+  **Start Normally**. The log of that start is kept as
+  `kioku-previous.log` in Kioku's files.
+- **Web:** open the address with `?safe=1` at the end, or use the
+  **Start without add-ons** link on the loading page.
+- **Termux:** use **Safe mode** on the error screen.
+
+In safe mode the deck list says so. Tap **What now?** there for the way
+to Tools › Add-ons. Add-ons load again the next time Kioku starts: close it
+in the app switcher (iPhone, iPad) or Recents (Android) and open it again,
+or reload the page (web).
+
+If Kioku is already running, **Start in Safe Mode** offers to close it.
+Open it again to start in safe mode.
 
 Report add-ons that work or don't on
 [GitHub](https://github.com/krmanik/kioku/issues).

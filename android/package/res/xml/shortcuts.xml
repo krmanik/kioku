@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Long-press on the app icon: "Start in Safe Mode" (Anki without
+     add-ons). KiokuActivity leaves the request for kioku/safemode.py. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="safe_mode"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_safe_mode"
+        android:shortcutShortLabel="@string/safe_mode_short"
+        android:shortcutLongLabel="@string/safe_mode_long"
+        android:shortcutDisabledMessage="@string/safe_mode_disabled">
+        <intent
+            android:action="io.ankidesk.kioku.SAFE_MODE"
+            android:targetPackage="io.ankidesk.kioku"
+            android:targetClass="io.ankidesk.kioku.KiokuActivity" />
+    </shortcut>
+</shortcuts>

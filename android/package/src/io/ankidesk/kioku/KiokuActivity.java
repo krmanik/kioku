@@ -34,6 +34,8 @@ public class KiokuActivity extends QtActivity {
     private static final String TAG = "Kioku";
     /** A kioku:// link from KiokuLinkActivity */
     static final String EXTRA_LINK = "io.ankidesk.kioku.LINK";
+    /** The app shortcut "Start in Safe Mode" (res/xml/shortcuts.xml) */
+    static final String ACTION_SAFE_MODE = "io.ankidesk.kioku.SAFE_MODE";
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -62,6 +64,7 @@ public class KiokuActivity extends QtActivity {
         boolean restored = savedInstanceState != null
                 || (getIntent().getFlags() & Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0;
         if (!restored) {
+            requestSafeMode(getIntent());
             setIntent(linkIntent(getIntent()));
         }
         super.onCreate(savedInstanceState);
@@ -121,7 +124,26 @@ public class KiokuActivity extends QtActivity {
 
     @Override
     protected void onNewIntent(Intent intent) {
+        // while Kioku runs, kioku/safemode.py offers to close it
+        requestSafeMode(intent);
         super.onNewIntent(linkIntent(intent));
+    }
+
+    /**
+     * The safe mode shortcut leaves a request in Documents, which
+     * kioku/safemode.py takes at the next start (Anki without add-ons).
+     */
+    private void requestSafeMode(Intent intent) {
+        if (intent == null || !ACTION_SAFE_MODE.equals(intent.getAction())) {
+            return;
+        }
+        File external = getExternalFilesDir(null);
+        File request = new File(external != null ? external : getFilesDir(), ".kioku-safe-mode");
+        try {
+            request.createNewFile();
+        } catch (IOException e) {
+            Log.e(TAG, "safe mode request", e);
+        }
     }
 
     /** A link from KiokuLinkActivity as the VIEW intent Qt expects. */

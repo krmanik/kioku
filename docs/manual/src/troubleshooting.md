@@ -24,6 +24,13 @@ iOS = iPhone/iPad, Android = Android native, Termux = Android Termux.
 Fixed in 0.2.2. Two causes: VoiceOver or another accessibility feature
 running, and iOS 18's WebKit. Update to 0.2.2 or newer.
 
+### Kioku closes while starting after installing an add-on
+
+Start in safe mode: touch and hold Kioku's icon, **Start in Safe Mode**.
+Then turn the add-on off in Tools › Add-ons. See
+[A broken add-on](using/addons.md#a-broken-add-on). Native Android works
+the same way.
+
 ### Kioku doesn't open any more
 
 A free Apple ID's signature expires after 7 days. Refresh it in AltStore or

@@ -550,7 +550,9 @@ def safe_area(w: QWidget) -> QMargins:
         max(0, safe.left() - kept[0]),
         max(0, safe.top() - kept[1]),
         max(0, safe.right() - kept[2]),
-        max(0, safe.bottom() - kept[3]),
+        # Android: the window's extra pixel below the screen counts as
+        # safe area, and its margin is in place already (_overhang)
+        max(0, safe.bottom() - _overhang(w) - kept[3]),
     )
 
 

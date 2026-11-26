@@ -47,6 +47,20 @@
         </dict>
     </array>
 
+    <!-- touch and hold the icon: Anki without add-ons (kioku/safemode.py, main.mm) -->
+    <key>UIApplicationShortcutItems</key>
+    <array>
+        <dict>
+            <key>UIApplicationShortcutItemType</key>
+            <string>io.ankidesk.kioku.safe-mode</string>
+            <key>UIApplicationShortcutItemTitle</key>
+            <string>Start in Safe Mode</string>
+            <key>UIApplicationShortcutItemSubtitle</key>
+            <string>Without add-ons</string>
+            <key>UIApplicationShortcutItemIconSymbolName</key>
+            <string>checkmark.shield</string>
+        </dict>
+    </array>
     <key>UILaunchStoryboardName</key>
     <string>LaunchScreen</string>
 

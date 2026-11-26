@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- app shortcut: start without add-ons (kioku/safemode.py) -->
+    <string name="safe_mode_short">Safe mode</string>
+    <string name="safe_mode_long">Start in Safe Mode</string>
+    <string name="safe_mode_disabled">Kioku is starting</string>
+</resources>

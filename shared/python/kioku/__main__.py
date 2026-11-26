@@ -74,6 +74,9 @@ def _setup_environment() -> None:
 
 
 def main() -> None:
+    from kioku import safemode
+
+    safemode.keep_previous_log(DOCUMENTS, LOG_PATH)
     _setup_logging()
     _setup_environment()
     print(f"Kioku: Python {sys.version} on {sys.platform}")
@@ -92,6 +95,10 @@ def main() -> None:
 
         patches.apply()
         try:
+            safemode.begin(DOCUMENTS)
+        except Exception:
+            traceback.print_exc()
+        try:
             from kioku import urlscheme
 
             urlscheme.install()
@@ -100,7 +107,10 @@ def main() -> None:
         import aqt
 
         aqt.run()
+        safemode.finished()
     except SystemExit as exit:
+        if not exit.code:
+            safemode.finished()
         _exit(exit.code if isinstance(exit.code, int) else 0)
     except BaseException:
         traceback.print_exc()

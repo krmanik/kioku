@@ -32,6 +32,12 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
   ([issue #33](https://github.com/krmanik/kioku/issues/33)).
 - iPhone in landscape: the title bar's **‹ Back** keeps clear of the
   notch.
+- Safe mode on iPhone, iPad, Android and the web: Anki without add-ons,
+  for an add-on that keeps Kioku from starting
+  ([issue #32](https://github.com/krmanik/kioku/issues/32)). Touch and
+  hold the app icon › **Start in Safe Mode**; after a start that didn't
+  finish Kioku asks; on the web add `?safe=1`. See
+  [A broken add-on](using/addons.md#a-broken-add-on).
 
 ## 0.2.11
 

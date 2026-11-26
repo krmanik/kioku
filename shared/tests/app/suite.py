@@ -1694,10 +1694,15 @@ def t_addon_window():
         yield 0.5
         check(windows.WindowManager._bar(w) is None, "title bar added")
         m = w.contentsMargins()
-        check((m.left(), m.top(), m.right(), m.bottom()) == (0, 0, 0, 0),
+        # Android: the window is a pixel taller than the screen (windows._fill)
+        check((m.left(), m.top(), m.right(), m.bottom()) == (0, 0, 0, windows._overhang(w)),
               f"margins {(m.left(), m.top(), m.right(), m.bottom())}")
-        safe = w.windowHandle().safeAreaMargins()
-        check(windows.safe_area(w) == safe, f"safe_area {windows.safe_area(w)} != {safe}")
+        safe = QMargins(w.windowHandle().safeAreaMargins())
+        # Android: minus the window's pixel below the screen, whose margin is set
+        safe.setBottom(max(0, safe.bottom() - windows._overhang(w)))
+        area = windows.safe_area(w)
+        check(area == safe, f"safe_area {(area.left(), area.top(), area.right(), area.bottom())}"
+              f" != {(safe.left(), safe.top(), safe.right(), safe.bottom())}")
         want = " ".join(f"{v}px" for v in (safe.top(), safe.right(), safe.bottom(), safe.left()))
         css = yield from safe_css(web, want)
         check(css == want, f"page has {css!r}, safe area {want}")
@@ -1721,6 +1726,45 @@ def t_addon_window():
         mw.setProperty("kioku_hide_menu_row", None)
         w.close()
     return f"safe area {want}"
+
+
+def t_safe_mode_request():
+    """Issue #32: the app icon's "Start in Safe Mode" while Kioku runs
+    leaves a request (iOS: the scene delegate's shortcut method, added in
+    main.mm) and Kioku offers to close; Cancel drops the request."""
+    from aqt.qt import QMessageBox
+    from kioku import safemode
+
+    request = os.path.join(kioku_platform.documents_dir(), safemode.REQUEST)
+    check(not os.path.exists(request), "a request was left from before")
+    how = "request file"
+    if sys.platform == "ios":
+        from rubicon.objc import ObjCClass
+        from kioku_platform.webview import prop
+
+        app = prop(ObjCClass("UIApplication"), "sharedApplication")
+        scene = prop(app, "connectedScenes").anyObject()
+        item = ObjCClass("UIApplicationShortcutItem").alloc().initWithType_localizedTitle_(
+            "io.ankidesk.kioku.safe-mode", "Start in Safe Mode")
+        prop(scene, "delegate").windowScene_performActionForShortcutItem_completionHandler_(scene, item, None)
+        how = "scene delegate's shortcut method"
+    else:
+        open(request, "w").close()
+    try:
+        check(os.path.exists(request), f"no request from the {how}")
+        safemode._request_while_running()
+        boxes = lambda: [w for w in QApplication.topLevelWidgets()  # noqa: E731
+                         if isinstance(w, QMessageBox) and w.isVisible() and "safe mode" in w.text()]
+        yield Until(lambda: boxes(), 10, "the offer to close Kioku")
+        box = boxes()[0]
+        labels = [b.text() for b in box.buttons()]
+        check("Close Kioku" in labels, f"buttons {labels}")
+        box.button(QMessageBox.StandardButton.Cancel).click()
+        yield Until(lambda: not os.path.exists(request), 5, "request dropped on Cancel")
+    finally:
+        if os.path.exists(request):
+            os.remove(request)
+    return f"{how}, offer to close, Cancel dropped it"
 
 
 def t_https():
@@ -1794,6 +1838,7 @@ TESTS = [
     ("accessibility", t_accessibility),
     ("ankiweb-service", t_ankiweb_service),
     ("addon-window", t_addon_window),
+    ("safe-mode-request", t_safe_mode_request),
     ("https", t_https),
     ("cleanup", t_cleanup),
 ]

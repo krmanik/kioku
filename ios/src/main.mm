@@ -5,6 +5,8 @@
 
 #import <Foundation/Foundation.h>
 #import <JavaScriptCore/JavaScriptCore.h>
+#import <UIKit/UIKit.h>
+#import <objc/runtime.h>
 #include <Python.h>
 #include <pthread.h>
 #include <sys/resource.h>
@@ -54,6 +56,43 @@ __attribute__((constructor)) static void set_webkit_stack_bounds(void) {
     @autoreleasepool {
         [[[JSVirtualMachine alloc] init] release];
     }
+}
+
+// The Home Screen quick action "Start in Safe Mode" (Info.plist
+// UIApplicationShortcutItems) leaves a request in Documents that
+// kioku/safemode.py takes: Anki without add-ons. Qt's scene delegate
+// ignores shortcut items. Opening the app with one, it comes with the
+// scene's connection options; while the app runs, to
+// windowScene:performActionForShortcutItem:completionHandler:.
+static NSString *const safe_mode_shortcut = @"io.ankidesk.kioku.safe-mode";
+
+static void request_safe_mode(UIApplicationShortcutItem *item) {
+    if (![item.type isEqualToString:safe_mode_shortcut]) return;
+    NSString *docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+    [[NSData data] writeToFile:[docs stringByAppendingPathComponent:@".kioku-safe-mode"] atomically:YES];
+}
+
+__attribute__((constructor)) static void take_safe_mode_shortcut(void) {
+    Class delegate = objc_getClass("QIOSWindowSceneDelegate");
+    if (!delegate) return;
+    SEL connect = @selector(scene:willConnectToSession:options:);
+    Method method = class_getInstanceMethod(delegate, connect);
+    if (method) {
+        typedef void (*Connect)(id, SEL, UIScene *, UISceneSession *, UISceneConnectionOptions *);
+        Connect original = (Connect)method_getImplementation(method);
+        method_setImplementation(method, imp_implementationWithBlock(
+            ^(id self, UIScene *scene, UISceneSession *session, UISceneConnectionOptions *options) {
+                if (options.shortcutItem) request_safe_mode(options.shortcutItem);
+                original(self, connect, scene, session, options);
+            }));
+    }
+    class_addMethod(delegate, @selector(windowScene:performActionForShortcutItem:completionHandler:),
+                    imp_implementationWithBlock(
+                        ^(id self, UIWindowScene *scene, UIApplicationShortcutItem *item, void (^done)(BOOL)) {
+                            request_safe_mode(item);
+                            if (done) done(YES);
+                        }),
+                    "v@:@@@?");
 }
 
 int main(int argc, char *argv[]) {

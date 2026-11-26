@@ -312,6 +312,13 @@ def keep_awake() -> None:
     pass
 
 
+def safe_mode_requested() -> bool:
+    """?safe=1 in the page's address (kioku/safemode.py)."""
+    from . import web
+
+    return web.js("safeModeRequested") == "1"
+
+
 def move_to_back() -> None:
     pass
 

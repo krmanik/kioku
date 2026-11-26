@@ -69,6 +69,10 @@
             <meta-data
                 android:name="android.app.arguments"
                 android:value="-- %%INSERT_APP_ARGUMENTS%% --" />
+            <!-- long-press on the icon: Start in Safe Mode -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
         <!-- kioku:// links (kioku/urlscheme.py): add notes, sync, search.
              Passed on to KiokuActivity, see KiokuLinkActivity.java -->
