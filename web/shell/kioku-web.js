@@ -34,6 +34,27 @@
     return btoa(s);
   }
 
+  // iOS and iPadOS (which reports itself as a Mac with touch)
+  function isIOS() {
+    return /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  }
+
+  // The iOS file picker greys out every file whose extension has no system
+  // type when `accept` lists it (.ankiaddon, .apkg, .colpkg: issue #34), so
+  // there `accept` is kept only when iOS knows every entry
+  const IOS_TYPES = new Set([
+    ".txt", ".csv", ".tsv", ".json", ".html", ".htm", ".xml", ".zip", ".pdf",
+    ".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".svg", ".bmp", ".tif", ".tiff",
+    ".mp3", ".m4a", ".wav", ".aac", ".ogg", ".flac", ".mp4", ".mov", ".webm",
+  ]);
+  function iosKnowsAll(accept) {
+    return accept.split(",").every((t) => {
+      t = t.trim().toLowerCase();
+      return !t || t.includes("/") || IOS_TYPES.has(t);
+    });
+  }
+
   function href(frame) {
     try {
       return frame.contentWindow.location.href;
@@ -330,7 +351,7 @@
       const input = document.createElement("input");
       input.type = "file";
       input.multiple = !!multi;
-      if (accept) input.accept = accept;
+      if (accept && !(isIOS() && !iosKnowsAll(accept))) input.accept = accept;
       input.style.display = "none";
       document.body.appendChild(input);
       let done = false;

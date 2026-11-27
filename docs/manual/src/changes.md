@@ -4,6 +4,11 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
 
 ## 0.2.12
 
+- iPad, iPhone, Android: a JSON error with a very large document no
+  longer closes the app; Anki shows the error instead.
+- Web on iPhone and iPad: Install from file and Import can choose
+  `.ankiaddon`, `.apkg` and `.colpkg` files; the file picker had greyed
+  them out ([issue #34](https://github.com/krmanik/kioku/issues/34)).
 - Web: menus and the reviewer's buttons (Edit, More) work again. Each
   showed an error (`'WebView' has no attribute 'set_touchable'`). A tap
   on a page now closes an open menu, as in the apps.
