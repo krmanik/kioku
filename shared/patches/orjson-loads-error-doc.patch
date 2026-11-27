@@ -1,0 +1,26 @@
+--- a/src/exception.rs	2026-11-27 07:28:33
++++ b/src/exception.rs	2026-11-27 07:28:33
+@@ -15,8 +15,22 @@
+     unsafe {
+         let err_pos = PyIntRef::from_i64(err.pos());
+         let err_msg = PyStrRef::from_str(&err.message);
++        // Kioku: orjson writes into PyUnicode_New's result without a NULL
++        // check, so a document too big to copy crashed the app (SIGSEGV at
++        // 0x38) instead of raising; build it with CPython and fall back to ""
+         let doc = match err.data {
+-            Some(as_str) => PyStrRef::from_str(as_str),
++            Some(as_str) => {
++                let ptr = crate::ffi::PyUnicode_FromStringAndSize(
++                    as_str.as_ptr().cast::<core::ffi::c_char>(),
++                    crate::util::usize_to_isize(as_str.len()),
++                );
++                if ptr.is_null() {
++                    pyo3_ffi::PyErr_Clear();
++                    PyStrRef::empty()
++                } else {
++                    PyStrRef::from_ptr_unchecked(ptr)
++                }
++            }
+             None => PyStrRef::empty(),
+         };
+         let mut args = PyTupleRef::with_capacity(3);

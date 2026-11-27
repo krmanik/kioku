@@ -65,3 +65,10 @@ PATCH=$ROOT/patches/orjson-target-arch.patch
 if ! patch -R -s -f --dry-run -d "sdist/orjson-$ORJSON_VERSION" -p1 < "$PATCH" > /dev/null; then
     patch -s -d "sdist/orjson-$ORJSON_VERSION" -p1 < "$PATCH"
 fi
+
+# orjson raised its JSONDecodeError by writing into an unchecked
+# PyUnicode_New result: a document too big to copy crashed the app
+PATCH=$ROOT/../shared/patches/orjson-loads-error-doc.patch
+if ! patch -R -s -f --dry-run -d "sdist/orjson-$ORJSON_VERSION" -p1 < "$PATCH" > /dev/null; then
+    patch -s -d "sdist/orjson-$ORJSON_VERSION" -p1 < "$PATCH"
+fi
