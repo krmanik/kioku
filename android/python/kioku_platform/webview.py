@@ -62,12 +62,6 @@ def delete_cookies(domain: str, name: str | None) -> None:
     bridge.call("cookies.delete", domain=domain, name=name or "")
 
 
-def _main_window() -> QWidget | None:
-    import aqt
-
-    return aqt.mw
-
-
 class _FollowHost(QObject):
     """Keeps the Android view over its Qt widget, but moves or shrinks it
     only once Qt has drawn what that uncovers. Qt draws nothing under the
@@ -286,9 +280,9 @@ class WebView:
         container = QWidget.createWindowContainer(window, widget)
         _FollowHost(widget, container)
         container.show()
-        # kioku.windows keeps dialogs above the on-screen keyboard; the main
-        # window's pages keep clear of it themselves
-        bridge.call("webview.keyboardInsets", id=self.id, on=widget.window() is _main_window())
+        # kioku.windows keeps dialogs above the on-screen keyboard and
+        # kioku.screenedges the main window: no page takes its insets too
+        bridge.call("webview.keyboardInsets", id=self.id, on=False)
         self._container = container
         self._host = widget
 

@@ -10,6 +10,12 @@ text and buttons stay clear of the notch and the home indicator. The menu
 bar keeps its margins. While the bottom bar is hidden (Preferences › Hide
 bottom bar during review) the window keeps out of the bottom safe area as
 before.
+
+Android: while the on-screen keyboard is open the window keeps out of the
+part it covers (windows.keyboard_overlap), as Kioku's other windows do. The
+window keeps its size (windows._fill_main), so Android 11 to 14 left the
+bottom bar (Show Answer) under the keyboard when the reviewer's typing box
+had it open.
 """
 
 from __future__ import annotations
@@ -18,8 +24,10 @@ from typing import Any
 
 import aqt
 from aqt import gui_hooks
-from aqt.qt import QEvent, QObject, QSize, Qt, QTimer, QWidget, sip
+from aqt.qt import QEvent, QGuiApplication, QObject, QSize, Qt, QTimer, QWidget, sip
 from PyQt6.QtWebEngineCore import QWebEngineScript
+
+from . import windows
 
 STYLE_ID = "kioku-edges"
 SIDES = ("left", "right", "bottom")
@@ -127,12 +135,20 @@ class ScreenEdges(QObject):
         self._pending = False
         mw.installEventFilter(self)
         mw.bottomWeb.installEventFilter(self)
+        im = QGuiApplication.inputMethod()
+        if im is not None:
+            for changed in (im.keyboardRectangleChanged, im.visibleChanged):
+                changed.connect(self._schedule)
         self.update()
 
-    def eventFilter(self, obj: Any, event: Any) -> bool:
-        if event.type() in EVENTS and not self._pending:
+    def _schedule(self, *_args: Any) -> None:
+        if not self._pending:
             self._pending = True
             QTimer.singleShot(0, self.update)
+
+    def eventFilter(self, obj: Any, event: Any) -> bool:
+        if event.type() in EVENTS:
+            self._schedule()
         return False
 
     def update(self) -> None:
@@ -152,12 +168,17 @@ class ScreenEdges(QObject):
         bar = mw.bottomWeb
         # Anki "hides" the bar by shrinking it to 1 px (`hidden`)
         covered = not bar.isHidden() and not getattr(bar, "hidden", False)
-        mw.setContentsMargins(0, safe.top(), 0, 0 if covered else safe.bottom())
+        shown = covered
+        keyboard = windows.keyboard_overlap(mw)
+        if keyboard:
+            # the bar sits on the keyboard, which covers the gesture bar
+            covered = False
+        mw.setContentsMargins(0, safe.top(), 0, keyboard or (0 if covered else safe.bottom()))
         self._pad_menu_bar(safe.left(), safe.right())
         sides = {"left": safe.left(), "right": safe.right(), "bottom": safe.bottom()}
         self.top.set(sides)
         self.main.set(sides)
-        if self.bottom.set(sides if covered else {**sides, "bottom": 0}) and covered:
+        if self.bottom.set(sides if covered else {**sides, "bottom": 0}) and shown:
             bar.adjustHeightToFit()
 
     def _pad_menu_bar(self, left: int, right: int) -> None:

@@ -1480,6 +1480,46 @@ def t_main_window_keyboard():
     return f"normal, {geo.width()}x{geo.height()}"
 
 
+def t_main_keyboard_bar():
+    """Android: the main window keeps its size while the keyboard is open
+    (windows._fill_main), so on Android 11 to 14 the reviewer's bottom bar
+    (Show Answer) stayed under the keyboard that its typing box opened.
+    kioku.screenedges keeps the window out of the part the keyboard covers.
+    A Qt line edit in the main window opens the keyboard here (a tap in the
+    page does the same in use)."""
+    if sys.platform != "android":
+        raise Skip(sys.platform)
+    import aqt
+    from aqt.qt import QGuiApplication, QLineEdit
+
+    mw = aqt.mw
+    im = QGuiApplication.inputMethod()
+    edit = QLineEdit(mw)
+    edit.setGeometry(0, mw.height() // 4, mw.width(), 40)
+    edit.show()
+    try:
+        edit.setFocus()
+        yield 0.3
+        im.show()
+        yield Until(lambda: im.isVisible() and not im.keyboardRectangle().isEmpty(), 10,
+                    "keyboard and its rectangle")
+        yield 1
+        ratio = mw.screen().devicePixelRatio()
+        top = im.keyboardRectangle().top() / ratio
+        bar = mw.bottomWeb
+        bottom = bar.mapToGlobal(bar.rect().bottomLeft()).y()
+        margin = mw.contentsMargins().bottom()
+    finally:
+        im.hide()
+        edit.deleteLater()
+    yield Until(lambda: not im.isVisible(), 10, "keyboard closed")
+    yield 0.5
+    check(bottom <= top + 1, f"bottom bar ends at y {bottom}, keyboard starts at {top:.0f}")
+    after = mw.contentsMargins().bottom()
+    check(after < margin, f"bottom margin {after} kept after the keyboard closed (was {margin})")
+    return f"bar ends {bottom}, keyboard at {top:.0f}, margin {margin} -> {after}"
+
+
 def t_keyboard_window_size():
     """Issue #4: on Android 11 to 14 the keyboard's adjustResize resized the
     app's window, and for a few frames Android showed the main window (drawn
@@ -1833,6 +1873,7 @@ TESTS = [
     ("programs", t_programs),
     ("microphone", t_microphone),
     ("main-window-keyboard", t_main_window_keyboard),
+    ("main-keyboard-bar", t_main_keyboard_bar),
     ("keyboard-window-size", t_keyboard_window_size),
     ("symbol-glyphs", t_symbol_glyphs),
     ("accessibility", t_accessibility),

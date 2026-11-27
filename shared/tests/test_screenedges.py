@@ -119,3 +119,24 @@ def test_hidden_bar_leaves_the_bottom_safe_area_alone() -> None:
     mw.bottomWeb.hidden = False
     edges.update()
     assert margins(mw) == (0, 59, 0, 0) and edges.bottom.insets == {"bottom": 34}
+
+
+def test_keyboard_keeps_the_bottom_bar_above_it(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """Android: the main window keeps its size while the keyboard is open
+    (windows._fill_main), so Android 11 to 14 left the reviewer's bottom bar
+    (Show Answer) under the keyboard. The window keeps out of the part the
+    keyboard covers; the bar drops its gesture bar padding meanwhile."""
+    from kioku import screenedges
+
+    overlap = {"px": 0}
+    monkeypatch.setattr(screenedges.windows, "keyboard_overlap", lambda w: overlap["px"])
+    mw = Main()
+    edges = ScreenEdges(mw)
+    adjusted = mw.bottomWeb.adjusted
+    overlap["px"] = 300
+    edges.update()
+    assert margins(mw) == (0, 59, 0, 300) and edges.bottom.insets == {}
+    assert mw.bottomWeb.adjusted == adjusted + 1  # bar shrinks to its buttons
+    overlap["px"] = 0
+    edges.update()
+    assert margins(mw) == (0, 59, 0, 0) and edges.bottom.insets == {"bottom": 34}
