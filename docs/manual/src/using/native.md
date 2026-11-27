@@ -18,6 +18,12 @@
     Settings › Multitasking & Gestures, **Automatically Show and Hide Menu
     Bar** off), turn off **View › Show Menu Row** to have the menus only
     once. Kioku remembers it; turn it back on from the iPad's View menu.
+- **More room while reviewing:** **View › Toggle Full Screen** (iPad:
+  **View › Hide Toolbars**) hides the menu row and the top bar (Decks, Add,
+  Browse…) while you review; the answer buttons stay. Swipe right on the
+  card to leave full screen (iPad: View › Show Toolbars). To hide only the
+  top bar during review, set Preferences › **Hide top bar during review**
+  to **Always** (**Hide bottom bar** would hide the answer buttons too).
 - **Every other window** (Browse, Add, Statistics, Preferences, Deck Options…)
   opens full screen on top, with a title bar.
 - **Closing a window:**
