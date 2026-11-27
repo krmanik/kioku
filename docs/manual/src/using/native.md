@@ -23,7 +23,8 @@
   Browse…) while you review; the answer buttons stay. Swipe right on the
   card to leave full screen (iPad: View › Show Toolbars). To hide only the
   top bar during review, set Preferences › **Hide top bar during review**
-  to **Always** (**Hide bottom bar** would hide the answer buttons too).
+  to **Always**. With **Hide bottom bar** too, tap the card to bring the
+  answer buttons back; answering hides them again.
 - **Every other window** (Browse, Add, Statistics, Preferences, Deck Options…)
   opens full screen on top, with a title bar.
 - **Closing a window:**

@@ -68,6 +68,7 @@ def apply() -> None:
     _patch_browser_columns()
     _patch_full_screen()
     _patch_screen_edges()
+    _patch_hide_bars()
     _patch_menu_row_property()
     _patch_native_menu_bar()
     _patch_main_view_width()
@@ -487,6 +488,12 @@ def _patch_screen_edges() -> None:
     from . import screenedges
 
     screenedges.apply()
+
+
+def _patch_hide_bars() -> None:
+    from . import hidebars
+
+    hidebars.apply()
 
 
 MENU_ROW_KEY = "kioku_menu_row"

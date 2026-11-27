@@ -11,6 +11,10 @@ All releases: [GitHub Releases](https://github.com/krmanik/kioku/releases).
   them out ([issue #34](https://github.com/krmanik/kioku/issues/34)).
 - Android: the reviewer's Show Answer and answer buttons stay above the
   on-screen keyboard while you type in a card's answer box.
+- Preferences › Hide bottom bar / Hide top bar during review on a touch
+  screen: tap the card to show the hidden bars, tap again to hide them.
+  Answering hides them again. Before, the answer buttons never came back
+  without a mouse.
 - Web: menus and the reviewer's buttons (Edit, More) work again. Each
   showed an error (`'WebView' has no attribute 'set_touchable'`). A tap
   on a page now closes an open menu, as in the apps.
